@@ -411,13 +411,15 @@ function setupInteractions(canvas) {
           });
         }
       } else {
-        // Regular click: toggle selection
+        // Regular click: toggle selection + show detail panel
         if (selectedNodeId === node.id) {
           selectedNodeId = null;
+          hideDetailPanel();
         } else {
           selectedNodeId = node.id;
           blastNodeId = null;
           blastSet = new Set();
+          showDetailPanel(node);
         }
       }
     } else {
@@ -425,6 +427,7 @@ function setupInteractions(canvas) {
       selectedNodeId = null;
       blastNodeId = null;
       blastSet = new Set();
+      hideDetailPanel();
     }
 
     render();
@@ -462,6 +465,78 @@ function setupInteractions(canvas) {
 // ---------------------------------------------------------------------------
 // Controls (search + protocol filters)
 // ---------------------------------------------------------------------------
+
+function showDetailPanel(node) {
+  const panel = document.getElementById("detail-panel");
+  const content = document.getElementById("detail-content");
+
+  // Find connections for this node
+  const outgoing = graphData.edges.filter(
+    (e) => e.source_service_id === node.id,
+  );
+  const incoming = graphData.edges.filter(
+    (e) => e.target_service_id === node.id,
+  );
+
+  // Find target/source names
+  const nameById = {};
+  graphData.nodes.forEach((n) => (nameById[n.id] = n.name));
+
+  let html = `<h3>${node.name}</h3>`;
+
+  html += `<div class="detail-section">
+    <div class="detail-label">Language</div>
+    <div class="detail-value">${node.language || "unknown"}</div>
+  </div>`;
+
+  if (node.repo_name) {
+    html += `<div class="detail-section">
+      <div class="detail-label">Repository</div>
+      <div class="detail-value">${node.repo_name}</div>
+    </div>`;
+  }
+
+  if (outgoing.length > 0) {
+    html += `<div class="detail-section">
+      <div class="detail-label">Calls (${outgoing.length})</div>`;
+    for (const e of outgoing) {
+      const target = nameById[e.target_service_id] || "?";
+      html += `<div class="connection-item">
+        <div><span class="conn-method">${e.method || e.protocol}</span> <span class="conn-path">${e.path || ""}</span></div>
+        <div class="conn-direction">→ <span class="conn-target">${target}</span></div>
+        ${e.source_file ? `<div class="conn-file">${e.source_file}</div>` : ""}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (incoming.length > 0) {
+    html += `<div class="detail-section">
+      <div class="detail-label">Called by (${incoming.length})</div>`;
+    for (const e of incoming) {
+      const source = nameById[e.source_service_id] || "?";
+      html += `<div class="connection-item">
+        <div><span class="conn-method">${e.method || e.protocol}</span> <span class="conn-path">${e.path || ""}</span></div>
+        <div class="conn-direction">← <span class="conn-target">${source}</span></div>
+        ${e.target_file ? `<div class="conn-file">${e.target_file}</div>` : ""}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (outgoing.length === 0 && incoming.length === 0) {
+    html += `<div class="detail-section">
+      <div class="detail-value" style="color: #718096">No connections</div>
+    </div>`;
+  }
+
+  content.innerHTML = html;
+  panel.style.display = "block";
+}
+
+function hideDetailPanel() {
+  document.getElementById("detail-panel").style.display = "none";
+}
 
 function setupControls() {
   // Search
@@ -706,6 +781,13 @@ async function init() {
 
   setupInteractions(canvas);
   setupControls();
+
+  // Detail panel close button
+  document.getElementById("detail-close").addEventListener("click", () => {
+    hideDetailPanel();
+    selectedNodeId = null;
+    render();
+  });
 }
 
 // ---------------------------------------------------------------------------

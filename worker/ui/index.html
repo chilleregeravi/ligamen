@@ -144,6 +144,76 @@
         color: #718096;
         font-size: 13px;
       }
+      #detail-panel {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 320px;
+        max-height: calc(100% - 16px);
+        overflow-y: auto;
+        background: #1a1f2e;
+        border: 1px solid #4a5568;
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 12px;
+        display: none;
+        z-index: 15;
+      }
+      #detail-close {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        cursor: pointer;
+        font-size: 18px;
+        color: #718096;
+        line-height: 1;
+      }
+      #detail-close:hover {
+        color: #e2e8f0;
+      }
+      #detail-panel h3 {
+        font-size: 15px;
+        color: #63b3ed;
+        margin-bottom: 8px;
+      }
+      #detail-panel .detail-section {
+        margin-bottom: 12px;
+      }
+      #detail-panel .detail-label {
+        color: #718096;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+      }
+      #detail-panel .detail-value {
+        color: #e2e8f0;
+      }
+      #detail-panel .connection-item {
+        padding: 6px 8px;
+        background: #2d3748;
+        border-radius: 4px;
+        margin-bottom: 4px;
+      }
+      #detail-panel .connection-item .conn-direction {
+        color: #718096;
+        font-size: 10px;
+      }
+      #detail-panel .conn-method {
+        color: #68d391;
+        font-weight: 600;
+      }
+      #detail-panel .conn-path {
+        color: #f6ad55;
+      }
+      #detail-panel .conn-target {
+        color: #63b3ed;
+      }
+      #detail-panel .conn-file {
+        color: #718096;
+        font-size: 10px;
+        margin-top: 2px;
+      }
       #project-select {
         background: #2d3748;
         border: 1px solid #4a5568;
@@ -192,6 +262,10 @@
     <div id="canvas-container">
       <canvas id="graph-canvas"></canvas>
       <div id="tooltip"></div>
+      <div id="detail-panel">
+        <div id="detail-close">&times;</div>
+        <div id="detail-content"></div>
+      </div>
     </div>
     <script type="module" src="./graph.js"></script>
   </body>
