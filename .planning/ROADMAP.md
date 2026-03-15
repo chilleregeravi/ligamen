@@ -67,12 +67,10 @@ Plans:
   4. `GET /api/readiness` returns 200 only after the worker is fully initialized; the readiness probe (`wait_for_worker()` in `lib/worker-client.sh`) polls until readiness or times out with a clear error
   5. `scripts/worker-stop.sh` sends SIGTERM, the worker flushes state and exits cleanly, and the PID file is removed
   6. Worker reads `ALLCLEAR_LOG_LEVEL` from `~/.allclear/settings.json` and writes structured logs to `~/.allclear/logs/`
-**Plans**: 4 plans
+**Plans**: 2 plans
 Plans:
-- [ ] 21-01-PLAN.md — Modify session-start.sh: worker auto-start when impact-map section present (INTG-01, INTG-02)
-- [ ] 21-02-PLAN.md — Create worker/chroma-sync.js and add 3-tier search fallback to query-engine.js (INTG-03, INTG-04)
-- [ ] 21-03-PLAN.md — Add createSnapshot/isFirstScan to worker/db.js and first-run recommendations to SKILL.md (INTG-05, INTG-06)
-- [ ] 21-04-PLAN.md — Integration test suite: E2E scan-to-query, incremental scan, ChromaDB fallback, session hook (all INTG-*)
+- [ ] 15-01-PLAN.md — Shell lifecycle scripts (worker-start.sh, worker-stop.sh, lib/worker-client.sh) with PID/port management and readiness probe
+- [ ] 15-02-PLAN.md — Worker entry point (worker/index.js), package.json v2.0 dependencies, bats lifecycle test suite
 
 ### Phase 16: MCP Server
 **Goal**: Claude Code agents can autonomously check impact via MCP tools without any running worker, querying SQLite directly through the stdio MCP server
@@ -84,12 +82,7 @@ Plans:
   3. `impact_changed` tool called in a repo with uncommitted changes returns the services affected by those specific file changes
   4. All five MCP tools (`impact_query`, `impact_scan`, `impact_changed`, `impact_graph`, `impact_search`) return empty results (not errors) when the database does not yet exist
   5. No `console.log` call in `worker/mcp-server.js` — all logging goes to stderr — verified by a CI lint check; calling any tool returns a valid JSON-RPC response without stdout corruption
-**Plans**: 4 plans
-Plans:
-- [ ] 21-01-PLAN.md — Modify session-start.sh: worker auto-start when impact-map section present (INTG-01, INTG-02)
-- [ ] 21-02-PLAN.md — Create worker/chroma-sync.js and add 3-tier search fallback to query-engine.js (INTG-03, INTG-04)
-- [ ] 21-03-PLAN.md — Add createSnapshot/isFirstScan to worker/db.js and first-run recommendations to SKILL.md (INTG-05, INTG-06)
-- [ ] 21-04-PLAN.md — Integration test suite: E2E scan-to-query, incremental scan, ChromaDB fallback, session hook (all INTG-*)
+**Plans**: TBD
 
 ### Phase 17: HTTP Server & Web UI
 **Goal**: Users can open a browser and see their service dependency graph as an interactive force-directed visualization, and the REST API supports all graph query operations
@@ -176,7 +169,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-13 | v1.0 | 17/17 | Complete | 2026-03-15 |
 | 14. Storage Foundation | v2.0 | 0/2 | In progress | - |
-| 15. Worker Lifecycle | v2.0 | 0/? | Not started | - |
+| 15. Worker Lifecycle | v2.0 | 0/2 | Planned | - |
 | 16. MCP Server | v2.0 | 0/? | Not started | - |
 | 17. HTTP Server & Web UI | v2.0 | 0/? | Not started | - |
 | 18. Agent Scanning | v2.0 | 0/2 | Not started | - |
