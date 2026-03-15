@@ -131,34 +131,26 @@ Uncertain: Is user-api calling config-service at GET /config?
 
 ## Step 4: Save to Database
 
-Ensure the worker is running:
+Write the confirmed findings directly to SQLite using the AllClear db module:
 
 ```bash
-source ${CLAUDE_PLUGIN_ROOT}/lib/worker-client.sh
-worker_running || bash ${CLAUDE_PLUGIN_ROOT}/scripts/worker-start.sh
+node --input-type=module -e "
+  import { openDb, writeScan } from '${CLAUDE_PLUGIN_ROOT}/worker/db.js';
+  import { QueryEngine } from '${CLAUDE_PLUGIN_ROOT}/worker/query-engine.js';
+  const db = openDb();
+  const qe = new QueryEngine(db);
+  const findings = JSON.parse(process.argv[1]);
+  const repoId = qe.upsertRepo({ path: findings.repo_path, name: findings.repo_name, type: 'single' });
+  qe.persistFindings(repoId, findings, findings.commit || null);
+  console.log('saved');
+" '<CONFIRMED_FINDINGS_JSON>'
 ```
 
-For each repo's confirmed findings, POST to the worker:
+Repeat for each repo. Print: "Dependency map saved. N services, M connections."
 
-```bash
-COMMIT=$(git -C "${REPO_PATH}" rev-parse HEAD 2>/dev/null || echo "")
-worker_call POST /scan '{"repo_path":"...","repo_name":"...","findings":{...},"commit":"..."}'
+If this was the **first map build**, add `"impact-map": {"history": true}` to `allclear.config.json` and print:
+
 ```
-
-Data is immediately available — no restart needed.
-
-Print: "Dependency map saved. N services, M connections."
-
----
-
-## Step 5: Open Graph UI
-
-```bash
-PORT=$(cat ~/.allclear/worker.port)
-open "http://localhost:${PORT}"
+Map built successfully. View it with /allclear:map --view
+To enable agent-based impact checking, add the AllClear MCP server to your .mcp.json.
 ```
-
-If this was the **first map build**, also:
-
-1. Add `"impact-map": {"history": true}` to `allclear.config.json`
-2. Print MCP registration instructions for enabling agent-based impact checking
