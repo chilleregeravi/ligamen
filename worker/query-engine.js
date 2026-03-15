@@ -586,16 +586,36 @@ export class QueryEngine {
    * @returns {Array<{connection_id: number, source: string, target: string, type: string, detail: string}>}
    */
   detectMismatches() {
-    // Only flag as mismatch when:
-    // 1. target_file is null (handler not found)
-    // 2. The target service's repo WAS scanned (has repo_state)
-    // 3. Other connections TO the same target DO have target_file set
-    //    (proving the target repo was scanned and handlers are detectable)
+    // Cross-reference consumed endpoints against what target services expose.
     //
-    // Cross-repo connections where the target repo wasn't scanned or
-    // where no connections to that target have handlers are NOT mismatches —
-    // they're just incomplete data.
-    const unverified = this._db
+    // A mismatch = consumer calls path P on service B, but B's exposed_endpoints
+    // table does NOT contain path P.
+    //
+    // Only runs when:
+    // - The target service has at least one entry in exposed_endpoints (was scanned with the new prompt)
+    // - The connection is a network call (not internal/sdk/import)
+    //
+    // If the target has NO exposed_endpoints, we can't verify — skip (not a mismatch).
+
+    // Check if exposed_endpoints table exists (migration may not have run)
+    try {
+      this._db
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='exposed_endpoints'",
+        )
+        .get();
+    } catch {
+      return []; // table doesn't exist yet
+    }
+
+    const tableExists = this._db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='exposed_endpoints'",
+      )
+      .get();
+    if (!tableExists) return [];
+
+    const mismatches = this._db
       .prepare(
         `
       SELECT c.id, c.method, c.path, c.protocol,
@@ -603,25 +623,29 @@ export class QueryEngine {
       FROM connections c
       JOIN services s_src ON c.source_service_id = s_src.id
       JOIN services s_tgt ON c.target_service_id = s_tgt.id
-      JOIN repos r ON s_tgt.repo_id = r.id
-      JOIN repo_state rs ON rs.repo_id = r.id
-      WHERE c.target_file IS NULL
-        AND c.protocol NOT IN ('internal', 'sdk', 'import')
+      WHERE c.protocol NOT IN ('internal', 'sdk', 'import')
+        AND c.path IS NOT NULL
+        -- Target has exposed endpoints (was scanned properly)
         AND EXISTS (
-          SELECT 1 FROM connections c2
-          WHERE c2.target_service_id = c.target_service_id
-            AND c2.target_file IS NOT NULL
+          SELECT 1 FROM exposed_endpoints ep
+          WHERE ep.service_id = c.target_service_id
+        )
+        -- But this specific path is NOT in the exposed list
+        AND NOT EXISTS (
+          SELECT 1 FROM exposed_endpoints ep
+          WHERE ep.service_id = c.target_service_id
+            AND ep.path = c.path
         )
     `,
       )
       .all();
 
-    return unverified.map((c) => ({
+    return mismatches.map((c) => ({
       connection_id: c.id,
       source: c.source,
       target: c.target,
-      type: "unverified_endpoint",
-      detail: `${c.method || c.protocol} ${c.path || "?"} — endpoint handler not found in ${c.target}`,
+      type: "endpoint_not_exposed",
+      detail: `${c.method || c.protocol} ${c.path} — ${c.target} does not expose this endpoint`,
     }));
   }
 
@@ -700,7 +724,28 @@ export class QueryEngine {
       }
     }
 
-    // 5. Update repo_state
+    // 5. Store exposed endpoints from the service scan
+    for (const svc of findings.services || []) {
+      const svcId = serviceIdMap.get(svc.name);
+      if (!svcId || !svc.exposes) continue;
+      for (const endpoint of svc.exposes) {
+        // Parse "GET /users" or just "/users"
+        const parts = endpoint.trim().split(/\s+/);
+        const method = parts.length > 1 ? parts[0] : null;
+        const path = parts.length > 1 ? parts[1] : parts[0];
+        try {
+          this._db
+            .prepare(
+              "INSERT OR IGNORE INTO exposed_endpoints (service_id, method, path, handler) VALUES (?, ?, ?, ?)",
+            )
+            .run(svcId, method, path, svc.boundary_entry || null);
+        } catch {
+          /* ignore duplicates */
+        }
+      }
+    }
+
+    // 6. Update repo_state
     if (commit) {
       this.setRepoState(repoId, commit);
     }

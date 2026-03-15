@@ -185,6 +185,19 @@ export function getQueryEngineByHash(hash) {
         );
         db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(2);
       }
+      if (currentVer < 3) {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS exposed_endpoints (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_id  INTEGER NOT NULL REFERENCES services(id),
+            method      TEXT,
+            path        TEXT NOT NULL,
+            handler     TEXT,
+            UNIQUE(service_id, method, path)
+          );
+        `);
+        db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(3);
+      }
     } catch {
       /* column may already exist */
     }
