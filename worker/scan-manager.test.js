@@ -109,11 +109,12 @@ describe('getChangedFiles', () => {
   });
 
   test('detects renamed files', () => {
-    const baseCommit = execSync('git rev-parse HEAD', { cwd: repoDir, encoding: 'utf8' }).trim();
-    // Create a file to rename
+    // Add old.txt first, then set base to that commit
     writeFileSync(join(repoDir, 'old.txt'), 'rename me');
     execSync('git add old.txt', { cwd: repoDir, stdio: 'pipe' });
     execSync('git commit -m "add old.txt"', { cwd: repoDir, stdio: 'pipe' });
+    // Now capture base AFTER old.txt is committed so git can see the rename
+    const baseCommit = execSync('git rev-parse HEAD', { cwd: repoDir, encoding: 'utf8' }).trim();
     execSync('git mv old.txt new.txt', { cwd: repoDir, stdio: 'pipe' });
     execSync('git commit -m "rename old to new"', { cwd: repoDir, stdio: 'pipe' });
 
