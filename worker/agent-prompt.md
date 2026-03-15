@@ -54,12 +54,32 @@ Example evidence strings:
 
 ---
 
+## What IS a Service
+
+A service is a **deployable unit** that runs as a process and communicates over a network or message bus. Examples:
+- An HTTP/REST API server (Express, FastAPI, Gin, Actix, Spring Boot)
+- A gRPC server
+- A message queue consumer/producer (Kafka, RabbitMQ, SQS)
+- A WebSocket server
+- A background worker that processes jobs from a queue
+
+**NOT services:**
+- Shared libraries (`lib/`, `utils/`, `helpers/`, `common/`)
+- CLI tools and scripts (`scripts/`, `bin/`)
+- Test files and fixtures (`tests/`, `__tests__/`, `spec/`)
+- Configuration files
+- Build tools, linters, formatters
+- Shell scripts that are sourced (not executed as servers)
+- Plugin/extension code that extends another tool (hooks, skills, commands)
+
 ## What NOT to Report
 
 - Do **not** invent connections.
 - Do **not** report endpoints constructed entirely from variables.
 - Do **not** infer connections from import statements alone.
 - Do **not** include library-internal calls (e.g., calls within the same module that are not service boundaries).
+- Do **not** report shared libraries, utility modules, or helper functions as services.
+- Do **not** report CLI scripts, build tools, or test infrastructure as services.
 - Do **not** add prose, explanation, or commentary before or after the JSON output.
 
 ---
