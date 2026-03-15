@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Service Dependency Intelligence
 status: planning
-stopped_at: Completed 21-03-PLAN.md — snapshot-on-rescan VACUUM INTO and first-run ChromaDB/MCP recommendations
-last_updated: "2026-03-15T19:35:08.524Z"
+stopped_at: Completed 21-01-PLAN.md — session-start hook auto-starts worker on impact-map presence
+last_updated: "2026-03-15T19:35:25.971Z"
 last_activity: 2026-03-15 — Roadmap created, 8 phases defined (14-21)
 progress:
   total_phases: 8
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 20-command-layer P01 | 2min | 1 tasks | 1 files |
 | Phase 20-command-layer P02 | 82s | 1 tasks | 1 files |
 | Phase 21-integration-config P03 | 2min | 2 tasks | 3 files |
+| Phase 21-integration-config P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 20-02]: State B (worker up, no map data) still runs legacy grep to give partial results
 - [Phase 21-integration-config]: VACUUM INTO used for snapshot atomicity — safer than cp because it excludes WAL/SHM sidecars
 - [Phase 21-integration-config]: Snapshot paths stored relative (snapshots/timestamp.db) — portable across machine/user changes
+- [Phase 21-integration-config]: worker_start_background() and worker_status_line() added to lib/worker-client.sh to fill Phase 15 implementation gap
+- [Phase 21-integration-config]: session-start.sh auto-starts worker when impact-map section present in allclear.config.json — non-blocking, exits 0 always
 
 ### Pending Todos
 
@@ -126,6 +129,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T19:35:08.520Z
-Stopped at: Completed 21-03-PLAN.md — snapshot-on-rescan VACUUM INTO and first-run ChromaDB/MCP recommendations
+Last session: 2026-03-15T19:35:25.968Z
+Stopped at: Completed 21-01-PLAN.md — session-start hook auto-starts worker on impact-map presence
 Resume file: None
