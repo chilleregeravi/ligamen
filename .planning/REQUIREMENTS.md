@@ -79,11 +79,11 @@
 ### Command Layer
 
 - [x] **CMDL-01**: `/allclear:map` orchestrates full flow: discover repos → confirm → scan → validate → persist → open UI
-- [ ] **CMDL-02**: `/allclear:cross-impact` queries impact map for services affected by current changes
-- [ ] **CMDL-03**: `/allclear:cross-impact` auto-detects changes from git diff when no args provided
-- [ ] **CMDL-04**: `/allclear:cross-impact` walks graph transitively and classifies impact as CRITICAL/WARN/INFO
-- [ ] **CMDL-05**: `/allclear:cross-impact` falls back to grep-based symbol scan when no map exists
-- [ ] **CMDL-06**: After impact report, suggests full re-scan if map may be stale
+- [x] **CMDL-02**: `/allclear:cross-impact` queries impact map for services affected by current changes
+- [x] **CMDL-03**: `/allclear:cross-impact` auto-detects changes from git diff when no args provided
+- [x] **CMDL-04**: `/allclear:cross-impact` walks graph transitively and classifies impact as CRITICAL/WARN/INFO
+- [x] **CMDL-05**: `/allclear:cross-impact` falls back to grep-based symbol scan when no map exists
+- [x] **CMDL-06**: After impact report, suggests full re-scan if map may be stale
 
 ### Integration & Config
 
@@ -175,11 +175,11 @@
 | DISC-05 | Phase 19 | Complete |
 | DISC-06 | Phase 19 | Complete |
 | CMDL-01 | Phase 20 | Complete |
-| CMDL-02 | Phase 20 | Pending |
-| CMDL-03 | Phase 20 | Pending |
-| CMDL-04 | Phase 20 | Pending |
-| CMDL-05 | Phase 20 | Pending |
-| CMDL-06 | Phase 20 | Pending |
+| CMDL-02 | Phase 20 | Complete |
+| CMDL-03 | Phase 20 | Complete |
+| CMDL-04 | Phase 20 | Complete |
+| CMDL-05 | Phase 20 | Complete |
+| CMDL-06 | Phase 20 | Complete |
 | INTG-01 | Phase 21 | Pending |
 | INTG-02 | Phase 21 | Pending |
 | INTG-03 | Phase 21 | Pending |

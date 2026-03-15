@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Service Dependency Intelligence
 status: planning
-stopped_at: "Completed 20-01-PLAN.md — /allclear:map command with full 10-step orchestration pipeline"
-last_updated: "2026-03-15T19:30:42.506Z"
+stopped_at: Completed 20-02-PLAN.md — cross-impact.md rewritten with worker-aware three-state flow
+last_updated: "2026-03-15T19:31:01.180Z"
 last_activity: 2026-03-15 — Roadmap created, 8 phases defined (14-21)
 progress:
   total_phases: 8
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-agent-scanning P01 | 3min | 2 tasks | 3 files |
 | Phase 18-agent-scanning P02 | 3.5min | 2 tasks | 3 files |
 | Phase 20-command-layer P01 | 2min | 1 tasks | 1 files |
+| Phase 20-command-layer P02 | 82s | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 18-agent-scanning]: Rename detection: baseCommit must be after file-to-rename is committed — diff from before add shows A new.txt not R old.txt->new.txt
 - [Phase 20-command-layer]: commands/map.md is a pure orchestration prompt — all heavy lifting delegated to Phase 15/17/18/19 infrastructure
 - [Phase 20-command-layer]: First-build detection: versions list empty before Step 7 persist triggers MCP instructions + impact-map section write to allclear.config.json
+- [Phase 20-02]: cross-impact is query-only — never starts the worker inline
+- [Phase 20-02]: State B (worker up, no map data) still runs legacy grep to give partial results
 
 ### Pending Todos
 
@@ -120,6 +123,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T19:30:42.503Z
-Stopped at: Completed 20-01-PLAN.md — /allclear:map command with full 10-step orchestration pipeline
+Last session: 2026-03-15T19:30:56.158Z
+Stopped at: Completed 20-02-PLAN.md — cross-impact.md rewritten with worker-aware three-state flow
 Resume file: None
