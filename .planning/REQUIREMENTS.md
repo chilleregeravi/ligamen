@@ -42,14 +42,14 @@
 
 ### Sensitive File Guard Hook
 
-- [ ] **GRDH-01**: Guard hook fires on PreToolUse for Edit and Write tool events
-- [ ] **GRDH-02**: Hook hard-blocks edits to lock files (*.lock, Cargo.lock, poetry.lock, package-lock.json, bun.lock) using PreToolUse permissionDecision: "deny" schema
-- [ ] **GRDH-03**: Hook hard-blocks edits to secret/credential files (.env, .env.*, *credentials*, *secret*, *.pem, *.key) with path normalization via realpath
-- [ ] **GRDH-08**: Hook provides clear explanation in block messages ("AllClear: blocked write to .env — sensitive file protected")
-- [ ] **GRDH-04**: Hook hard-blocks edits to generated directories (node_modules/, .venv/, target/)
-- [ ] **GRDH-05**: Hook warns but allows edits to SQL migration files with immutability notice
-- [ ] **GRDH-06**: Hook warns but allows edits to generated code files (*.pb.go, *_generated.*, *.gen.*)
-- [ ] **GRDH-07**: Hook warns but allows edits to CHANGELOG.md with auto-generation notice
+- [x] **GRDH-01**: Guard hook fires on PreToolUse for Edit and Write tool events
+- [x] **GRDH-02**: Hook hard-blocks edits to lock files (*.lock, Cargo.lock, poetry.lock, package-lock.json, bun.lock) using PreToolUse permissionDecision: "deny" schema
+- [x] **GRDH-03**: Hook hard-blocks edits to secret/credential files (.env, .env.*, *credentials*, *secret*, *.pem, *.key) with path normalization via realpath
+- [x] **GRDH-08**: Hook provides clear explanation in block messages ("AllClear: blocked write to .env — sensitive file protected")
+- [x] **GRDH-04**: Hook hard-blocks edits to generated directories (node_modules/, .venv/, target/)
+- [x] **GRDH-05**: Hook warns but allows edits to SQL migration files with immutability notice
+- [x] **GRDH-06**: Hook warns but allows edits to generated code files (*.pb.go, *_generated.*, *.gen.*)
+- [x] **GRDH-07**: Hook warns but allows edits to CHANGELOG.md with auto-generation notice
 
 ### Session Start Hook
 
@@ -80,8 +80,8 @@
 ### Cross-Repo Drift Skill
 
 - [ ] **DRFT-01**: `/allclear drift` skill checks version alignment of shared dependencies across sibling repos
-- [ ] **DRFT-02**: Skill checks type definition consistency for shared models across repos
-- [ ] **DRFT-03**: Skill checks OpenAPI spec consistency for shared endpoints
+- [x] **DRFT-02**: Skill checks type definition consistency for shared models across repos
+- [x] **DRFT-03**: Skill checks OpenAPI spec consistency for shared endpoints
 - [ ] **DRFT-04**: Skill supports subcommands: versions, types, openapi
 - [ ] **DRFT-05**: Skill reports drift with specific divergences and which repos are affected
 - [ ] **DRFT-06**: Skill output uses severity levels and defaults to actionable differences only (not wall of text)
@@ -175,14 +175,14 @@
 | LNTH-06 | Phase 4 | Complete |
 | LNTH-07 | Phase 4 | Complete |
 | LNTH-08 | Phase 4 | Complete |
-| GRDH-01 | Phase 5 | Pending |
-| GRDH-02 | Phase 5 | Pending |
-| GRDH-03 | Phase 5 | Pending |
-| GRDH-04 | Phase 5 | Pending |
-| GRDH-05 | Phase 5 | Pending |
-| GRDH-06 | Phase 5 | Pending |
-| GRDH-07 | Phase 5 | Pending |
-| GRDH-08 | Phase 5 | Pending |
+| GRDH-01 | Phase 5 | Complete |
+| GRDH-02 | Phase 5 | Complete |
+| GRDH-03 | Phase 5 | Complete |
+| GRDH-04 | Phase 5 | Complete |
+| GRDH-05 | Phase 5 | Complete |
+| GRDH-06 | Phase 5 | Complete |
+| GRDH-07 | Phase 5 | Complete |
+| GRDH-08 | Phase 5 | Complete |
 | SSTH-01 | Phase 6 | Complete |
 | SSTH-02 | Phase 6 | Complete |
 | SSTH-03 | Phase 6 | Complete |
@@ -205,8 +205,8 @@
 | IMPT-06 | Phase 9 | Complete |
 | IMPT-07 | Phase 9 | Complete |
 | DRFT-01 | Phase 10 | Pending |
-| DRFT-02 | Phase 10 | Pending |
-| DRFT-03 | Phase 10 | Pending |
+| DRFT-02 | Phase 10 | Complete |
+| DRFT-03 | Phase 10 | Complete |
 | DRFT-04 | Phase 10 | Pending |
 | DRFT-05 | Phase 10 | Pending |
 | DRFT-06 | Phase 10 | Pending |

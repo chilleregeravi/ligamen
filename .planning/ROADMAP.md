@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: Shared Libraries** - Project type detection (detect.sh) and sibling repo discovery (siblings.sh)
 - [x] **Phase 3: Format Hook** - Auto-format on every Claude edit for Python, Rust, TypeScript, Go, JSON, YAML (completed 2026-03-15)
 - [ ] **Phase 4: Lint Hook** - Auto-lint on every Claude edit with per-language linter invocation
-- [ ] **Phase 5: Guard Hook** - Hard-block and soft-warn PreToolUse hook for sensitive and generated files
+- [x] **Phase 5: Guard Hook** - Hard-block and soft-warn PreToolUse hook for sensitive and generated files (completed 2026-03-15)
 - [x] **Phase 6: Session Hook** - Session-start context injection with project type and available commands (completed 2026-03-15)
 - [ ] **Phase 7: Quality Gate Skill** - `/allclear` slash-command for full quality checks and subcommands
 - [x] **Phase 8: Config Layer** - allclear.config.json overrides and environment variable toggles (completed 2026-03-15)
@@ -96,7 +96,7 @@ Plans:
   4. An attempt to write a SQL migration file or generated code file (`*.pb.go`, `*_generated.*`, `*.gen.*`) produces a visible warning but allows the write to proceed
   5. An attempt to write `CHANGELOG.md` produces a visible warning about auto-generation but allows the write to proceed
   6. All block messages follow the format "AllClear: blocked write to X — Y" where Y explains the protection reason
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 05-01-PLAN.md — Guard hook script, hooks.json registration, and bats test suite
 
@@ -224,7 +224,7 @@ All phases are independent and can execute in parallel. No ordering constraints.
 | 2. Shared Libraries | 0/1 | Planned | - |
 | 3. Format Hook | 1/1 | Complete   | 2026-03-15 |
 | 4. Lint Hook | 0/1 | Planned | - |
-| 5. Guard Hook | 0/1 | Planned | - |
+| 5. Guard Hook | 1/1 | Complete   | 2026-03-15 |
 | 6. Session Hook | 2/2 | Complete   | 2026-03-15 |
 | 7. Quality Gate Skill | 0/1 | Planning complete | - |
 | 8. Config Layer | 1/1 | Complete   | 2026-03-15 |

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 13-tests-01-PLAN.md
-last_updated: "2026-03-15T10:12:40.287Z"
+stopped_at: Completed 10-drift-skill 10-02-PLAN.md
+last_updated: "2026-03-15T10:13:03.006Z"
 last_activity: 2026-03-15 — Roadmap revised to parallel structure, 7 sequential phases replaced with 13 independent phases
 progress:
   total_phases: 13
@@ -64,6 +64,7 @@ Progress: [███░░░░░░░] 29%
 | Phase 09-impact-skill P01 | 4 | 2 tasks | 3 files |
 | Phase 13-tests P01 | 3 | 2 tasks | 2 files |
 | Phase 05-guard-hook P01 | 3 | 2 tasks | 2 files |
+| Phase 10-drift-skill P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,10 @@ Recent decisions affecting current work:
 - [Phase 09-impact-skill]: SKILL.md uses live shell injection for sibling discovery so Claude sees current sibling list at invocation time
 - [Phase 13-tests]: detect.bats uses detect_all_project_types for mixed-language assertions since detect_project_type returns single type with priority ordering
 - [Phase 13-tests]: Bats submodules confirmed committed by Phase 06 agent (bda446f) — tests run GREEN since lib/detect.sh and lib/siblings.sh already implemented by parallel phases
+- [Phase 05-guard-hook]: Hard blocks output hookSpecificOutput.permissionDecision deny JSON on stdout AND human-readable message on stderr per TEST-08 contract
+- [Phase 05-guard-hook]: ALLCLEAR_EXTRA_BLOCKED checked before built-in patterns so user overrides can pre-empt soft-warn paths
+- [Phase 10-drift-skill]: Type checking scoped to same-language repos by default to prevent cross-language false positives
+- [Phase 10-drift-skill]: OpenAPI comparison uses oasdiff for $ref resolution; falls back to yq structural diff labeled as degraded
 
 ### Pending Todos
 
@@ -120,6 +125,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T10:12:33.843Z
-Stopped at: Completed 13-tests-01-PLAN.md
+Last session: 2026-03-15T10:13:03.002Z
+Stopped at: Completed 10-drift-skill 10-02-PLAN.md
 Resume file: None
