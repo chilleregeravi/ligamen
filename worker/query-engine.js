@@ -262,8 +262,8 @@ export class QueryEngine {
     `);
 
     this._stmtUpsertService = db.prepare(`
-      INSERT OR REPLACE INTO services (repo_id, name, root_path, language)
-      VALUES (@repo_id, @name, @root_path, @language)
+      INSERT OR REPLACE INTO services (repo_id, name, root_path, language, type)
+      VALUES (@repo_id, @name, @root_path, @language, @type)
     `);
 
     this._stmtUpsertConnection = db.prepare(`
@@ -445,7 +445,10 @@ export class QueryEngine {
    * @returns {number} Row id
    */
   upsertService(serviceData) {
-    const result = this._stmtUpsertService.run(serviceData);
+    const result = this._stmtUpsertService.run({
+      type: "service",
+      ...serviceData,
+    });
     return result.lastInsertRowid;
   }
 
@@ -540,7 +543,7 @@ export class QueryEngine {
     const services = this._db
       .prepare(
         `
-      SELECT s.id, s.name, s.root_path, s.language, s.repo_id, r.name as repo_name, r.path as repo_path
+      SELECT s.id, s.name, s.root_path, s.language, s.type, s.repo_id, r.name as repo_name, r.path as repo_path
       FROM services s
       JOIN repos r ON r.id = s.repo_id
     `,
@@ -636,6 +639,7 @@ export class QueryEngine {
         name: svc.name,
         root_path: svc.root_path || ".",
         language: svc.language || "unknown",
+        type: svc.type || "service",
       });
       serviceIdMap.set(svc.name, id);
     }
