@@ -72,9 +72,9 @@ if [[ -n "${ALLCLEAR_EXTRA_BLOCKED:-}" ]]; then
   IFS=':' read -ra _extra_patterns <<< "$ALLCLEAR_EXTRA_BLOCKED"
   for _pat in "${_extra_patterns[@]}"; do
     [[ -z "$_pat" ]] && continue
-    # Match against basename (unquoted glob) and against full path
-    # shellcheck disable=SC2254
-    if [[ "$BASENAME" == "$_pat" ]] || [[ "$FILE" == "$_pat" ]]; then
+    # Match against basename and full path — unquoted for glob expansion (*.bak matches foo.bak)
+    # shellcheck disable=SC2053
+    if [[ "$BASENAME" == $_pat ]] || [[ "$FILE" == $_pat ]]; then
       block_file "$FILE" "matches custom block pattern '$_pat' in ALLCLEAR_EXTRA_BLOCKED"
     fi
   done
