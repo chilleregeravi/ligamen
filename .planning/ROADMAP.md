@@ -98,7 +98,7 @@ Plans:
   6. All block messages follow the format "AllClear: blocked write to X — Y" where Y explains the protection reason
 **Plans:** 1 plan
 Plans:
-- [ ] 02-01-PLAN.md — Create lib/detect.sh and lib/siblings.sh shared libraries
+- [ ] 05-01-PLAN.md — Guard hook script, hooks.json registration, and bats test suite
 
 ### Phase 6: Session Hook
 **Goal**: Every Claude session begins with the project's type and available AllClear commands already visible — injected exactly once regardless of which hook event fires
@@ -187,7 +187,10 @@ Plans:
   3. `/allclear deploy` with no kubectl available outputs a single clear skip message and exits cleanly
 **Plans:** 1 plan
 Plans:
-- [ ] 02-01-PLAN.md — Create lib/detect.sh and lib/siblings.sh shared libraries
+- [ ] 12-01-PLAN.md — Create deploy-verify SKILL.md with kubectl diff, image tag comparison, configmap checks, and graceful skip
+
+
+
 
 ### Phase 13: Tests
 **Goal**: Every hook's exit-code contract and library function is verified by an automated bats test suite that runs to completion in a clean environment
@@ -216,12 +219,12 @@ All phases are independent and can execute in parallel. No ordering constraints.
 | 2. Shared Libraries | 0/1 | Planned | - |
 | 3. Format Hook | 0/TBD | Not started | - |
 | 4. Lint Hook | 0/TBD | Not started | - |
-| 5. Guard Hook | 0/TBD | Not started | - |
+| 5. Guard Hook | 0/1 | Planned | - |
 | 6. Session Hook | 0/TBD | Not started | - |
 | 7. Quality Gate Skill | 0/TBD | Not started | - |
 | 8. Config Layer | 0/TBD | Not started | - |
 | 9. Impact Skill | 0/TBD | Not started | - |
 | 10. Drift Skill | 0/TBD | Not started | - |
 | 11. Pulse Skill | 0/1 | Planning complete | - |
-| 12. Deploy Skill | 0/TBD | Not started | - |
+| 12. Deploy Skill | 0/1 | Planning complete | - |
 | 13. Tests | 0/3 | Planning complete | - |
