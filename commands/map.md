@@ -66,11 +66,11 @@ Save confirmed list to `allclear.config.json`.
 
 ---
 
-## Step 2: Scan Each Repo with a Claude Agent
+## Step 2: Scan Each Repo (Two-Phase)
 
-**This is the main task.** For each confirmed repo, spawn an agent to analyze the code.
+**This is the main task.** Each repo is scanned in two phases for accuracy and efficiency.
 
-**Scan mode:** If `full` flag is present OR this is the first scan (no existing data), scan all files in every repo. Otherwise, only scan repos with changes since last scan — check git HEAD against the last scanned commit.
+**Scan mode:** If `full` subcommand is present OR this is the first scan (no existing data), scan all repos. Otherwise, only scan repos with changes since last scan — check git HEAD against the last scanned commit.
 
 **For each repo:**
 
@@ -82,34 +82,56 @@ Save confirmed list to `allclear.config.json`.
 
    Compare with the repo's `last_scanned_commit` from the database. If they match and `full` is not set, skip this repo and print: "Skipping <repo> (no changes since last scan)".
 
-2. Read the agent prompt template:
+2. **Phase 1 — Discovery** (fast, reads only structure files):
+   Read the discovery prompt template:
+
+   ```bash
+   cat ${CLAUDE_PLUGIN_ROOT}/worker/agent-prompt-discovery.md
+   ```
+
+   Replace `{{REPO_PATH}}` with the absolute path. Spawn a quick agent:
+
+   ```
+   Agent(
+     prompt="<filled discovery prompt>",
+     subagent_type="Explore",
+     description="Discover <repo-name> structure"
+   )
+   ```
+
+   The agent returns a JSON with `languages`, `frameworks`, `service_hints`, `route_files`, etc. This takes seconds.
+
+3. **Phase 2 — Deep scan** (reads source code, targeted by discovery):
+   Read the deep scan prompt template:
 
    ```bash
    cat ${CLAUDE_PLUGIN_ROOT}/worker/agent-prompt.md
    ```
 
-3. Replace `{{REPO_PATH}}` with the absolute path and `{{SERVICE_HINT}}` with empty string.
-
-4. **Spawn an agent** using the Agent tool:
+   Replace `{{REPO_PATH}}` with the absolute path. Replace `{{DISCOVERY_JSON}}` with the Phase 1 JSON output. Spawn a focused agent:
 
    ```
    Agent(
-     prompt="<filled prompt with repo path>",
+     prompt="<filled deep scan prompt with discovery context>",
      subagent_type="Explore",
-     description="Scan <repo-name> for services"
+     description="Deep scan <repo-name> for services"
    )
    ```
 
-5. The agent returns a JSON code block with `services`, `connections`, and `schemas` arrays. Extract the JSON from between the ``` markers.
+   The agent uses the discovery context to focus on relevant files — route files, handler files, proto files — instead of scanning everything.
 
-6. Print progress:
+4. Extract the JSON from between the ``` markers. Validate the findings.
+
+5. Print progress:
 
    ```
-   Scanning 1/N: api... done (3 services, 5 connections)
+   Scanning 1/N: api...
+     Phase 1: discovered (python, fastapi, 2 services, 5 route files)
+     Phase 2: scanned (2 services, 5 connections, 8 endpoints exposed)
    Scanning 2/N: auth... (skipped — no changes)
    ```
 
-7. Collect all findings. Group by confidence (high/low).
+6. Collect all findings. Group by confidence (high/low).
 
 ---
 
