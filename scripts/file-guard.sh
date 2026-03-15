@@ -74,7 +74,7 @@ if [[ -n "${ALLCLEAR_EXTRA_BLOCKED:-}" ]]; then
     [[ -z "$_pat" ]] && continue
     # Match against basename (unquoted glob) and against full path
     # shellcheck disable=SC2254
-    if [[ "$BASENAME" == $_pat ]] || [[ "$FILE" == $_pat ]]; then
+    if [[ "$BASENAME" == "$_pat" ]] || [[ "$FILE" == "$_pat" ]]; then
       block_file "$FILE" "matches custom block pattern '$_pat' in ALLCLEAR_EXTRA_BLOCKED"
     fi
   done
@@ -106,11 +106,11 @@ fi
 
 # ---------------------------------------------------------------------------
 # GRDH-02: Hard-block lock files
-# Patterns: *.lock, package-lock.json, bun.lock
-# (package-lock.json and bun.lock are also caught by *.lock but listed explicitly)
+# Patterns: *.lock (Cargo.lock, poetry.lock, yarn.lock, Pipfile.lock, bun.lock)
+#           package-lock.json (doesn't match *.lock — separate pattern)
 # ---------------------------------------------------------------------------
 case "$BASENAME" in
-  *.lock|package-lock.json|bun.lock)
+  *.lock|package-lock.json)
     block_file "$FILE" "lock file -- managed by package manager, not Claude"
     ;;
 esac

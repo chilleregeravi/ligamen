@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # lib/worker-client.sh — AllClear worker HTTP client helpers
 # Source this file; do not execute it directly.
 # Functions: worker_running(), worker_call(), wait_for_worker(),

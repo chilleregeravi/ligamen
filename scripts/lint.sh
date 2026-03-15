@@ -12,7 +12,6 @@ exec 2>/dev/null
 # 3. Read stdin JSON and extract file path / tool name (PLGN-07 pattern)
 INPUT=$(cat)
 FILE=$(printf '%s\n' "$INPUT" | jq -r '.tool_input.file_path // empty')
-TOOL=$(printf '%s\n' "$INPUT" | jq -r '.tool_name // empty')
 
 # ── MCP server stdout-pollution guard ──────────────────────────────────────────
 # console.log in worker/mcp-server.js silently corrupts the MCP JSON-RPC session.
