@@ -138,7 +138,11 @@ Plans:
   4. Setting `ALLCLEAR_EXTRA_BLOCKED=<pattern>` adds additional file patterns to the guard hook's hard-block list
 **Plans:** 1 plan
 Plans:
-- [ ] 02-01-PLAN.md — Create lib/detect.sh and lib/siblings.sh shared libraries
+- [ ] 08-01-PLAN.md — Config library, env var patterns, and bats test suite
+
+
+
+
 
 ### Phase 9: Impact Skill
 **Goal**: Developers can scan all sibling repos for any reference to a symbol or changed file with one command, with results grouped by repo and classified by match type
@@ -222,7 +226,7 @@ All phases are independent and can execute in parallel. No ordering constraints.
 | 5. Guard Hook | 0/1 | Planned | - |
 | 6. Session Hook | 0/TBD | Not started | - |
 | 7. Quality Gate Skill | 0/TBD | Not started | - |
-| 8. Config Layer | 0/TBD | Not started | - |
+| 8. Config Layer | 0/1 | Planned | - |
 | 9. Impact Skill | 0/TBD | Not started | - |
 | 10. Drift Skill | 0/TBD | Not started | - |
 | 11. Pulse Skill | 0/1 | Planning complete | - |
