@@ -125,7 +125,7 @@ Plans:
   4. `/allclear fix` applies auto-fixes to lint and format failures; it never auto-fixes test or typecheck failures
 **Plans:** 1 plan
 Plans:
-- [ ] 02-01-PLAN.md — Create lib/detect.sh and lib/siblings.sh shared libraries
+- [ ] 07-01-PLAN.md — Create quality gate SKILL.md with subcommand dispatch and result reporting
 
 ### Phase 8: Config Layer
 **Goal**: An `allclear.config.json` file and environment variables give users full control over hook behavior and sibling repo paths without touching plugin code
@@ -224,8 +224,8 @@ All phases are independent and can execute in parallel. No ordering constraints.
 | 3. Format Hook | 0/TBD | Not started | - |
 | 4. Lint Hook | 0/1 | Planned | - |
 | 5. Guard Hook | 0/1 | Planned | - |
-| 6. Session Hook | 0/TBD | Not started | - |
-| 7. Quality Gate Skill | 0/TBD | Not started | - |
+| 6. Session Hook | 0/2 | Planning complete | - |
+| 7. Quality Gate Skill | 0/1 | Planning complete | - |
 | 8. Config Layer | 0/1 | Planned | - |
 | 9. Impact Skill | 0/1 | Planning complete | - |
 | 10. Drift Skill | 0/TBD | Not started | - |
