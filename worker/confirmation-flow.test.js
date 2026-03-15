@@ -9,8 +9,8 @@
  * - buildConfirmationPrompt: full prompt assembly
  */
 
-import { test, describe } from 'node:test';
-import assert from 'node:assert/strict';
+import { test, describe } from "node:test";
+import assert from "node:assert/strict";
 import {
   MAX_LOW_CONFIDENCE,
   groupByConfidence,
@@ -18,13 +18,23 @@ import {
   formatLowConfidenceQuestions,
   applyEdits,
   buildConfirmationPrompt,
-} from './confirmation-flow.js';
+} from "./confirmation-flow.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeFinding({ service = 'svc-a', repo = '/repos/svc-a', confidence = 'high', sourceService = 'caller', targetService = 'svc-a', protocol = 'rest', method = 'GET', path = '/items', sourceFile = 'caller/client.ts:42' } = {}) {
+function makeFinding({
+  service = "svc-a",
+  repo = "/repos/svc-a",
+  confidence = "high",
+  sourceService = "caller",
+  targetService = "svc-a",
+  protocol = "rest",
+  method = "GET",
+  path = "/items",
+  sourceFile = "caller/client.ts:42",
+} = {}) {
   return {
     service,
     repo,
@@ -44,9 +54,15 @@ function makeFinding({ service = 'svc-a', repo = '/repos/svc-a', confidence = 'h
   };
 }
 
-function makeFindings(count, confidence = 'high', repoBase = '/repos/svc-') {
+function makeFindings(count, confidence = "high", repoBase = "/repos/svc-") {
   return Array.from({ length: count }, (_, i) =>
-    makeFinding({ service: `svc-${i}`, repo: `${repoBase}${i}`, confidence, sourceService: `caller-${i}`, targetService: `svc-${i}` })
+    makeFinding({
+      service: `svc-${i}`,
+      repo: `${repoBase}${i}`,
+      confidence,
+      sourceService: `caller-${i}`,
+      targetService: `svc-${i}`,
+    }),
   );
 }
 
@@ -54,18 +70,18 @@ function makeFindings(count, confidence = 'high', repoBase = '/repos/svc-') {
 // Task 1 Tests: groupByConfidence
 // ---------------------------------------------------------------------------
 
-describe('groupByConfidence', () => {
-  test('empty array returns empty groups', () => {
+describe("groupByConfidence", () => {
+  test("empty array returns empty groups", () => {
     const result = groupByConfidence([]);
     assert.equal(result.high.length, 0);
     assert.equal(result.low.length, 0);
     assert.equal(result.lowOverflow.length, 0);
   });
 
-  test('5 high + 3 low returns correct counts', () => {
+  test("5 high + 3 low returns correct counts", () => {
     const findings = [
-      ...makeFindings(5, 'high'),
-      ...makeFindings(3, 'low', '/repos/low-'),
+      ...makeFindings(5, "high"),
+      ...makeFindings(3, "low", "/repos/low-"),
     ];
     const result = groupByConfidence(findings);
     assert.equal(result.high.length, 5);
@@ -73,22 +89,26 @@ describe('groupByConfidence', () => {
     assert.equal(result.lowOverflow.length, 0);
   });
 
-  test('15 low findings: low.length === 10, lowOverflow.length === 5', () => {
-    const findings = makeFindings(15, 'low', '/repos/low-');
+  test("15 low findings: low.length === 10, lowOverflow.length === 5", () => {
+    const findings = makeFindings(15, "low", "/repos/low-");
     const result = groupByConfidence(findings);
     assert.equal(result.low.length, 10);
     assert.equal(result.lowOverflow.length, 5);
     assert.equal(result.high.length, 0);
   });
 
-  test('MAX_LOW_CONFIDENCE is 10', () => {
+  test("MAX_LOW_CONFIDENCE is 10", () => {
     assert.equal(MAX_LOW_CONFIDENCE, 10);
   });
 
-  test('confidence matching is case-insensitive', () => {
+  test("confidence matching is case-insensitive", () => {
     const findings = [
-      makeFinding({ confidence: 'HIGH' }),
-      makeFinding({ confidence: 'Low', service: 'svc-low', repo: '/repos/low' }),
+      makeFinding({ confidence: "HIGH" }),
+      makeFinding({
+        confidence: "Low",
+        service: "svc-low",
+        repo: "/repos/low",
+      }),
     ];
     const result = groupByConfidence(findings);
     assert.equal(result.high.length, 1);
@@ -100,30 +120,44 @@ describe('groupByConfidence', () => {
 // Task 1 Tests: formatHighConfidenceSummary
 // ---------------------------------------------------------------------------
 
-describe('formatHighConfidenceSummary', () => {
-  test('empty input returns empty string', () => {
+describe("formatHighConfidenceSummary", () => {
+  test("empty input returns empty string", () => {
     const result = formatHighConfidenceSummary([]);
-    assert.equal(result, '');
+    assert.equal(result, "");
   });
 
   test('output contains "confirm" instruction', () => {
-    const findings = makeFindings(1, 'high');
+    const findings = makeFindings(1, "high");
     const result = formatHighConfidenceSummary(findings);
     assert.match(result, /confirm/i);
   });
 
-  test('groups connections by repo path', () => {
+  test("groups connections by repo path", () => {
     const findings = [
-      makeFinding({ service: 'svc-a', repo: '/repos/a', confidence: 'high', sourceService: 'caller', targetService: 'svc-a', path: '/items' }),
-      makeFinding({ service: 'svc-b', repo: '/repos/b', confidence: 'high', sourceService: 'caller', targetService: 'svc-b', path: '/users' }),
+      makeFinding({
+        service: "svc-a",
+        repo: "/repos/a",
+        confidence: "high",
+        sourceService: "caller",
+        targetService: "svc-a",
+        path: "/items",
+      }),
+      makeFinding({
+        service: "svc-b",
+        repo: "/repos/b",
+        confidence: "high",
+        sourceService: "caller",
+        targetService: "svc-b",
+        path: "/users",
+      }),
     ];
     const result = formatHighConfidenceSummary(findings);
     assert.match(result, /\[repo: \/repos\/a\]/);
     assert.match(result, /\[repo: \/repos\/b\]/);
   });
 
-  test('includes header with connection and service counts', () => {
-    const findings = makeFindings(2, 'high');
+  test("includes header with connection and service counts", () => {
+    const findings = makeFindings(2, "high");
     const result = formatHighConfidenceSummary(findings);
     assert.match(result, /High confidence findings/i);
     assert.match(result, /2 connection/i);
@@ -135,19 +169,19 @@ describe('formatHighConfidenceSummary', () => {
 // Task 1 Tests: formatLowConfidenceQuestions
 // ---------------------------------------------------------------------------
 
-describe('formatLowConfidenceQuestions', () => {
-  test('returns array of same length as input', () => {
-    const findings = makeFindings(3, 'low', '/repos/low-');
+describe("formatLowConfidenceQuestions", () => {
+  test("returns array of same length as input", () => {
+    const findings = makeFindings(3, "low", "/repos/low-");
     const result = formatLowConfidenceQuestions(findings);
     assert.equal(result.length, 3);
   });
 
-  test('each question contains sourceService and targetService names', () => {
+  test("each question contains sourceService and targetService names", () => {
     const finding = makeFinding({
-      confidence: 'low',
-      sourceService: 'payment-service',
-      targetService: 'order-service',
-      repo: '/repos/order',
+      confidence: "low",
+      sourceService: "payment-service",
+      targetService: "order-service",
+      repo: "/repos/order",
     });
     const result = formatLowConfidenceQuestions([finding]);
     assert.equal(result.length, 1);
@@ -155,7 +189,7 @@ describe('formatLowConfidenceQuestions', () => {
     assert.match(result[0], /order-service/);
   });
 
-  test('empty input returns empty array', () => {
+  test("empty input returns empty array", () => {
     const result = formatLowConfidenceQuestions([]);
     assert.deepEqual(result, []);
   });
@@ -165,48 +199,48 @@ describe('formatLowConfidenceQuestions', () => {
 // Task 2 Tests: applyEdits
 // ---------------------------------------------------------------------------
 
-describe('applyEdits', () => {
+describe("applyEdits", () => {
   test('"confirm" instruction returns findings unchanged', () => {
-    const findings = makeFindings(3, 'high');
-    const result = applyEdits(findings, 'confirm');
+    const findings = makeFindings(3, "high");
+    const result = applyEdits(findings, "confirm");
     assert.deepEqual(result, findings);
   });
 
   test('"Confirm" (mixed case) returns findings unchanged', () => {
-    const findings = makeFindings(2, 'high');
-    const result = applyEdits(findings, 'Confirm');
+    const findings = makeFindings(2, "high");
+    const result = applyEdits(findings, "Confirm");
     assert.deepEqual(result, findings);
   });
 
-  test('empty string returns findings unchanged', () => {
-    const findings = makeFindings(2, 'high');
-    const result = applyEdits(findings, '');
+  test("empty string returns findings unchanged", () => {
+    const findings = makeFindings(2, "high");
+    const result = applyEdits(findings, "");
     assert.deepEqual(result, findings);
   });
 
   test('"remove {service-name}" removes matching findings', () => {
     const findings = [
-      makeFinding({ service: 'user-service', repo: '/repos/user' }),
-      makeFinding({ service: 'auth-service', repo: '/repos/auth' }),
+      makeFinding({ service: "user-service", repo: "/repos/user" }),
+      makeFinding({ service: "auth-service", repo: "/repos/auth" }),
     ];
-    const result = applyEdits(findings, 'remove user-service');
+    const result = applyEdits(findings, "remove user-service");
     assert.equal(result.length, 1);
-    assert.equal(result[0].service, 'auth-service');
+    assert.equal(result[0].service, "auth-service");
   });
 
   test('"remove {service-name}" is case-insensitive', () => {
     const findings = [
-      makeFinding({ service: 'User-Service', repo: '/repos/user' }),
-      makeFinding({ service: 'auth-service', repo: '/repos/auth' }),
+      makeFinding({ service: "User-Service", repo: "/repos/user" }),
+      makeFinding({ service: "auth-service", repo: "/repos/auth" }),
     ];
-    const result = applyEdits(findings, 'remove user-service');
+    const result = applyEdits(findings, "remove user-service");
     assert.equal(result.length, 1);
-    assert.equal(result[0].service, 'auth-service');
+    assert.equal(result[0].service, "auth-service");
   });
 
-  test('unrecognized instruction returns findings unchanged', () => {
-    const findings = makeFindings(2, 'high');
-    const result = applyEdits(findings, 'do something weird');
+  test("unrecognized instruction returns findings unchanged", () => {
+    const findings = makeFindings(2, "high");
+    const result = applyEdits(findings, "do something weird");
     assert.deepEqual(result, findings);
   });
 });
@@ -215,9 +249,9 @@ describe('applyEdits', () => {
 // Task 2 Tests: buildConfirmationPrompt
 // ---------------------------------------------------------------------------
 
-describe('buildConfirmationPrompt', () => {
-  test('includes high-confidence summary when high findings present', () => {
-    const high = makeFindings(2, 'high');
+describe("buildConfirmationPrompt", () => {
+  test("includes high-confidence summary when high findings present", () => {
+    const high = makeFindings(2, "high");
     const grouped = {
       high,
       low: [],
@@ -229,35 +263,35 @@ describe('buildConfirmationPrompt', () => {
     assert.match(result, /High confidence findings/i);
   });
 
-  test('omits high-confidence section when only low findings present', () => {
-    const low = makeFindings(2, 'low', '/repos/low-');
+  test("omits high-confidence section when only low findings present", () => {
+    const low = makeFindings(2, "low", "/repos/low-");
     const grouped = {
       high: [],
       low,
       lowOverflow: [],
-      highSummary: '',
+      highSummary: "",
       lowQuestions: formatLowConfidenceQuestions(low),
     };
     const result = buildConfirmationPrompt(grouped);
     assert.doesNotMatch(result, /High confidence findings/i);
   });
 
-  test('includes overflow notice when lowOverflow.length > 0', () => {
-    const low = makeFindings(10, 'low', '/repos/low-');
-    const lowOverflow = makeFindings(3, 'low', '/repos/overflow-');
+  test("includes overflow notice when lowOverflow.length > 0", () => {
+    const low = makeFindings(10, "low", "/repos/low-");
+    const lowOverflow = makeFindings(3, "low", "/repos/overflow-");
     const grouped = {
       high: [],
       low,
       lowOverflow,
-      highSummary: '',
+      highSummary: "",
       lowQuestions: formatLowConfidenceQuestions(low),
     };
     const result = buildConfirmationPrompt(grouped);
     assert.match(result, /3 additional/i);
   });
 
-  test('no overflow notice when lowOverflow is empty', () => {
-    const high = makeFindings(1, 'high');
+  test("no overflow notice when lowOverflow is empty", () => {
+    const high = makeFindings(1, "high");
     const grouped = {
       high,
       low: [],

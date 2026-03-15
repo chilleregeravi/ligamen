@@ -43,13 +43,13 @@ Once installed, AllClear hooks run in the background with zero configuration.
 
 Every time Claude writes or edits a file, AllClear runs the appropriate formatter:
 
-| Extension | Formatter |
-|-----------|-----------|
-| `.py` | `ruff format` or `black` |
-| `.rs` | `rustfmt` |
+| Extension                 | Formatter                    |
+| ------------------------- | ---------------------------- |
+| `.py`                     | `ruff format` or `black`     |
+| `.rs`                     | `rustfmt`                    |
 | `.ts` `.tsx` `.js` `.jsx` | `prettier` or `eslint --fix` |
-| `.go` | `gofmt` |
-| `.json` `.yaml` `.yml` | `prettier` |
+| `.go`                     | `gofmt`                      |
+| `.json` `.yaml` `.yml`    | `prettier`                   |
 
 If a formatter isn't found, the hook silently skips. If it crashes, it exits cleanly — never blocks Claude.
 
@@ -57,12 +57,12 @@ If a formatter isn't found, the hook silently skips. If it crashes, it exits cle
 
 After every write/edit, AllClear runs your linter and surfaces issues as a system message:
 
-| Language | Linter |
-|----------|--------|
-| Python | `ruff check` |
-| Rust | `cargo clippy` (throttled to once per 30s) |
-| TypeScript/JavaScript | `eslint` |
-| Go | `golangci-lint` |
+| Language              | Linter                                     |
+| --------------------- | ------------------------------------------ |
+| Python                | `ruff check`                               |
+| Rust                  | `cargo clippy` (throttled to once per 30s) |
+| TypeScript/JavaScript | `eslint`                                   |
+| Go                    | `golangci-lint`                            |
 
 ### File guard (PreToolUse)
 
@@ -101,6 +101,7 @@ Build an interactive service dependency graph by scanning linked repos with Clau
 ```
 
 The map flow:
+
 1. Discovers repos from `allclear.config.json` + parent directory + memory
 2. Presents repo list for confirmation
 3. Spawns Claude agents to analyze each repo (any language, no external tools)
@@ -152,11 +153,7 @@ AllClear works with zero configuration. All features auto-detect project types a
 
 ```json
 {
-  "linked-repos": [
-    "../api",
-    "../auth",
-    "../sdk"
-  ],
+  "linked-repos": ["../api", "../auth", "../sdk"],
   "impact-map": {
     "history": true
   }
@@ -186,13 +183,13 @@ AllClear works with zero configuration. All features auto-detect project types a
 
 ### Environment variables
 
-| Variable | Effect |
-|----------|--------|
-| `ALLCLEAR_DISABLE_FORMAT=1` | Skip auto-formatting |
-| `ALLCLEAR_DISABLE_LINT=1` | Skip auto-linting |
-| `ALLCLEAR_DISABLE_GUARD=1` | Skip file guard |
-| `ALLCLEAR_DISABLE_SESSION_START=1` | Skip session context |
-| `ALLCLEAR_LINT_THROTTLE=<seconds>` | Cargo clippy throttle (default: `30`) |
+| Variable                            | Effect                                 |
+| ----------------------------------- | -------------------------------------- |
+| `ALLCLEAR_DISABLE_FORMAT=1`         | Skip auto-formatting                   |
+| `ALLCLEAR_DISABLE_LINT=1`           | Skip auto-linting                      |
+| `ALLCLEAR_DISABLE_GUARD=1`          | Skip file guard                        |
+| `ALLCLEAR_DISABLE_SESSION_START=1`  | Skip session context                   |
+| `ALLCLEAR_LINT_THROTTLE=<seconds>`  | Cargo clippy throttle (default: `30`)  |
 | `ALLCLEAR_EXTRA_BLOCKED=<patterns>` | Colon-separated glob patterns to block |
 
 ### MCP Server (optional)

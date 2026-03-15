@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# drift-versions.bats — Tests for skills/drift/scripts/drift-versions.sh
+# drift-versions.bats — Tests for scripts/drift-versions.sh
 # Requirements: DRFT-01 (version extraction), DRFT-05 (report with repo details), DRFT-06 (severity filtering)
 
 TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
 PLUGIN_ROOT="$(cd "$TEST_DIR/.." && pwd)"
-DRIFT_VERSIONS="${PLUGIN_ROOT}/skills/drift/scripts/drift-versions.sh"
+DRIFT_VERSIONS="${PLUGIN_ROOT}/scripts/drift-versions.sh"
 FIXTURES="${TEST_DIR}/fixtures/drift"
 
 load "$TEST_DIR/test_helper/bats-support/load"
@@ -91,12 +91,12 @@ load "$TEST_DIR/test_helper/bats-assert/load"
   local tmpdir
   tmpdir=$(mktemp -d)
   cat > "${tmpdir}/allclear.config.json" <<'EOF'
-{"siblings": []}
+{"linked-repos": []}
 EOF
   # Run drift-versions with SIBLINGS pointing to both fixture repos
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   # lodash has pinned mismatch: 4.17.21 vs 4.17.15
@@ -108,7 +108,7 @@ EOF
 @test "report shows repo names and versions in finding details" {
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   # Output should mention both repos and their versions
@@ -119,7 +119,7 @@ EOF
 @test "report shows WARN for range specifier vs range specifier mismatch (express)" {
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   # express: ^4.18.0 vs ~4.18.0 — different locking strategies = WARN
@@ -130,7 +130,7 @@ EOF
 @test "no drift reported for packages at identical versions" {
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   # jest is 29.0.0 in both repos — should NOT appear as drift
@@ -144,7 +144,7 @@ EOF
 @test "default output shows CRITICAL findings" {
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   assert_output --partial "CRITICAL"
@@ -153,7 +153,7 @@ EOF
 @test "default output suppresses INFO-level findings" {
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   refute_output --partial "[ INFO  ]"
@@ -162,7 +162,7 @@ EOF
 @test "with --all flag, INFO-level findings are shown" {
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}' --all
   "
   # When --all is passed, INFO findings should appear (if any exist)
@@ -174,7 +174,7 @@ EOF
   # repo-a has go-playground/validator, repo-b does not
   run bash -c "
     export CLAUDE_PLUGIN_ROOT='${PLUGIN_ROOT}'
-    export DRIFT_TEST_SIBLINGS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
+    export DRIFT_TEST_LINKED_REPOS='${FIXTURES}/repo-a ${FIXTURES}/repo-b'
     bash '${DRIFT_VERSIONS}'
   "
   refute_output --partial "go-playground/validator"

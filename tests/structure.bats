@@ -29,6 +29,10 @@ setup() {
   assert_success
 }
 
+@test "commands/ directory exists at plugin root" {
+  assert [ -d "commands" ]
+}
+
 @test "skills/ directory exists at plugin root" {
   assert [ -d "skills" ]
 }
@@ -45,6 +49,10 @@ setup() {
   assert [ -d "lib" ]
 }
 
+@test "commands/ is NOT inside .claude-plugin/" {
+  assert [ ! -d ".claude-plugin/commands" ]
+}
+
 @test "skills/ is NOT inside .claude-plugin/" {
   assert [ ! -d ".claude-plugin/skills" ]
 }
@@ -53,19 +61,25 @@ setup() {
   assert [ ! -d ".claude-plugin/hooks" ]
 }
 
-@test "all five skill directories have SKILL.md" {
-  for skill in quality-gate cross-impact drift pulse deploy-verify; do
-    assert [ -f "skills/$skill/SKILL.md" ]
+@test "all five command files exist" {
+  for cmd in quality-gate cross-impact drift pulse deploy-verify; do
+    assert [ -f "commands/$cmd.md" ]
   done
 }
 
-@test "all SKILL.md files have valid frontmatter" {
-  for skill in quality-gate cross-impact drift pulse deploy-verify; do
-    run grep -c "^name:" "skills/$skill/SKILL.md"
-    assert_success
-    run grep -c "^description:" "skills/$skill/SKILL.md"
+@test "all command files have valid frontmatter" {
+  for cmd in quality-gate cross-impact drift pulse deploy-verify; do
+    run grep -c "^description:" "commands/$cmd.md"
     assert_success
   done
+}
+
+@test "quality-gate skill exists for auto-invocation" {
+  assert [ -f "skills/quality-gate/SKILL.md" ]
+  run grep -c "^name:" "skills/quality-gate/SKILL.md"
+  assert_success
+  run grep -c "^description:" "skills/quality-gate/SKILL.md"
+  assert_success
 }
 
 @test "all hook scripts are executable" {
@@ -77,7 +91,7 @@ setup() {
 
 @test "all lib scripts are executable" {
   assert [ -x "lib/detect.sh" ]
-  assert [ -x "lib/siblings.sh" ]
+  assert [ -x "lib/linked-repos.sh" ]
 }
 
 # ---------------------------------------------------------------------------

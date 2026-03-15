@@ -37,7 +37,10 @@ export function groupByConfidence(findings) {
   const lowAll = [];
 
   for (const f of findings) {
-    if (typeof f.confidence === 'string' && f.confidence.toLowerCase() === 'high') {
+    if (
+      typeof f.confidence === "string" &&
+      f.confidence.toLowerCase() === "high"
+    ) {
       high.push(f);
     } else {
       lowAll.push(f);
@@ -57,9 +60,12 @@ export function groupByConfidence(findings) {
  * @returns {string} Formatted summary string, or empty string if input is empty.
  */
 export function formatHighConfidenceSummary(highFindings) {
-  if (highFindings.length === 0) return '';
+  if (highFindings.length === 0) return "";
 
-  const totalConns = highFindings.reduce((sum, f) => sum + f.connections.length, 0);
+  const totalConns = highFindings.reduce(
+    (sum, f) => sum + f.connections.length,
+    0,
+  );
 
   // Group findings by repo path
   const repoMap = new Map();
@@ -70,21 +76,25 @@ export function formatHighConfidenceSummary(highFindings) {
   }
 
   const lines = [
-    `--- High confidence findings (${totalConns} connection${totalConns !== 1 ? 's' : ''} across ${highFindings.length} service${highFindings.length !== 1 ? 's' : ''}) ---`,
+    `--- High confidence findings (${totalConns} connection${totalConns !== 1 ? "s" : ""} across ${highFindings.length} service${highFindings.length !== 1 ? "s" : ""}) ---`,
   ];
 
   for (const [repoPath, repoFindings] of repoMap) {
     lines.push(`[repo: ${repoPath}]`);
     for (const f of repoFindings) {
       for (const conn of f.connections) {
-        lines.push(`  ${conn.sourceService} ${conn.method} ${conn.path} (${conn.protocol})`);
+        lines.push(
+          `  ${conn.sourceService} ${conn.method} ${conn.path} (${conn.protocol})`,
+        );
       }
     }
   }
 
-  lines.push(`\nType 'confirm' to accept all high-confidence findings, or describe changes.`);
+  lines.push(
+    `\nType 'confirm' to accept all high-confidence findings, or describe changes.`,
+  );
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -96,19 +106,19 @@ export function formatHighConfidenceSummary(highFindings) {
 export function formatLowConfidenceQuestions(lowFindings) {
   return lowFindings.map((f) => {
     const conn = f.connections[0] || {};
-    const source = conn.sourceService || '(unknown source)';
-    const target = conn.targetService || f.service || '(unknown target)';
-    const method = conn.method || '';
-    const path = conn.path || '';
-    const evidence = conn.sourceFile || '(unknown file)';
-    const protocol = conn.protocol ? ` via ${conn.protocol}` : '';
+    const source = conn.sourceService || "(unknown source)";
+    const target = conn.targetService || f.service || "(unknown target)";
+    const method = conn.method || "";
+    const path = conn.path || "";
+    const evidence = conn.sourceFile || "(unknown file)";
+    const protocol = conn.protocol ? ` via ${conn.protocol}` : "";
 
     return [
-      `Possible connection: ${source} → ${target}${method ? ` via ${method} ${path}` : ''}${protocol}`,
+      `Possible connection: ${source} → ${target}${method ? ` via ${method} ${path}` : ""}${protocol}`,
       `  Evidence: ${evidence}`,
       `  Question: Is ${source} intentionally calling ${target}'s ${method} ${path}?`,
       `  Type "yes", "no", or describe the correct connection.`,
-    ].join('\n');
+    ].join("\n");
   });
 }
 
@@ -127,15 +137,17 @@ export function formatLowConfidenceQuestions(lowFindings) {
  * @returns {Array} Modified (or unchanged) findings array.
  */
 export function applyEdits(findings, editInstructions) {
-  const instruction = (editInstructions || '').trim();
+  const instruction = (editInstructions || "").trim();
 
   // No-op cases
-  if (instruction === '' || instruction.toLowerCase() === 'confirm') {
+  if (instruction === "" || instruction.toLowerCase() === "confirm") {
     return findings;
   }
 
   // "remove connection {source} -> {target}"
-  const removeConnMatch = instruction.match(/^remove\s+connection\s+(.+?)\s*->\s*(.+)$/i);
+  const removeConnMatch = instruction.match(
+    /^remove\s+connection\s+(.+?)\s*->\s*(.+)$/i,
+  );
   if (removeConnMatch) {
     const srcName = removeConnMatch[1].trim().toLowerCase();
     const tgtName = removeConnMatch[2].trim().toLowerCase();
@@ -145,9 +157,9 @@ export function applyEdits(findings, editInstructions) {
         const filtered = f.connections.filter(
           (c) =>
             !(
-              (c.sourceService || '').toLowerCase() === srcName &&
-              (c.targetService || '').toLowerCase() === tgtName
-            )
+              (c.sourceService || "").toLowerCase() === srcName &&
+              (c.targetService || "").toLowerCase() === tgtName
+            ),
         );
         // If all connections removed and this was the only connection source, drop finding
         if (filtered.length === 0 && f.connections.length > 0) return null;
@@ -160,11 +172,15 @@ export function applyEdits(findings, editInstructions) {
   const removeServiceMatch = instruction.match(/^remove\s+(.+)$/i);
   if (removeServiceMatch) {
     const serviceName = removeServiceMatch[1].trim().toLowerCase();
-    return findings.filter((f) => (f.service || '').toLowerCase() !== serviceName);
+    return findings.filter(
+      (f) => (f.service || "").toLowerCase() !== serviceName,
+    );
   }
 
   // Unrecognized instruction
-  process.stderr.write('applyEdits: unrecognized instruction format — returning original findings\n');
+  process.stderr.write(
+    "applyEdits: unrecognized instruction format — returning original findings\n",
+  );
   return findings;
 }
 
@@ -185,15 +201,17 @@ export function buildConfirmationPrompt(grouped) {
 
   if (grouped.lowQuestions && grouped.lowQuestions.length > 0) {
     grouped.lowQuestions.forEach((q, i) => {
-      parts.push(`\n--- Low confidence finding ${i + 1} of ${grouped.low.length} ---\n${q}`);
+      parts.push(
+        `\n--- Low confidence finding ${i + 1} of ${grouped.low.length} ---\n${q}`,
+      );
     });
   }
 
   if (grouped.lowOverflow && grouped.lowOverflow.length > 0) {
     parts.push(
-      `\n[Note: ${grouped.lowOverflow.length} additional low-confidence connections found — they will be presented after you confirm or skip the above.]`
+      `\n[Note: ${grouped.lowOverflow.length} additional low-confidence connections found — they will be presented after you confirm or skip the above.]`,
     );
   }
 
-  return parts.join('\n');
+  return parts.join("\n");
 }

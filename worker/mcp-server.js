@@ -1,26 +1,32 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import Database from 'better-sqlite3';
-import crypto from 'crypto';
-import os from 'os';
-import path from 'path';
-import fs from 'fs';
-import { execSync } from 'child_process';
-import { z } from 'zod';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import Database from "better-sqlite3";
+import crypto from "crypto";
+import os from "os";
+import path from "path";
+import fs from "fs";
+import { execSync } from "child_process";
+import { z } from "zod";
 
-const dataDir = process.env.ALLCLEAR_DATA_DIR || path.join(os.homedir(), '.allclear');
+const dataDir =
+  process.env.ALLCLEAR_DATA_DIR || path.join(os.homedir(), ".allclear");
 
 /**
  * Resolve the per-project DB path: ~/.allclear/projects/<hash>/impact-map.db
  * Uses the same hashing logic as worker/db.js projectHashDir().
  */
 function resolveDbPath(projectRoot = process.cwd()) {
-  const hash = crypto.createHash('sha256').update(projectRoot).digest('hex').slice(0, 12);
-  return path.join(dataDir, 'projects', hash, 'impact-map.db');
+  const hash = crypto
+    .createHash("sha256")
+    .update(projectRoot)
+    .digest("hex")
+    .slice(0, 12);
+  return path.join(dataDir, "projects", hash, "impact-map.db");
 }
 
-const dbPath = process.env.ALLCLEAR_DB_PATH
-  || resolveDbPath(process.env.ALLCLEAR_PROJECT_ROOT || process.cwd());
+const dbPath =
+  process.env.ALLCLEAR_DB_PATH ||
+  resolveDbPath(process.env.ALLCLEAR_PROJECT_ROOT || process.cwd());
 
 /**
  * Open the SQLite database in read-only mode.
@@ -32,10 +38,10 @@ export function openDb() {
   }
   try {
     const db = new Database(dbPath, { readonly: true });
-    db.pragma('journal_mode = WAL');
+    db.pragma("journal_mode = WAL");
     return db;
   } catch (err) {
-    console.error('[allclear-mcp] Failed to open database:', err.message);
+    console.error("[allclear-mcp] Failed to open database:", err.message);
     return null;
   }
 }
@@ -50,10 +56,15 @@ export function openDb() {
  * @param {{ service: string, endpoint?: string, direction?: string, transitive?: boolean }} params
  * @returns {{ results: Array }}
  */
-export async function queryImpact(db, { service, endpoint, direction = 'consumes', transitive = false }) {
+export async function queryImpact(
+  db,
+  { service, endpoint, direction = "consumes", transitive = false },
+) {
   if (!db) return { results: [] };
 
-  const svcRow = db.prepare('SELECT id FROM services WHERE name = ?').get(service);
+  const svcRow = db
+    .prepare("SELECT id FROM services WHERE name = ?")
+    .get(service);
   if (!svcRow) return { results: [] };
   const serviceId = svcRow.id;
 
@@ -61,28 +72,30 @@ export async function queryImpact(db, { service, endpoint, direction = 'consumes
     // Recursive CTE for full transitive impact
     const cte = `
       WITH RECURSIVE impacted(id, depth, path) AS (
-        SELECT ${direction === 'consumes' ? 'target_service_id' : 'source_service_id'}, 1,
-               CAST(? AS TEXT) || ',' || CAST(${direction === 'consumes' ? 'target_service_id' : 'source_service_id'} AS TEXT)
-        FROM connections WHERE ${direction === 'consumes' ? 'source_service_id' : 'target_service_id'} = ?
+        SELECT ${direction === "consumes" ? "target_service_id" : "source_service_id"}, 1,
+               CAST(? AS TEXT) || ',' || CAST(${direction === "consumes" ? "target_service_id" : "source_service_id"} AS TEXT)
+        FROM connections WHERE ${direction === "consumes" ? "source_service_id" : "target_service_id"} = ?
         UNION ALL
-        SELECT ${direction === 'consumes' ? 'c.target_service_id' : 'c.source_service_id'}, i.depth + 1,
-               i.path || ',' || CAST(${direction === 'consumes' ? 'c.target_service_id' : 'c.source_service_id'} AS TEXT)
-        FROM connections c JOIN impacted i ON ${direction === 'consumes' ? 'c.source_service_id' : 'c.target_service_id'} = i.id
-        WHERE i.path NOT LIKE '%,' || CAST(${direction === 'consumes' ? 'c.target_service_id' : 'c.source_service_id'} AS TEXT) || ',%'
+        SELECT ${direction === "consumes" ? "c.target_service_id" : "c.source_service_id"}, i.depth + 1,
+               i.path || ',' || CAST(${direction === "consumes" ? "c.target_service_id" : "c.source_service_id"} AS TEXT)
+        FROM connections c JOIN impacted i ON ${direction === "consumes" ? "c.source_service_id" : "c.target_service_id"} = i.id
+        WHERE i.path NOT LIKE '%,' || CAST(${direction === "consumes" ? "c.target_service_id" : "c.source_service_id"} AS TEXT) || ',%'
           AND i.depth < 10
       )
       SELECT DISTINCT i.id, i.depth, s.name as service, c.protocol, c.method, c.path as path
       FROM impacted i
       JOIN services s ON s.id = i.id
       JOIN connections c ON (
-        ${direction === 'consumes'
-          ? 'c.source_service_id = i.id OR c.target_service_id = i.id'
-          : 'c.source_service_id = i.id OR c.target_service_id = i.id'}
+        ${
+          direction === "consumes"
+            ? "c.source_service_id = i.id OR c.target_service_id = i.id"
+            : "c.source_service_id = i.id OR c.target_service_id = i.id"
+        }
       )
       ORDER BY i.depth, s.name
     `;
     const rows = db.prepare(cte).all(serviceId, serviceId);
-    const results = rows.map(r => ({
+    const results = rows.map((r) => ({
       service: r.service,
       protocol: r.protocol,
       method: r.method,
@@ -94,7 +107,7 @@ export async function queryImpact(db, { service, endpoint, direction = 'consumes
 
   // Direct (non-transitive) query
   let query;
-  if (direction === 'consumes') {
+  if (direction === "consumes") {
     query = `
       SELECT s.name as service, c.protocol, c.method, c.path as path, 1 as depth
       FROM connections c
@@ -111,7 +124,7 @@ export async function queryImpact(db, { service, endpoint, direction = 'consumes
   }
 
   if (endpoint) {
-    query += ' AND c.path LIKE ?';
+    query += " AND c.path LIKE ?";
     const rows = db.prepare(query).all(serviceId, `%${endpoint}%`);
     return { results: rows };
   }
@@ -126,7 +139,10 @@ export async function queryImpact(db, { service, endpoint, direction = 'consumes
  * @param {{ repo?: string, commit_range?: string, _changedFiles?: string[] }} params
  * @returns {{ affected: Array, changed_files: string[], error?: string }}
  */
-export async function queryChanged(db, { repo, commit_range, _changedFiles } = {}) {
+export async function queryChanged(
+  db,
+  { repo, commit_range, _changedFiles } = {},
+) {
   // Allow tests to inject changed files directly (bypasses git)
   let changedFiles = _changedFiles;
   let gitError = null;
@@ -135,20 +151,29 @@ export async function queryChanged(db, { repo, commit_range, _changedFiles } = {
     const cwd = repo || process.cwd();
     try {
       if (commit_range) {
-        const out = execSync(`git diff --name-only ${commit_range}`, { cwd, encoding: 'utf8' });
-        changedFiles = out.trim().split('\n').filter(Boolean);
+        const out = execSync(`git diff --name-only ${commit_range}`, {
+          cwd,
+          encoding: "utf8",
+        });
+        changedFiles = out.trim().split("\n").filter(Boolean);
       } else {
-        const unstaged = execSync('git diff --name-only HEAD', { cwd, encoding: 'utf8' });
-        const staged = execSync('git diff --name-only --cached', { cwd, encoding: 'utf8' });
+        const unstaged = execSync("git diff --name-only HEAD", {
+          cwd,
+          encoding: "utf8",
+        });
+        const staged = execSync("git diff --name-only --cached", {
+          cwd,
+          encoding: "utf8",
+        });
         changedFiles = [
           ...new Set([
-            ...unstaged.trim().split('\n').filter(Boolean),
-            ...staged.trim().split('\n').filter(Boolean),
+            ...unstaged.trim().split("\n").filter(Boolean),
+            ...staged.trim().split("\n").filter(Boolean),
           ]),
         ];
       }
     } catch (err) {
-      gitError = 'not a git repo';
+      gitError = "not a git repo";
       changedFiles = [];
     }
   }
@@ -184,10 +209,12 @@ export async function queryChanged(db, { repo, commit_range, _changedFiles } = {
     }
   }
 
-  const affected = Array.from(affectedMap.entries()).map(([service, connection_count]) => ({
-    service,
-    connection_count,
-  }));
+  const affected = Array.from(affectedMap.entries()).map(
+    ([service, connection_count]) => ({
+      service,
+      connection_count,
+    }),
+  );
 
   const result = { affected, changed_files: changedFiles };
   if (gitError) result.error = gitError;
@@ -200,10 +227,15 @@ export async function queryChanged(db, { repo, commit_range, _changedFiles } = {
  * @param {{ service: string, depth?: number, direction?: string }} params
  * @returns {{ nodes: Array, edges: Array }}
  */
-export async function queryGraph(db, { service, depth = 2, direction = 'both' }) {
+export async function queryGraph(
+  db,
+  { service, depth = 2, direction = "both" },
+) {
   if (!db) return { nodes: [], edges: [] };
 
-  const svcRow = db.prepare('SELECT id, name, language FROM services WHERE name = ?').get(service);
+  const svcRow = db
+    .prepare("SELECT id, name, language FROM services WHERE name = ?")
+    .get(service);
   if (!svcRow) return { nodes: [], edges: [] };
   const serviceId = svcRow.id;
   const maxDepth = Math.min(depth, 5);
@@ -212,10 +244,14 @@ export async function queryGraph(db, { service, depth = 2, direction = 'both' })
   const edgeSet = new Set();
   const edges = [];
 
-  nodeMap.set(svcRow.id, { id: svcRow.id, name: svcRow.name, language: svcRow.language });
+  nodeMap.set(svcRow.id, {
+    id: svcRow.id,
+    name: svcRow.name,
+    language: svcRow.language,
+  });
 
   // Traverse downstream (this service → targets)
-  if (direction === 'downstream' || direction === 'both') {
+  if (direction === "downstream" || direction === "both") {
     const cte = `
       WITH RECURSIVE traversal(id, depth) AS (
         SELECT target_service_id, 1 FROM connections WHERE source_service_id = ?
@@ -229,33 +265,42 @@ export async function queryGraph(db, { service, depth = 2, direction = 'both' })
     const reachable = db.prepare(cte).all(serviceId, maxDepth);
     for (const { id } of reachable) {
       if (!nodeMap.has(id)) {
-        const s = db.prepare('SELECT id, name, language FROM services WHERE id = ?').get(id);
-        if (s) nodeMap.set(id, { id: s.id, name: s.name, language: s.language });
+        const s = db
+          .prepare("SELECT id, name, language FROM services WHERE id = ?")
+          .get(id);
+        if (s)
+          nodeMap.set(id, { id: s.id, name: s.name, language: s.language });
       }
     }
 
     // Collect edges among reachable nodes
-    const reachableIds = [serviceId, ...reachable.map(r => r.id)];
+    const reachableIds = [serviceId, ...reachable.map((r) => r.id)];
     const connStmt = db.prepare(`
       SELECT c.id, s1.name as source, s2.name as target, c.protocol, c.method, c.path
       FROM connections c
       JOIN services s1 ON c.source_service_id = s1.id
       JOIN services s2 ON c.target_service_id = s2.id
-      WHERE c.source_service_id IN (${reachableIds.map(() => '?').join(',')})
-        AND c.target_service_id IN (${reachableIds.map(() => '?').join(',')})
+      WHERE c.source_service_id IN (${reachableIds.map(() => "?").join(",")})
+        AND c.target_service_id IN (${reachableIds.map(() => "?").join(",")})
     `);
     const conns = connStmt.all(...reachableIds, ...reachableIds);
     for (const conn of conns) {
       const key = `${conn.source}→${conn.target}`;
       if (!edgeSet.has(key)) {
         edgeSet.add(key);
-        edges.push({ source: conn.source, target: conn.target, protocol: conn.protocol, method: conn.method, path: conn.path });
+        edges.push({
+          source: conn.source,
+          target: conn.target,
+          protocol: conn.protocol,
+          method: conn.method,
+          path: conn.path,
+        });
       }
     }
   }
 
   // Traverse upstream (sources → this service)
-  if (direction === 'upstream' || direction === 'both') {
+  if (direction === "upstream" || direction === "both") {
     const cte = `
       WITH RECURSIVE traversal(id, depth) AS (
         SELECT source_service_id, 1 FROM connections WHERE target_service_id = ?
@@ -269,34 +314,43 @@ export async function queryGraph(db, { service, depth = 2, direction = 'both' })
     const reachable = db.prepare(cte).all(serviceId, maxDepth);
     for (const { id } of reachable) {
       if (!nodeMap.has(id)) {
-        const s = db.prepare('SELECT id, name, language FROM services WHERE id = ?').get(id);
-        if (s) nodeMap.set(id, { id: s.id, name: s.name, language: s.language });
+        const s = db
+          .prepare("SELECT id, name, language FROM services WHERE id = ?")
+          .get(id);
+        if (s)
+          nodeMap.set(id, { id: s.id, name: s.name, language: s.language });
       }
     }
 
     // Collect upstream edges
-    const reachableIds = [serviceId, ...reachable.map(r => r.id)];
+    const reachableIds = [serviceId, ...reachable.map((r) => r.id)];
     const connStmt = db.prepare(`
       SELECT c.id, s1.name as source, s2.name as target, c.protocol, c.method, c.path
       FROM connections c
       JOIN services s1 ON c.source_service_id = s1.id
       JOIN services s2 ON c.target_service_id = s2.id
-      WHERE c.source_service_id IN (${reachableIds.map(() => '?').join(',')})
-        AND c.target_service_id IN (${reachableIds.map(() => '?').join(',')})
+      WHERE c.source_service_id IN (${reachableIds.map(() => "?").join(",")})
+        AND c.target_service_id IN (${reachableIds.map(() => "?").join(",")})
     `);
     const conns = connStmt.all(...reachableIds, ...reachableIds);
     for (const conn of conns) {
       const key = `${conn.source}→${conn.target}`;
       if (!edgeSet.has(key)) {
         edgeSet.add(key);
-        edges.push({ source: conn.source, target: conn.target, protocol: conn.protocol, method: conn.method, path: conn.path });
+        edges.push({
+          source: conn.source,
+          target: conn.target,
+          protocol: conn.protocol,
+          method: conn.method,
+          path: conn.path,
+        });
       }
     }
   }
 
   // Remove the root service node from result nodes list (return only connected nodes)
   // Actually include all nodes including root for full subgraph
-  const nodes = Array.from(nodeMap.values()).filter(n => n.id !== serviceId);
+  const nodes = Array.from(nodeMap.values()).filter((n) => n.id !== serviceId);
 
   return { nodes, edges };
 }
@@ -312,7 +366,9 @@ export async function querySearch(db, { query, limit = 20 }) {
 
   // Attempt FTS5 query first
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       SELECT c.path, c.protocol,
              s_src.name as source_service,
              s_tgt.name as target_service
@@ -322,13 +378,17 @@ export async function querySearch(db, { query, limit = 20 }) {
       JOIN services s_tgt ON c.target_service_id = s_tgt.id
       WHERE connections_fts MATCH ?
       LIMIT ?
-    `).all(query, limit);
-    return { results: rows, search_mode: 'fts5' };
+    `,
+      )
+      .all(query, limit);
+    return { results: rows, search_mode: "fts5" };
   } catch (err) {
     // If FTS5 table doesn't exist, fall back to SQL LIKE
-    if (err.message && err.message.includes('no such table: connections_fts')) {
+    if (err.message && err.message.includes("no such table: connections_fts")) {
       const pattern = `%${query}%`;
-      const rows = db.prepare(`
+      const rows = db
+        .prepare(
+          `
         SELECT c.path, c.protocol,
                s_src.name as source_service,
                s_tgt.name as target_service
@@ -337,11 +397,13 @@ export async function querySearch(db, { query, limit = 20 }) {
         JOIN services s_tgt ON c.target_service_id = s_tgt.id
         WHERE c.path LIKE ? OR c.source_file LIKE ?
         LIMIT ?
-      `).all(pattern, pattern, limit);
-      return { results: rows, search_mode: 'sql_fallback' };
+      `,
+        )
+        .all(pattern, pattern, limit);
+      return { results: rows, search_mode: "sql_fallback" };
     }
-    console.error('[allclear-mcp] querySearch error:', err.message);
-    return { results: [], search_mode: 'error' };
+    console.error("[allclear-mcp] querySearch error:", err.message);
+    return { results: [], search_mode: "error" };
   }
 }
 
@@ -352,21 +414,23 @@ export async function querySearch(db, { query, limit = 20 }) {
  */
 export async function queryScan({ repo, full = false } = {}) {
   try {
-    const portFilePath = path.join(dataDir, 'worker.port');
+    const portFilePath = path.join(dataDir, "worker.port");
     let port;
     try {
-      port = fs.readFileSync(portFilePath, 'utf8').trim();
+      port = fs.readFileSync(portFilePath, "utf8").trim();
     } catch {
       return {
-        status: 'unavailable',
-        message: 'Worker not running. Run /allclear:map to build the dependency map.',
+        status: "unavailable",
+        message:
+          "Worker not running. Run /allclear:map to build the dependency map.",
       };
     }
 
     if (!port) {
       return {
-        status: 'unavailable',
-        message: 'Worker not running. Run /allclear:map to build the dependency map.',
+        status: "unavailable",
+        message:
+          "Worker not running. Run /allclear:map to build the dependency map.",
       };
     }
 
@@ -374,29 +438,40 @@ export async function queryScan({ repo, full = false } = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
     try {
-      const res = await fetch(`http://localhost:${port}/api/readiness`, { signal: controller.signal });
+      const res = await fetch(`http://localhost:${port}/api/readiness`, {
+        signal: controller.signal,
+      });
       clearTimeout(timeout);
       if (!res.ok) {
-        return { status: 'unavailable', message: `Worker not responding on port ${port}.` };
+        return {
+          status: "unavailable",
+          message: `Worker not responding on port ${port}.`,
+        };
       }
     } catch (err) {
       clearTimeout(timeout);
-      return { status: 'unavailable', message: `Worker not responding on port ${port}.` };
+      return {
+        status: "unavailable",
+        message: `Worker not responding on port ${port}.`,
+      };
     }
 
     // Trigger scan
     try {
       await fetch(`http://localhost:${port}/scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repo, full }),
       });
-      return { status: 'triggered', message: 'Scan started. Results will be available after confirmation.' };
+      return {
+        status: "triggered",
+        message: "Scan started. Results will be available after confirmation.",
+      };
     } catch (err) {
-      return { status: 'error', message: err.message };
+      return { status: "error", message: err.message };
     }
   } catch (err) {
-    return { status: 'error', message: err.message };
+    return { status: "error", message: err.message };
   }
 }
 
@@ -404,94 +479,140 @@ export async function queryScan({ repo, full = false } = {}) {
 // MCP Server setup
 // ─────────────────────────────────────────────────────────────
 
-const server = new McpServer({ name: 'allclear-impact', version: '2.0.0' });
+const server = new McpServer({ name: "allclear-impact", version: "2.0.0" });
 
 // ── impact_query ─────────────────────────────────────────────
 server.tool(
-  'impact_query',
-  'Query which services consume or are consumed by a given service. Returns direct or transitive dependency relationships.',
+  "impact_query",
+  "Query which services consume or are consumed by a given service. Returns direct or transitive dependency relationships.",
   {
-    service: z.string().describe('Name of the service to query'),
-    endpoint: z.string().optional().describe('Filter by specific endpoint path'),
-    direction: z.enum(['consumes', 'exposes']).default('consumes')
-      .describe('consumes = services this service calls; exposes = services that call this service'),
-    transitive: z.boolean().default(false)
-      .describe('When true, follows dependency chains transitively (up to depth 10)'),
+    service: z.string().describe("Name of the service to query"),
+    endpoint: z
+      .string()
+      .optional()
+      .describe("Filter by specific endpoint path"),
+    direction: z
+      .enum(["consumes", "exposes"])
+      .default("consumes")
+      .describe(
+        "consumes = services this service calls; exposes = services that call this service",
+      ),
+    transitive: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, follows dependency chains transitively (up to depth 10)",
+      ),
   },
   async (params) => {
     const db = openDb();
     const result = await queryImpact(db, params);
     if (db) db.close();
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
 );
 
 // ── impact_changed ───────────────────────────────────────────
 server.tool(
-  'impact_changed',
-  'Identify which services are affected by currently changed files in the git working tree.',
+  "impact_changed",
+  "Identify which services are affected by currently changed files in the git working tree.",
   {
-    repo: z.string().optional().describe('Absolute path to the git repo (defaults to cwd)'),
-    commit_range: z.string().optional().describe('Git commit range e.g. "HEAD~3..HEAD" — if omitted, uses working tree diff'),
+    repo: z
+      .string()
+      .optional()
+      .describe("Absolute path to the git repo (defaults to cwd)"),
+    commit_range: z
+      .string()
+      .optional()
+      .describe(
+        'Git commit range e.g. "HEAD~3..HEAD" — if omitted, uses working tree diff',
+      ),
   },
   async (params) => {
     const db = openDb();
     const result = await queryChanged(db, params);
     if (db) db.close();
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
 );
 
 // ── impact_graph ─────────────────────────────────────────────
 server.tool(
-  'impact_graph',
-  'Return the dependency subgraph (nodes + edges) for a service up to a given depth.',
+  "impact_graph",
+  "Return the dependency subgraph (nodes + edges) for a service up to a given depth.",
   {
-    service: z.string().describe('Name of the service to centre the graph on'),
-    depth: z.number().int().min(1).max(5).default(2)
-      .describe('How many hops to traverse (max 5)'),
-    direction: z.enum(['upstream', 'downstream', 'both']).default('both')
-      .describe('Which direction to traverse: upstream = callers, downstream = callees, both = full neighbourhood'),
+    service: z.string().describe("Name of the service to centre the graph on"),
+    depth: z
+      .number()
+      .int()
+      .min(1)
+      .max(5)
+      .default(2)
+      .describe("How many hops to traverse (max 5)"),
+    direction: z
+      .enum(["upstream", "downstream", "both"])
+      .default("both")
+      .describe(
+        "Which direction to traverse: upstream = callers, downstream = callees, both = full neighbourhood",
+      ),
   },
   async (params) => {
     const db = openDb();
     const result = await queryGraph(db, params);
     if (db) db.close();
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
 );
 
 // ── impact_search ─────────────────────────────────────────────
 server.tool(
-  'impact_search',
-  'Full-text search across all service connections by path, protocol, or file name. Falls back to SQL LIKE when FTS5 index is unavailable.',
+  "impact_search",
+  "Full-text search across all service connections by path, protocol, or file name. Falls back to SQL LIKE when FTS5 index is unavailable.",
   {
-    query: z.string().describe('Search term to match against connection paths, protocols, and file names'),
-    limit: z.number().int().min(1).max(100).default(20).describe('Maximum number of results to return'),
+    query: z
+      .string()
+      .describe(
+        "Search term to match against connection paths, protocols, and file names",
+      ),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe("Maximum number of results to return"),
   },
   async (params) => {
     const db = openDb();
     const result = await querySearch(db, params);
     if (db) db.close();
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
 );
 
 // ── impact_scan ──────────────────────────────────────────────
 server.tool(
-  'impact_scan',
-  'Trigger a dependency scan via the AllClear HTTP worker. Returns unavailable when the worker is not running.',
+  "impact_scan",
+  "Trigger a dependency scan via the AllClear HTTP worker. Returns unavailable when the worker is not running.",
   {
-    repo: z.string().optional().describe('Absolute path to the repo to scan (defaults to cwd)'),
-    full: z.boolean().default(false).describe('When true, forces a full re-scan instead of an incremental scan'),
+    repo: z
+      .string()
+      .optional()
+      .describe("Absolute path to the repo to scan (defaults to cwd)"),
+    full: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, forces a full re-scan instead of an incremental scan",
+      ),
   },
   async (params) => {
     const result = await queryScan(params);
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
 );
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.on('SIGTERM', () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));

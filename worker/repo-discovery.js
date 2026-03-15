@@ -13,13 +13,19 @@
  *   formatRepoList(repos)                  — format repo list for CLI output
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 
 // ---------------------------------------------------------------------------
 // Manifest files that identify a directory as a project repo
 // ---------------------------------------------------------------------------
-const MANIFESTS = ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'pom.xml'];
+const MANIFESTS = [
+  "package.json",
+  "pyproject.toml",
+  "go.mod",
+  "Cargo.toml",
+  "pom.xml",
+];
 
 // ---------------------------------------------------------------------------
 // loadFromConfig(projectRoot)
@@ -29,25 +35,25 @@ const MANIFESTS = ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'po
 // linked-repos relative to projectRoot.
 // ---------------------------------------------------------------------------
 export function loadFromConfig(projectRoot) {
-  const configPath = path.join(projectRoot, 'allclear.config.json');
+  const configPath = path.join(projectRoot, "allclear.config.json");
   let config;
   try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   } catch {
     return [];
   }
 
-  const linkedRepos = config['linked-repos'];
+  const linkedRepos = config["linked-repos"];
   if (!Array.isArray(linkedRepos) || linkedRepos.length === 0) {
     return [];
   }
 
-  return linkedRepos.map(p => {
+  return linkedRepos.map((p) => {
     const resolved = path.resolve(projectRoot, p);
     return {
       path: resolved,
       name: path.basename(resolved),
-      source: 'config',
+      source: "config",
       isNew: false,
     };
   });
@@ -65,12 +71,12 @@ export function loadFromConfig(projectRoot) {
 // ---------------------------------------------------------------------------
 export function discoverNew(projectRoot, existingPaths) {
   const resolvedProject = path.resolve(projectRoot);
-  const parentDir = path.join(resolvedProject, '..');
+  const parentDir = path.join(resolvedProject, "..");
 
   // Build exclusion set (normalized absolute paths)
   const excluded = new Set([
     resolvedProject,
-    ...existingPaths.map(p => path.resolve(p)),
+    ...existingPaths.map((p) => path.resolve(p)),
   ]);
 
   let entries;
@@ -88,15 +94,15 @@ export function discoverNew(projectRoot, existingPaths) {
     if (excluded.has(absPath)) continue;
 
     // Check if any manifest file exists in this directory
-    const hasManifest = MANIFESTS.some(manifest =>
-      fs.existsSync(path.join(absPath, manifest))
+    const hasManifest = MANIFESTS.some((manifest) =>
+      fs.existsSync(path.join(absPath, manifest)),
     );
 
     if (hasManifest) {
       discovered.push({
         path: absPath,
         name: path.basename(absPath),
-        source: 'discovered',
+        source: "discovered",
         isNew: true,
       });
     }
@@ -123,7 +129,7 @@ export function deduplicateRepos(repos) {
     } else {
       // config always beats discovered for the same path
       const existing = map.get(key);
-      if (existing.source !== 'config' && repo.source === 'config') {
+      if (existing.source !== "config" && repo.source === "config") {
         map.set(key, repo);
       }
     }
@@ -140,16 +146,16 @@ export function deduplicateRepos(repos) {
 // all other keys. Creates the file if absent.
 // ---------------------------------------------------------------------------
 export function saveConfirmed(projectRoot, confirmedPaths) {
-  const configPath = path.join(projectRoot, 'allclear.config.json');
+  const configPath = path.join(projectRoot, "allclear.config.json");
   let config = {};
   try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   } catch {
     // File absent or unreadable — start with empty config
   }
 
-  config['linked-repos'] = confirmedPaths;
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  config["linked-repos"] = confirmedPaths;
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +164,7 @@ export function saveConfirmed(projectRoot, confirmedPaths) {
 // Returns true if the args array contains "--view", false otherwise.
 // ---------------------------------------------------------------------------
 export function isViewOnlyMode(args) {
-  return args.includes('--view');
+  return args.includes("--view");
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +175,7 @@ export function isViewOnlyMode(args) {
 // ones with a [NEW] marker.
 // ---------------------------------------------------------------------------
 export function formatRepoList(repos) {
-  const newCount = repos.filter(r => r.isNew).length;
+  const newCount = repos.filter((r) => r.isNew).length;
   const lines = [];
 
   lines.push(`Found ${repos.length} repos (${newCount} new)`);
@@ -182,7 +188,7 @@ export function formatRepoList(repos) {
     }
   }
 
-  lines.push('Confirm this list, or tell me which repos to add or remove.');
+  lines.push("Confirm this list, or tell me which repos to add or remove.");
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

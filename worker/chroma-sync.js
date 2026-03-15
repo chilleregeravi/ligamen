@@ -19,9 +19,9 @@
  *   - chromaAvailable is set once at startup via heartbeat(), not per-query
  */
 
-import { ChromaClient } from 'chromadb';
+import { ChromaClient } from "chromadb";
 
-const COLLECTION_NAME = 'allclear-impact';
+const COLLECTION_NAME = "allclear-impact";
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -73,10 +73,10 @@ export async function initChromaSync(settings = {}, mockClient = null) {
     if (mockClient) {
       client = mockClient;
     } else {
-      const host = settings.ALLCLEAR_CHROMA_HOST || 'localhost';
-      const port = parseInt(settings.ALLCLEAR_CHROMA_PORT || '8000', 10);
-      const ssl = settings.ALLCLEAR_CHROMA_SSL === 'true';
-      const protocol = ssl ? 'https' : 'http';
+      const host = settings.ALLCLEAR_CHROMA_HOST || "localhost";
+      const port = parseInt(settings.ALLCLEAR_CHROMA_PORT || "8000", 10);
+      const ssl = settings.ALLCLEAR_CHROMA_SSL === "true";
+      const protocol = ssl ? "https" : "http";
       // ChromaClient constructor never throws (chromadb v3) — errors surface on heartbeat()
       client = new ChromaClient({ path: `${protocol}://${host}:${port}` });
     }
@@ -89,7 +89,7 @@ export async function initChromaSync(settings = {}, mockClient = null) {
     _chromaAvailable = true;
     return true;
   } catch (err) {
-    process.stderr.write('[chroma] init failed: ' + err.message + '\n');
+    process.stderr.write("[chroma] init failed: " + err.message + "\n");
     _chromaAvailable = false;
     _collection = null;
     return false;
@@ -123,14 +123,18 @@ export async function syncFindings(findings) {
       const svcId = `svc:${svc.name}`;
       ids.push(svcId);
       documents.push(svc.name);
-      metadatas.push({ type: 'service', name: svc.name });
+      metadatas.push({ type: "service", name: svc.name });
 
       // Add each endpoint path as a separate document
       for (const endpoint of svc.endpoints || []) {
         const epId = `ep:${svc.name}:${endpoint.path}`;
         ids.push(epId);
         documents.push(`${svc.name} ${endpoint.path}`);
-        metadatas.push({ type: 'endpoint', service: svc.name, path: endpoint.path });
+        metadatas.push({
+          type: "endpoint",
+          service: svc.name,
+          path: endpoint.path,
+        });
       }
     }
 
@@ -139,7 +143,7 @@ export async function syncFindings(findings) {
     }
   } catch (err) {
     // Log but never rethrow — fire-and-forget contract
-    process.stderr.write('[chroma] syncFindings error: ' + err.message + '\n');
+    process.stderr.write("[chroma] syncFindings error: " + err.message + "\n");
   }
 }
 
@@ -155,7 +159,7 @@ export async function syncFindings(findings) {
 export async function chromaSearch(query, limit) {
   // Intentionally throws — caller (query-engine.js) uses this to trigger FTS5 fallback
   if (!_chromaAvailable || !_collection) {
-    throw new Error('ChromaDB not available');
+    throw new Error("ChromaDB not available");
   }
 
   const response = await _collection.query({
@@ -171,7 +175,7 @@ export async function chromaSearch(query, limit) {
 
   return ids.map((id, i) => ({
     id,
-    document: docs[i] || '',
+    document: docs[i] || "",
     score: distances[i] ?? 0,
     metadata: metas[i] || {},
   }));

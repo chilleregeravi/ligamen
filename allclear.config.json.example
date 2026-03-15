@@ -1,7 +1,3 @@
 {
-  "siblings": [
-    "../api",
-    "../ui",
-    "../sdk"
-  ]
+  "linked-repos": ["../api", "../ui", "../sdk"]
 }

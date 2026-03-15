@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # scripts/impact.sh — Cross-repo reference scanner for AllClear
 # Usage: bash scripts/impact.sh [symbol...] [--changed] [--exclude <repo>]
-# Scans sibling repositories for references to specified symbols.
+# Scans linked repositories for references to specified symbols.
 # Classifies matches as code, config, docs, or test based on file path.
 # Groups output by repo in tab-separated format: repo\tterm\ttype\tfilepath
 set -euo pipefail
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-source "${PLUGIN_ROOT}/lib/siblings.sh"
+source "${PLUGIN_ROOT}/lib/linked-repos.sh"
 
 # ─── classify_match ──────────────────────────────────────────────────────────
 # Classifies a file path into: test | docs | config | code (default)
@@ -100,16 +100,16 @@ if [[ ${#TERMS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-# ─── Discover sibling repos ───────────────────────────────────────────────────
-SIBLINGS="$(list_siblings 2>/dev/null)"
+# ─── Discover linked repos ───────────────────────────────────────────────────
+LINKED_REPOS="$(list_linked_repos 2>/dev/null)"
 
 echo "Scanning for: ${TERMS[*]}"
 echo "---"
 
-# ─── Scan each sibling ────────────────────────────────────────────────────────
-while IFS= read -r sibling_path; do
-  [[ -z "$sibling_path" ]] && continue
-  repo_name="$(basename "$sibling_path")"
+# ─── Scan each linked ────────────────────────────────────────────────────────
+while IFS= read -r linked_path; do
+  [[ -z "$linked_path" ]] && continue
+  repo_name="$(basename "$linked_path")"
 
   # Apply --exclude list
   skip=false
@@ -148,7 +148,7 @@ while IFS= read -r sibling_path; do
       --exclude-dir="dist" \
       --exclude-dir="build" \
       --exclude-dir=".planning" \
-      "$term" "$sibling_path" 2>/dev/null | \
+      "$term" "$linked_path" 2>/dev/null | \
     awk -F: -v term="$term" -v repo="$repo_name" '
       {
         filepath = $1
@@ -192,4 +192,4 @@ while IFS= read -r sibling_path; do
   done
 
   echo ""
-done <<< "$SIBLINGS"
+done <<< "$LINKED_REPOS"

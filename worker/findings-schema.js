@@ -31,13 +31,20 @@
  */
 
 /** @type {string[]} */
-export const VALID_PROTOCOLS = ['rest', 'grpc', 'kafka', 'rabbitmq', 'internal', 'sdk'];
+export const VALID_PROTOCOLS = [
+  "rest",
+  "grpc",
+  "kafka",
+  "rabbitmq",
+  "internal",
+  "sdk",
+];
 
 /** @type {string[]} */
-export const VALID_CONFIDENCE = ['high', 'low'];
+export const VALID_CONFIDENCE = ["high", "low"];
 
 /** @type {string[]} */
-export const VALID_ROLES = ['request', 'response', 'event_payload'];
+export const VALID_ROLES = ["request", "response", "event_payload"];
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -73,80 +80,92 @@ function ok(findings) {
  */
 export function validateFindings(obj) {
   // Top-level type check
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    return err('findings must be an object');
+  if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+    return err("findings must be an object");
   }
 
   // Required array fields checked first so that validateFindings({}) yields
   // the most actionable error ("missing required field: connections") per spec.
   if (!Array.isArray(obj.connections)) {
-    return err('missing required field: connections (must be an array)');
+    return err("missing required field: connections (must be an array)");
   }
 
   if (!Array.isArray(obj.services)) {
-    return err('missing required field: services (must be an array)');
+    return err("missing required field: services (must be an array)");
   }
 
   if (!Array.isArray(obj.schemas)) {
-    return err('missing required field: schemas (must be an array)');
+    return err("missing required field: schemas (must be an array)");
   }
 
   // Required top-level string fields
-  if (typeof obj.service_name !== 'string' || obj.service_name === '') {
-    return err('missing required field: service_name (must be a non-empty string)');
+  if (typeof obj.service_name !== "string" || obj.service_name === "") {
+    return err(
+      "missing required field: service_name (must be a non-empty string)",
+    );
   }
 
   if (!VALID_CONFIDENCE.includes(obj.confidence)) {
-    return err(`confidence must be one of: ${VALID_CONFIDENCE.join(', ')}`);
+    return err(`confidence must be one of: ${VALID_CONFIDENCE.join(", ")}`);
   }
 
   // Validate services
   for (let i = 0; i < obj.services.length; i++) {
     const svc = obj.services[i];
-    if (typeof svc !== 'object' || svc === null) {
+    if (typeof svc !== "object" || svc === null) {
       return err(`services[${i}] must be an object`);
     }
-    if (typeof svc.name !== 'string') {
+    if (typeof svc.name !== "string") {
       return err(`services[${i}].name must be a string`);
     }
     if (!VALID_CONFIDENCE.includes(svc.confidence)) {
-      return err(`services[${i}].confidence must be one of: ${VALID_CONFIDENCE.join(', ')}`);
+      return err(
+        `services[${i}].confidence must be one of: ${VALID_CONFIDENCE.join(", ")}`,
+      );
     }
   }
 
   // Validate connections
   for (let i = 0; i < obj.connections.length; i++) {
     const conn = obj.connections[i];
-    if (typeof conn !== 'object' || conn === null) {
+    if (typeof conn !== "object" || conn === null) {
       return err(`connection[${i}] must be an object`);
     }
-    if (typeof conn.source !== 'string') {
+    if (typeof conn.source !== "string") {
       return err(`connection[${i}].source must be a string`);
     }
-    if (typeof conn.target !== 'string') {
+    if (typeof conn.target !== "string") {
       return err(`connection[${i}].target must be a string`);
     }
     if (!VALID_PROTOCOLS.includes(conn.protocol)) {
-      return err(`connection[${i}].protocol must be one of: ${VALID_PROTOCOLS.join(', ')}`);
+      return err(
+        `connection[${i}].protocol must be one of: ${VALID_PROTOCOLS.join(", ")}`,
+      );
     }
-    if (typeof conn.method !== 'string') {
+    if (typeof conn.method !== "string") {
       return err(`connection[${i}].method must be a string`);
     }
-    if (typeof conn.path !== 'string') {
+    if (typeof conn.path !== "string") {
       return err(`connection[${i}].path must be a string`);
     }
     // source_file must be string or null
-    if (conn.source_file !== null && typeof conn.source_file !== 'string') {
+    if (conn.source_file !== null && typeof conn.source_file !== "string") {
       return err(`connection[${i}].source_file must be a string or null`);
     }
     // target_file is optional — but if present must be string or null
-    if ('target_file' in conn && conn.target_file !== null && typeof conn.target_file !== 'string') {
+    if (
+      "target_file" in conn &&
+      conn.target_file !== null &&
+      typeof conn.target_file !== "string"
+    ) {
       return err(`connection[${i}].target_file must be a string or null`);
     }
     if (!VALID_CONFIDENCE.includes(conn.confidence)) {
-      return err(`connection[${i}].confidence must be one of: ${VALID_CONFIDENCE.join(', ')}`);
+      return err(
+        `connection[${i}].confidence must be one of: ${VALID_CONFIDENCE.join(", ")}`,
+      );
     }
-    if (typeof conn.evidence !== 'string') {
+    if (typeof conn.evidence !== "string") {
       return err(`connection[${i}].evidence must be a string`);
     }
   }
@@ -154,16 +173,16 @@ export function validateFindings(obj) {
   // Validate schemas
   for (let i = 0; i < obj.schemas.length; i++) {
     const schema = obj.schemas[i];
-    if (typeof schema !== 'object' || schema === null) {
+    if (typeof schema !== "object" || schema === null) {
       return err(`schema[${i}] must be an object`);
     }
-    if (typeof schema.name !== 'string') {
+    if (typeof schema.name !== "string") {
       return err(`schema[${i}].name must be a string`);
     }
     if (!VALID_ROLES.includes(schema.role)) {
-      return err(`schema[${i}].role must be one of: ${VALID_ROLES.join(', ')}`);
+      return err(`schema[${i}].role must be one of: ${VALID_ROLES.join(", ")}`);
     }
-    if (typeof schema.file !== 'string') {
+    if (typeof schema.file !== "string") {
       return err(`schema[${i}].file must be a string`);
     }
     if (!Array.isArray(schema.fields)) {
@@ -171,16 +190,16 @@ export function validateFindings(obj) {
     }
     for (let j = 0; j < schema.fields.length; j++) {
       const field = schema.fields[j];
-      if (typeof field !== 'object' || field === null) {
+      if (typeof field !== "object" || field === null) {
         return err(`schema[${i}].fields[${j}] must be an object`);
       }
-      if (typeof field.name !== 'string') {
+      if (typeof field.name !== "string") {
         return err(`schema[${i}].fields[${j}].name must be a string`);
       }
-      if (typeof field.type !== 'string') {
+      if (typeof field.type !== "string") {
         return err(`schema[${i}].fields[${j}].type must be a string`);
       }
-      if (typeof field.required !== 'boolean') {
+      if (typeof field.required !== "boolean") {
         return err(`schema[${i}].fields[${j}].required must be a boolean`);
       }
     }
@@ -204,13 +223,13 @@ const JSON_BLOCK_RE = /```json\s*\n([\s\S]*?)\n```/;
  * @returns {FindingsResult}
  */
 export function parseAgentOutput(rawText) {
-  if (typeof rawText !== 'string') {
-    return err('no JSON block found in agent output');
+  if (typeof rawText !== "string") {
+    return err("no JSON block found in agent output");
   }
 
   const match = rawText.match(JSON_BLOCK_RE);
   if (!match) {
-    return err('no JSON block found in agent output');
+    return err("no JSON block found in agent output");
   }
 
   const jsonStr = match[1].trim();

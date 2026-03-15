@@ -11,7 +11,7 @@ setup() {
   # Reset the guard variable before each test so lib/config.sh re-loads
   unset _ALLCLEAR_CONFIG_LOADED
   unset ALLCLEAR_CONFIG_FILE
-  unset ALLCLEAR_CONFIG_SIBLINGS
+  unset ALLCLEAR_CONFIG_LINKED_REPOS
   # Save original directory
   ORIG_DIR="$PWD"
 }
@@ -22,7 +22,7 @@ teardown() {
   # Reset the guard variable after each test
   unset _ALLCLEAR_CONFIG_LOADED
   unset ALLCLEAR_CONFIG_FILE
-  unset ALLCLEAR_CONFIG_SIBLINGS
+  unset ALLCLEAR_CONFIG_LINKED_REPOS
 }
 
 # ---------------------------------------------------------------------------
@@ -32,16 +32,16 @@ teardown() {
 @test "config.sh loads siblings from allclear.config.json" {
   cd "$FIXTURE_DIR"
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_SIBLINGS[@]}" -eq 3 ]
-  [ "${ALLCLEAR_CONFIG_SIBLINGS[0]}" = "../api" ]
-  [ "${ALLCLEAR_CONFIG_SIBLINGS[1]}" = "../ui" ]
-  [ "${ALLCLEAR_CONFIG_SIBLINGS[2]}" = "/opt/repos/sdk" ]
+  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 3 ]
+  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[0]}" = "../api" ]
+  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[1]}" = "../ui" ]
+  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[2]}" = "/opt/repos/sdk" ]
 }
 
 @test "config.sh returns empty siblings when no config file" {
   cd "$BATS_TEST_TMPDIR"
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_SIBLINGS[@]}" -eq 0 ]
+  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 0 ]
 }
 
 @test "config.sh warns on malformed JSON" {
@@ -66,7 +66,7 @@ teardown() {
   unset _ALLCLEAR_CONFIG_LOADED
   cd "$tmpdir"
   source "$LIB_CONFIG" 2>/dev/null
-  [ "${#ALLCLEAR_CONFIG_SIBLINGS[@]}" -eq 0 ]
+  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 0 ]
 }
 
 @test "config.sh respects ALLCLEAR_CONFIG_FILE override" {
@@ -74,17 +74,17 @@ teardown() {
   cd "$BATS_TEST_TMPDIR"
   export ALLCLEAR_CONFIG_FILE="$FIXTURE_DIR/allclear.config.json"
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_SIBLINGS[@]}" -eq 3 ]
-  [ "${ALLCLEAR_CONFIG_SIBLINGS[0]}" = "../api" ]
+  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 3 ]
+  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[0]}" = "../api" ]
 }
 
 @test "config.sh guard prevents double loading" {
   cd "$FIXTURE_DIR"
   source "$LIB_CONFIG"
-  local first_count="${#ALLCLEAR_CONFIG_SIBLINGS[@]}"
+  local first_count="${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}"
   # Source again — should return early, no error
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_SIBLINGS[@]}" -eq "$first_count" ]
+  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq "$first_count" ]
 }
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,14 @@
+{
+  "name": "allclear",
+  "owner": {
+    "name": "AllClear Contributors"
+  },
+  "plugins": [
+    {
+      "name": "allclear",
+      "version": "0.1.0",
+      "source": "./plugins/allclear",
+      "description": "Auto-format, auto-lint, and cross-repo quality gates for Claude Code"
+    }
+  ]
+}

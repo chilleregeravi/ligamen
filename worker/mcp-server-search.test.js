@@ -3,24 +3,21 @@
  * Run: node --test worker/mcp-server-search.test.js
  */
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import Database from 'better-sqlite3';
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import Database from "better-sqlite3";
 
 // Import query functions exported from mcp-server.js
-import {
-  querySearch,
-  queryScan,
-} from './mcp-server.js';
+import { querySearch, queryScan } from "./mcp-server.js";
 
 // ─────────────────────────────────────────────────────────────
 // Test DB setup helpers
 // ─────────────────────────────────────────────────────────────
 
 function createTestDb({ withFts = true } = {}) {
-  const db = new Database(':memory:');
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  const db = new Database(":memory:");
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
 
   db.exec(`
     CREATE TABLE repos (
@@ -67,13 +64,37 @@ function createTestDb({ withFts = true } = {}) {
     `);
   }
 
-  db.prepare('INSERT INTO repos VALUES (1, ?, ?, ?, ?, ?)').run('/repo', 'main-repo', 'monorepo', null, null);
-  db.prepare('INSERT INTO services VALUES (?, ?, ?, ?, ?)').run(1, 1, 'order-service', '/repo/orders', 'javascript');
-  db.prepare('INSERT INTO services VALUES (?, ?, ?, ?, ?)').run(2, 1, 'payment-service', '/repo/payments', 'javascript');
+  db.prepare("INSERT INTO repos VALUES (1, ?, ?, ?, ?, ?)").run(
+    "/repo",
+    "main-repo",
+    "monorepo",
+    null,
+    null,
+  );
+  db.prepare("INSERT INTO services VALUES (?, ?, ?, ?, ?)").run(
+    1,
+    1,
+    "order-service",
+    "/repo/orders",
+    "javascript",
+  );
+  db.prepare("INSERT INTO services VALUES (?, ?, ?, ?, ?)").run(
+    2,
+    1,
+    "payment-service",
+    "/repo/payments",
+    "javascript",
+  );
 
-  db.prepare('INSERT INTO connections VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-    1, 1, 2, 'http', 'POST', '/payments/charge',
-    '/repo/orders/src/checkout.js', '/repo/payments/src/handler.js'
+  db.prepare("INSERT INTO connections VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+    1,
+    1,
+    2,
+    "http",
+    "POST",
+    "/payments/charge",
+    "/repo/orders/src/checkout.js",
+    "/repo/payments/src/handler.js",
   );
 
   return db;
@@ -83,74 +104,77 @@ function createTestDb({ withFts = true } = {}) {
 // querySearch tests
 // ─────────────────────────────────────────────────────────────
 
-test('querySearch: null db returns empty results', async () => {
-  const result = await querySearch(null, { query: 'payment', limit: 20 });
+test("querySearch: null db returns empty results", async () => {
+  const result = await querySearch(null, { query: "payment", limit: 20 });
   assert.deepEqual(result.results, []);
 });
 
-test('querySearch: FTS5 query returns matching rows', async () => {
+test("querySearch: FTS5 query returns matching rows", async () => {
   const db = createTestDb({ withFts: true });
   // FTS5 uses token-based matching: "payments" is the token in the path "/payments/charge"
-  const result = await querySearch(db, { query: 'payments', limit: 20 });
+  const result = await querySearch(db, { query: "payments", limit: 20 });
   db.close();
-  assert.ok(Array.isArray(result.results), 'results should be array');
-  assert.ok(result.results.length >= 1, 'expected at least one FTS match');
-  assert.equal(result.search_mode, 'fts5');
+  assert.ok(Array.isArray(result.results), "results should be array");
+  assert.ok(result.results.length >= 1, "expected at least one FTS match");
+  assert.equal(result.search_mode, "fts5");
   const row = result.results[0];
-  assert.ok('source_service' in row, 'row should have source_service');
-  assert.ok('target_service' in row, 'row should have target_service');
-  assert.ok('path' in row, 'row should have path');
-  assert.ok('protocol' in row, 'row should have protocol');
+  assert.ok("source_service" in row, "row should have source_service");
+  assert.ok("target_service" in row, "row should have target_service");
+  assert.ok("path" in row, "row should have path");
+  assert.ok("protocol" in row, "row should have protocol");
 });
 
-test('querySearch: FTS5 query with no match returns empty results', async () => {
+test("querySearch: FTS5 query with no match returns empty results", async () => {
   const db = createTestDb({ withFts: true });
-  const result = await querySearch(db, { query: 'zzz_no_match_xyz', limit: 20 });
+  const result = await querySearch(db, {
+    query: "zzz_no_match_xyz",
+    limit: 20,
+  });
   db.close();
   assert.deepEqual(result.results, []);
-  assert.equal(result.search_mode, 'fts5');
+  assert.equal(result.search_mode, "fts5");
 });
 
-test('querySearch: falls back to SQL LIKE when FTS5 table absent', async () => {
+test("querySearch: falls back to SQL LIKE when FTS5 table absent", async () => {
   const db = createTestDb({ withFts: false });
   // connections_fts table does not exist
-  const result = await querySearch(db, { query: 'payment', limit: 20 });
+  const result = await querySearch(db, { query: "payment", limit: 20 });
   db.close();
-  assert.ok(Array.isArray(result.results), 'results should be array');
-  assert.ok(result.results.length >= 1, 'expected at least one LIKE match');
-  assert.equal(result.search_mode, 'sql_fallback');
+  assert.ok(Array.isArray(result.results), "results should be array");
+  assert.ok(result.results.length >= 1, "expected at least one LIKE match");
+  assert.equal(result.search_mode, "sql_fallback");
 });
 
-test('querySearch: respects limit parameter', async () => {
+test("querySearch: respects limit parameter", async () => {
   const db = createTestDb({ withFts: true });
-  const result = await querySearch(db, { query: 'payment', limit: 1 });
+  const result = await querySearch(db, { query: "payment", limit: 1 });
   db.close();
-  assert.ok(result.results.length <= 1, 'limit should be respected');
+  assert.ok(result.results.length <= 1, "limit should be respected");
 });
 
 // ─────────────────────────────────────────────────────────────
 // queryScan tests
 // ─────────────────────────────────────────────────────────────
 
-test('queryScan: returns unavailable when port file does not exist', async () => {
-  const result = await queryScan({ repo: '/nonexistent/path/abc123' });
-  assert.equal(result.status, 'unavailable');
-  assert.ok(typeof result.message === 'string');
+test("queryScan: returns unavailable when port file does not exist", async () => {
+  const result = await queryScan({ repo: "/nonexistent/path/abc123" });
+  assert.equal(result.status, "unavailable");
+  assert.ok(typeof result.message === "string");
 });
 
-test('queryScan: never throws — always returns structured object', async () => {
+test("queryScan: never throws — always returns structured object", async () => {
   let result;
   try {
-    result = await queryScan({ repo: '/nonexistent/path/abc123' });
+    result = await queryScan({ repo: "/nonexistent/path/abc123" });
   } catch {
-    assert.fail('queryScan should not throw');
+    assert.fail("queryScan should not throw");
   }
-  assert.ok('status' in result, 'result should have status');
-  assert.ok('message' in result, 'result should have message');
+  assert.ok("status" in result, "result should have status");
+  assert.ok("message" in result, "result should have message");
 });
 
-test('queryScan: returns object with status and message fields', async () => {
+test("queryScan: returns object with status and message fields", async () => {
   const result = await queryScan({});
-  assert.ok(typeof result.status === 'string', 'status should be string');
-  assert.ok(typeof result.message === 'string', 'message should be string');
+  assert.ok(typeof result.status === "string", "status should be string");
+  assert.ok(typeof result.message === "string", "message should be string");
 });

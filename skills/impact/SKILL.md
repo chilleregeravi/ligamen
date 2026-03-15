@@ -17,10 +17,12 @@ For full execution instructions, invoke the `/allclear:map` command which contai
 When this is the first successful map build (no prior map_versions, i.e., `isFirstScan()` returned true before this scan), output these recommendations to the user:
 
 ---
+
 Map built successfully. To unlock the full AllClear experience:
 
 **1. Enable semantic search (optional but recommended)**
 Add to ~/.allclear/settings.json:
+
 ```json
 {
   "ALLCLEAR_CHROMA_MODE": "local",
@@ -28,10 +30,12 @@ Add to ~/.allclear/settings.json:
   "ALLCLEAR_CHROMA_PORT": "8000"
 }
 ```
+
 Then start ChromaDB: `docker run -p 8000:8000 chromadb/chroma`
 
 **2. Add AllClear impact checking to all your Claude agents**
 Create or update `.mcp.json` at your project root:
+
 ```json
 {
   "mcpServers": {
@@ -43,8 +47,8 @@ Create or update `.mcp.json` at your project root:
   }
 }
 ```
-After saving, fully restart Claude Code for MCP changes to take effect.
----
+
+## After saving, fully restart Claude Code for MCP changes to take effect.
 
 The `/allclear:map` skill reads this section and outputs it verbatim after the first successful persist.
 The check `isFirstScan()` from `worker/db.js` is called before `writeScan()` to determine whether to show this.

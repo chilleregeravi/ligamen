@@ -31,16 +31,17 @@ GRAPH_RESPONSE=$(worker_call GET /graph 2>/dev/null || echo "[]")
 ```
 
 Parse the response:
+
 - If `GRAPH_RESPONSE` contains at least one service node (non-empty array / non-empty `services` key), set `MAP_HAS_DATA=yes`.
 - Otherwise set `MAP_HAS_DATA=no`.
 
 **Three degradation states:**
 
-| State | Condition | Action |
-|-------|-----------|--------|
-| A — No worker, no map | `WORKER_UP=no` | Jump to **Legacy Fallback** |
-| B — Worker up, no map data | `WORKER_UP=yes`, `MAP_HAS_DATA=no` | Print "No scan data found. Run `/allclear:map` to build the dependency map first." — then jump to **Legacy Fallback** (still provide grep results as a partial answer) |
-| C — Worker up, map has data | `WORKER_UP=yes`, `MAP_HAS_DATA=yes` | Proceed with **Graph Query Flow** |
+| State                       | Condition                           | Action                                                                                                                                                                 |
+| --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — No worker, no map       | `WORKER_UP=no`                      | Jump to **Legacy Fallback**                                                                                                                                            |
+| B — Worker up, no map data  | `WORKER_UP=yes`, `MAP_HAS_DATA=no`  | Print "No scan data found. Run `/allclear:map` to build the dependency map first." — then jump to **Legacy Fallback** (still provide grep results as a partial answer) |
+| C — Worker up, map has data | `WORKER_UP=yes`, `MAP_HAS_DATA=yes` | Proceed with **Graph Query Flow**                                                                                                                                      |
 
 > **Important:** Do NOT attempt to start the worker from this command. The map orchestrator (`/allclear:map`) owns the worker lifecycle. Cross-impact is a query-only command.
 
@@ -51,6 +52,7 @@ Parse the response:
 ### Step 1: Detect Changes
 
 Parse arguments from the user's invocation:
+
 - Collect positional args as the target symbol or endpoint path.
 - Detect `--changed` flag (treat same as no symbol: auto-detect from git diff).
 - Collect `--exclude` repo names.
@@ -67,6 +69,7 @@ CHANGED_FILES=$(printf "%s\n%s\n" "$DIFF_UNCOMMITTED" "$DIFF_RECENT" | sort -u |
 ```
 
 If `CHANGED_FILES` is empty and no symbol was provided, ask:
+
 > No changes detected. What would you like to check? (enter a service name or endpoint path)
 
 If a symbol argument was provided, use it directly as the query target.
@@ -86,6 +89,7 @@ TRANSITIVE_RESPONSE=$(worker_call GET "/impact?change=$(python3 -c 'import urlli
 Collect all `affected` items from all responses. Deduplicate by `service` + `change_type`.
 
 The worker returns JSON in this shape:
+
 ```json
 {
   "affected": [
@@ -102,6 +106,7 @@ The worker returns JSON in this shape:
 ```
 
 Severity mapping:
+
 - `endpoint_removed` → **CRITICAL**
 - `field_type_changed` → **WARN**
 - `field_added` → **INFO**
@@ -134,6 +139,7 @@ Transitive blast radius: <total unique services across all hops>
 ```
 
 If no affected services found, print:
+
 ```
 No impact found. Changes appear safe. (Verify the map is up to date.)
 ```
@@ -150,6 +156,7 @@ CURRENT_HEAD=$(git rev-parse HEAD 2>/dev/null)
 Check the `repo_state` table (via the `/graph` response or a direct query) — if the `last_scanned_commit` for any linked repo is earlier than its current HEAD, the map may be stale.
 
 If potentially stale, print:
+
 ```
 Note: Your dependency map may not reflect recent code changes.
 Run `/allclear:map` to re-scan and catch any new or removed connections.
@@ -179,22 +186,28 @@ Auto-discovered repos: !`source ${CLAUDE_PLUGIN_ROOT}/lib/linked-repos.sh && lis
 **Follow this decision tree before proceeding to the scan:**
 
 #### If `allclear.config.json` exists and has a non-empty `linked-repos` array:
+
 - Show the configured repos to the user: "Using linked repos from allclear.config.json: [list]"
 - Proceed to the Legacy Scan step.
 
 #### If `allclear.config.json` does NOT exist or has no `linked-repos`:
+
 Ask the user:
+
 > No linked repos configured. Would you like to:
+>
 > 1. **Auto-detect** — scan for repos and confirm
 > 2. **Manual** — enter repo paths yourself
 > 3. **Skip** — run without config (uses auto-discovery this time only)
 
 **If the user chooses Auto-detect (option 1):**
+
 1. Check auto-discovered repos from the output above (parent directory scan).
 2. Check memory for any previously known repos by searching for project context, repo names, or related work using the mem-search skill.
 3. Combine both sources into a deduplicated list.
 4. Present the combined list to the user for confirmation:
    > Found these repos:
+   >
    > - ../api (from parent directory)
    > - ../ui (from parent directory)
    > - ../shared-types (from memory)
@@ -204,12 +217,14 @@ Ask the user:
 6. Proceed to the Legacy Scan step using the confirmed repos.
 
 **If the user chooses Manual (option 2):**
+
 1. Ask: "Enter repo paths (relative or absolute), one per line or comma-separated:"
 2. Validate each path exists. Warn about any that don't.
 3. Write `allclear.config.json` with the validated paths.
 4. Proceed to the Legacy Scan step.
 
 **If the user chooses Skip (option 3):**
+
 - Use auto-discovered repos for this run only. Do not write config.
 - Proceed to the Legacy Scan step.
 
@@ -239,12 +254,12 @@ If no matches found anywhere, confirm the symbol appears safe to change or remov
 
 Match types and their risk levels:
 
-| Type   | Risk   | Meaning                                                             |
-|--------|--------|---------------------------------------------------------------------|
-| code   | HIGH   | Direct source reference — will break if symbol is removed/renamed  |
-| config | MEDIUM | Configuration reference — may need updating                        |
-| test   | LOW    | Test reference — tests will need updating, not a runtime break     |
-| docs   | LOW    | Documentation reference — no runtime impact                        |
+| Type   | Risk   | Meaning                                                           |
+| ------ | ------ | ----------------------------------------------------------------- |
+| code   | HIGH   | Direct source reference — will break if symbol is removed/renamed |
+| config | MEDIUM | Configuration reference — may need updating                       |
+| test   | LOW    | Test reference — tests will need updating, not a runtime break    |
+| docs   | LOW    | Documentation reference — no runtime impact                       |
 
 ### Reporting Format
 

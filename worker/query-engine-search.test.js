@@ -12,15 +12,15 @@
  * Uses better-sqlite3 directly for isolation (per Phase 14-02 decision).
  */
 
-import { test, describe, before, after } from 'node:test';
-import assert from 'node:assert/strict';
-import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
-import { join } from 'node:path';
-import { createHash } from 'node:crypto';
+import { test, describe, before, after } from "node:test";
+import assert from "node:assert/strict";
+import Database from "better-sqlite3";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir, homedir } from "node:os";
+import { join } from "node:path";
+import { createHash } from "node:crypto";
 
-import { search } from './query-engine.js';
+import { search } from "./query-engine.js";
 
 // ---------------------------------------------------------------------------
 // Test DB setup — use project root that maps to a temp dir
@@ -31,15 +31,15 @@ let tmpRoot;
 
 before(async () => {
   // Create a temp project root dir to derive the DB path
-  tmpRoot = mkdtempSync(join(tmpdir(), 'allclear-search-test-'));
+  tmpRoot = mkdtempSync(join(tmpdir(), "allclear-search-test-"));
 
   // Derive the DB path the same way openDb() does
-  const hash = createHash('sha256').update(tmpRoot).digest('hex').slice(0, 12);
-  const dbDir = join(homedir(), '.allclear', 'projects', hash);
+  const hash = createHash("sha256").update(tmpRoot).digest("hex").slice(0, 12);
+  const dbDir = join(homedir(), ".allclear", "projects", hash);
 
   // Use better-sqlite3 directly (Phase 14-02 decision: avoid singleton isolation issues)
-  db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
+  db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
 
   // Apply initial schema inline (mirrors 001_initial_schema migration)
   db.exec(`
@@ -92,38 +92,54 @@ before(async () => {
   `);
 
   // Seed test data
-  db.prepare('INSERT INTO repos (path, name, type) VALUES (?, ?, ?)').run('/test', 'test', 'single');
-  const repoId = db.prepare('SELECT last_insert_rowid() AS id').pluck().get();
-  db.prepare('INSERT INTO services (repo_id, name, root_path, language) VALUES (?, ?, ?, ?)').run(repoId, 'payment-service', '.', 'typescript');
-  db.prepare('INSERT INTO services (repo_id, name, root_path, language) VALUES (?, ?, ?, ?)').run(repoId, 'auth-service', '.', 'go');
+  db.prepare("INSERT INTO repos (path, name, type) VALUES (?, ?, ?)").run(
+    "/test",
+    "test",
+    "single",
+  );
+  const repoId = db.prepare("SELECT last_insert_rowid() AS id").pluck().get();
+  db.prepare(
+    "INSERT INTO services (repo_id, name, root_path, language) VALUES (?, ?, ?, ?)",
+  ).run(repoId, "payment-service", ".", "typescript");
+  db.prepare(
+    "INSERT INTO services (repo_id, name, root_path, language) VALUES (?, ?, ?, ?)",
+  ).run(repoId, "auth-service", ".", "go");
 
   // Inject the db instance into the search module (via setSearchDb)
-  const { setSearchDb } = await import('./query-engine.js');
+  const { setSearchDb } = await import("./query-engine.js");
   setSearchDb(db);
 });
 
 after(() => {
   if (db) db.close();
-  try { rmSync(tmpRoot, { recursive: true, force: true }); } catch (_) {}
+  try {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  } catch (_) {}
 });
 
 // ---------------------------------------------------------------------------
 // search() return shape
 // ---------------------------------------------------------------------------
 
-describe('search() — return shape', () => {
-  test('returns an array', async () => {
-    const results = await search('payment-service', { skipChroma: true, skipFts5: true });
-    assert.ok(Array.isArray(results), 'search must return an array');
+describe("search() — return shape", () => {
+  test("returns an array", async () => {
+    const results = await search("payment-service", {
+      skipChroma: true,
+      skipFts5: true,
+    });
+    assert.ok(Array.isArray(results), "search must return an array");
   });
 
-  test('each result has id, name, type, score', async () => {
-    const results = await search('payment-service', { skipChroma: true, skipFts5: true });
+  test("each result has id, name, type, score", async () => {
+    const results = await search("payment-service", {
+      skipChroma: true,
+      skipFts5: true,
+    });
     for (const r of results) {
-      assert.ok('id' in r, 'result must have id');
-      assert.ok('name' in r, 'result must have name');
-      assert.ok('type' in r, 'result must have type');
-      assert.ok('score' in r, 'result must have score');
+      assert.ok("id" in r, "result must have id");
+      assert.ok("name" in r, "result must have name");
+      assert.ok("type" in r, "result must have type");
+      assert.ok("score" in r, "result must have score");
     }
   });
 });
@@ -132,25 +148,37 @@ describe('search() — return shape', () => {
 // Tier 3 — SQL direct filter (skipChroma+skipFts5)
 // ---------------------------------------------------------------------------
 
-describe('search() — Tier 3 (SQL)', () => {
-  test('skipChroma+skipFts5 forces SQL tier', async () => {
-    const results = await search('payment', { skipChroma: true, skipFts5: true });
-    assert.ok(Array.isArray(results), 'must return array for SQL tier');
+describe("search() — Tier 3 (SQL)", () => {
+  test("skipChroma+skipFts5 forces SQL tier", async () => {
+    const results = await search("payment", {
+      skipChroma: true,
+      skipFts5: true,
+    });
+    assert.ok(Array.isArray(results), "must return array for SQL tier");
     // payment-service should be found via SQL LIKE
-    const names = results.map(r => r.name);
-    assert.ok(names.some(n => n.includes('payment')), 'payment-service should appear in SQL results');
+    const names = results.map((r) => r.name);
+    assert.ok(
+      names.some((n) => n.includes("payment")),
+      "payment-service should appear in SQL results",
+    );
   });
 
-  test('SQL tier result score is 0.5', async () => {
-    const results = await search('payment', { skipChroma: true, skipFts5: true });
+  test("SQL tier result score is 0.5", async () => {
+    const results = await search("payment", {
+      skipChroma: true,
+      skipFts5: true,
+    });
     for (const r of results) {
-      assert.equal(r.score, 0.5, 'SQL tier score must be 0.5');
+      assert.equal(r.score, 0.5, "SQL tier score must be 0.5");
     }
   });
 
-  test('returns empty array for non-matching query via SQL', async () => {
-    const results = await search('xyzzy-does-not-exist-12345', { skipChroma: true, skipFts5: true });
-    assert.ok(Array.isArray(results), 'must return array even when no matches');
+  test("returns empty array for non-matching query via SQL", async () => {
+    const results = await search("xyzzy-does-not-exist-12345", {
+      skipChroma: true,
+      skipFts5: true,
+    });
+    assert.ok(Array.isArray(results), "must return array even when no matches");
     assert.equal(results.length, 0);
   });
 });
@@ -159,30 +187,36 @@ describe('search() — Tier 3 (SQL)', () => {
 // Tier 2 — FTS5 (skipChroma only)
 // ---------------------------------------------------------------------------
 
-describe('search() — Tier 2 (FTS5)', () => {
-  test('skipChroma=true uses FTS5 tier when available', async () => {
-    const results = await search('auth', { skipChroma: true });
-    assert.ok(Array.isArray(results), 'must return array from FTS5 tier');
+describe("search() — Tier 2 (FTS5)", () => {
+  test("skipChroma=true uses FTS5 tier when available", async () => {
+    const results = await search("auth", { skipChroma: true });
+    assert.ok(Array.isArray(results), "must return array from FTS5 tier");
     // auth-service should be found via FTS5
-    const names = results.map(r => r.name);
-    assert.ok(names.some(n => n.includes('auth')), 'auth-service should appear in FTS5 results');
+    const names = results.map((r) => r.name);
+    assert.ok(
+      names.some((n) => n.includes("auth")),
+      "auth-service should appear in FTS5 results",
+    );
   });
 
-  test('FTS5 tier result score is 1', async () => {
-    const results = await search('auth', { skipChroma: true });
+  test("FTS5 tier result score is 1", async () => {
+    const results = await search("auth", { skipChroma: true });
     // FTS5 results have score=1
     if (results.length > 0) {
-      assert.equal(results[0].score, 1, 'FTS5 tier score must be 1');
+      assert.equal(results[0].score, 1, "FTS5 tier score must be 1");
     }
   });
 
-  test('falls through to SQL when FTS5 returns empty', async () => {
+  test("falls through to SQL when FTS5 returns empty", async () => {
     // Query that won't match FTS5 but will match SQL LIKE
     // Use a partial query — FTS5 requires whole-word tokens, LIKE handles substrings
-    const results = await search('payment', { skipChroma: true });
-    assert.ok(Array.isArray(results), 'must return array falling through to SQL');
+    const results = await search("payment", { skipChroma: true });
+    assert.ok(
+      Array.isArray(results),
+      "must return array falling through to SQL",
+    );
     // Either FTS5 or SQL found it
-    assert.ok(results.length > 0, 'payment-service must be found');
+    assert.ok(results.length > 0, "payment-service must be found");
   });
 });
 
@@ -190,12 +224,15 @@ describe('search() — Tier 2 (FTS5)', () => {
 // Tier 1 — ChromaDB (via isChromaAvailable flag)
 // ---------------------------------------------------------------------------
 
-describe('search() — Tier 1 (ChromaDB fallback when unavailable)', () => {
-  test('when isChromaAvailable=false, falls through to FTS5/SQL automatically', async () => {
+describe("search() — Tier 1 (ChromaDB fallback when unavailable)", () => {
+  test("when isChromaAvailable=false, falls through to FTS5/SQL automatically", async () => {
     // isChromaAvailable() returns false (no ChromaDB configured in tests)
-    const results = await search('payment');
-    assert.ok(Array.isArray(results), 'must return array when chroma unavailable');
+    const results = await search("payment");
+    assert.ok(
+      Array.isArray(results),
+      "must return array when chroma unavailable",
+    );
     // Falls through to FTS5 or SQL
-    assert.ok(results.length > 0, 'must find results via fallback tiers');
+    assert.ok(results.length > 0, "must find results via fallback tiers");
   });
 });

@@ -66,8 +66,10 @@ teardown() {
 @test "format hook - runs ruff format for .py file when present" {
   printf '#!/usr/bin/env bash\ntouch "%s/ruff_called"\nexit 0\n' "${STUB_DIR}" > "${STUB_DIR}/ruff"
   chmod +x "${STUB_DIR}/ruff"
-  local json='{"tool_name":"Write","tool_input":{"file_path":"/tmp/test.py"}}'
-  run bash -c "PATH='${STUB_DIR}:${PATH}' printf '%s' '${json}' | bash '${SCRIPT}'"
+  local testfile="${STUB_DIR}/test.py"
+  touch "$testfile"
+  local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
+  run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success
   [ -f "${STUB_DIR}/ruff_called" ]
 }
@@ -75,8 +77,10 @@ teardown() {
 @test "format hook - runs rustfmt for .rs file when present" {
   printf '#!/usr/bin/env bash\ntouch "%s/rustfmt_called"\nexit 0\n' "${STUB_DIR}" > "${STUB_DIR}/rustfmt"
   chmod +x "${STUB_DIR}/rustfmt"
-  local json='{"tool_name":"Write","tool_input":{"file_path":"/tmp/test.rs"}}'
-  run bash -c "PATH='${STUB_DIR}:${PATH}' printf '%s' '${json}' | bash '${SCRIPT}'"
+  local testfile="${STUB_DIR}/test.rs"
+  touch "$testfile"
+  local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
+  run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success
   [ -f "${STUB_DIR}/rustfmt_called" ]
 }
@@ -84,8 +88,10 @@ teardown() {
 @test "format hook - runs prettier for .ts file when present" {
   printf '#!/usr/bin/env bash\ntouch "%s/prettier_called_ts"\nexit 0\n' "${STUB_DIR}" > "${STUB_DIR}/prettier"
   chmod +x "${STUB_DIR}/prettier"
-  local json='{"tool_name":"Write","tool_input":{"file_path":"/tmp/test.ts"}}'
-  run bash -c "PATH='${STUB_DIR}:${PATH}' printf '%s' '${json}' | bash '${SCRIPT}'"
+  local testfile="${STUB_DIR}/test.ts"
+  touch "$testfile"
+  local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
+  run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success
   [ -f "${STUB_DIR}/prettier_called_ts" ]
 }
@@ -93,8 +99,10 @@ teardown() {
 @test "format hook - runs prettier for .js file when present" {
   printf '#!/usr/bin/env bash\ntouch "%s/prettier_called_js"\nexit 0\n' "${STUB_DIR}" > "${STUB_DIR}/prettier"
   chmod +x "${STUB_DIR}/prettier"
-  local json='{"tool_name":"Write","tool_input":{"file_path":"/tmp/test.js"}}'
-  run bash -c "PATH='${STUB_DIR}:${PATH}' printf '%s' '${json}' | bash '${SCRIPT}'"
+  local testfile="${STUB_DIR}/test.js"
+  touch "$testfile"
+  local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
+  run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success
   [ -f "${STUB_DIR}/prettier_called_js" ]
 }
@@ -102,8 +110,10 @@ teardown() {
 @test "format hook - runs gofmt for .go file when present" {
   printf '#!/usr/bin/env bash\ntouch "%s/gofmt_called"\nexit 0\n' "${STUB_DIR}" > "${STUB_DIR}/gofmt"
   chmod +x "${STUB_DIR}/gofmt"
-  local json='{"tool_name":"Write","tool_input":{"file_path":"/tmp/test.go"}}'
-  run bash -c "PATH='${STUB_DIR}:${PATH}' printf '%s' '${json}' | bash '${SCRIPT}'"
+  local testfile="${STUB_DIR}/test.go"
+  touch "$testfile"
+  local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
+  run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success
   [ -f "${STUB_DIR}/gofmt_called" ]
 }
@@ -111,8 +121,10 @@ teardown() {
 @test "format hook - runs prettier for .json file when present" {
   printf '#!/usr/bin/env bash\ntouch "%s/prettier_called_json"\nexit 0\n' "${STUB_DIR}" > "${STUB_DIR}/prettier"
   chmod +x "${STUB_DIR}/prettier"
-  local json='{"tool_name":"Write","tool_input":{"file_path":"/tmp/test.json"}}'
-  run bash -c "PATH='${STUB_DIR}:${PATH}' printf '%s' '${json}' | bash '${SCRIPT}'"
+  local testfile="${STUB_DIR}/test.json"
+  touch "$testfile"
+  local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
+  run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success
   [ -f "${STUB_DIR}/prettier_called_json" ]
 }

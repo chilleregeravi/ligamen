@@ -13,13 +13,13 @@
  * array is populated before any openDb() call can execute.
  */
 
-import Database from 'better-sqlite3';
-import crypto from 'crypto';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { syncFindings } from './chroma-sync.js';
-import { fileURLToPath, pathToFileURL } from 'url';
+import Database from "better-sqlite3";
+import crypto from "crypto";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { syncFindings } from "./chroma-sync.js";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,12 +37,12 @@ const _migrations = await loadMigrationsAsync();
  * @returns {Promise<Array<{version: number, up: (db: any) => void}>>}
  */
 async function loadMigrationsAsync() {
-  const migrationsDir = path.join(__dirname, 'migrations');
+  const migrationsDir = path.join(__dirname, "migrations");
   if (!fs.existsSync(migrationsDir)) return [];
 
   const files = fs
     .readdirSync(migrationsDir)
-    .filter(f => f.endsWith('.js'))
+    .filter((f) => f.endsWith(".js"))
     .sort();
 
   const migrations = [];
@@ -50,7 +50,11 @@ async function loadMigrationsAsync() {
     const modulePath = pathToFileURL(path.join(migrationsDir, file)).href;
     try {
       const migration = await import(modulePath);
-      if (migration && typeof migration.version === 'number' && typeof migration.up === 'function') {
+      if (
+        migration &&
+        typeof migration.version === "number" &&
+        typeof migration.up === "function"
+      ) {
         migrations.push({ version: migration.version, up: migration.up });
       }
     } catch (err) {
@@ -68,11 +72,11 @@ async function loadMigrationsAsync() {
  */
 function projectHashDir(projectRoot) {
   const hash = crypto
-    .createHash('sha256')
+    .createHash("sha256")
     .update(projectRoot)
-    .digest('hex')
+    .digest("hex")
     .slice(0, 12);
-  return path.join(os.homedir(), '.allclear', 'projects', hash);
+  return path.join(os.homedir(), ".allclear", "projects", hash);
 }
 
 /**
@@ -89,15 +93,15 @@ export function openDb(projectRoot = process.cwd()) {
   const dataDir = projectHashDir(projectRoot);
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const dbPath = path.join(dataDir, 'impact-map.db');
+  const dbPath = path.join(dataDir, "impact-map.db");
   const db = new Database(dbPath);
 
   // Apply pragmas in specified order
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('cache_size = -64000');   // 64 MB page cache
-  db.pragma('busy_timeout = 5000');   // 5s — prevents SQLITE_BUSY on concurrent reads
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  db.pragma("synchronous = NORMAL");
+  db.pragma("cache_size = -64000"); // 64 MB page cache
+  db.pragma("busy_timeout = 5000"); // 5s — prevents SQLITE_BUSY on concurrent reads
 
   runMigrations(db);
 
@@ -112,7 +116,7 @@ export function openDb(projectRoot = process.cwd()) {
  */
 export function getDb() {
   if (!_db) {
-    throw new Error('Database not initialized. Call openDb() first.');
+    throw new Error("Database not initialized. Call openDb() first.");
   }
   return _db;
 }
@@ -134,7 +138,7 @@ function runMigrations(db) {
   `);
 
   const currentVersion =
-    db.prepare('SELECT MAX(version) FROM schema_versions').pluck().get() ?? 0;
+    db.prepare("SELECT MAX(version) FROM schema_versions").pluck().get() ?? 0;
 
   for (const migration of _migrations) {
     if (migration.version <= currentVersion) continue;
@@ -142,9 +146,9 @@ function runMigrations(db) {
     // Wrap each migration in a transaction for atomicity
     const runMigration = db.transaction(() => {
       migration.up(db);
-      db
-        .prepare('INSERT INTO schema_versions (version) VALUES (?)')
-        .run(migration.version);
+      db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(
+        migration.version,
+      );
     });
 
     runMigration();
@@ -160,10 +164,12 @@ function runMigrations(db) {
  */
 function getHistoryLimit() {
   try {
-    const configPath = path.join(process.cwd(), 'allclear.config.json');
-    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    return cfg['impact-map']?.['history-limit'] ?? 10;
-  } catch (_) { return 10; }
+    const configPath = path.join(process.cwd(), "allclear.config.json");
+    const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    return cfg["impact-map"]?.["history-limit"] ?? 10;
+  } catch (_) {
+    return 10;
+  }
 }
 
 /**
@@ -181,21 +187,21 @@ function getHistoryLimit() {
  */
 export function writeScan(findings, queryEngine, repoId) {
   // Write services to SQLite (synchronous — better-sqlite3)
-  for (const svc of (findings.services || [])) {
+  for (const svc of findings.services || []) {
     queryEngine.upsertService({
       repo_id: repoId,
       name: svc.name,
-      root_path: svc.root_path || '.',
-      language: svc.language || 'unknown',
+      root_path: svc.root_path || ".",
+      language: svc.language || "unknown",
     });
   }
 
   // Write connections to SQLite (synchronous)
-  for (const conn of (findings.connections || [])) {
+  for (const conn of findings.connections || []) {
     queryEngine.upsertConnection({
       source_service_id: conn.source_service_id,
       target_service_id: conn.target_service_id,
-      protocol: conn.protocol || 'unknown',
+      protocol: conn.protocol || "unknown",
       method: conn.method || null,
       path: conn.path || null,
       source_file: conn.source_file || null,
@@ -205,8 +211,8 @@ export function writeScan(findings, queryEngine, repoId) {
 
   // Fire-and-forget ChromaDB sync — NEVER await in persist path
   // A ChromaDB outage generates a stderr warning only — SQLite writes already committed
-  syncFindings(findings).catch(err =>
-    process.stderr.write('[chroma] sync failed: ' + err.message + '\n')
+  syncFindings(findings).catch((err) =>
+    process.stderr.write("[chroma] sync failed: " + err.message + "\n"),
   );
 }
 
@@ -218,7 +224,7 @@ export function writeScan(findings, queryEngine, repoId) {
  */
 export function isFirstScan() {
   const db = getDb();
-  const row = db.prepare('SELECT COUNT(*) as cnt FROM map_versions').get();
+  const row = db.prepare("SELECT COUNT(*) as cnt FROM map_versions").get();
   return (row?.cnt ?? 0) === 0;
 }
 
@@ -235,17 +241,17 @@ export function isFirstScan() {
  * @returns {string} Absolute path to the created snapshot file.
  * @throws {Error} If VACUUM INTO fails.
  */
-export function createSnapshot(label = '') {
+export function createSnapshot(label = "") {
   const db = getDb();
 
   // Determine the DB file path from the open database
   const dbFilePath = db.name; // better-sqlite3 exposes the DB path as db.name
-  const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const snapshotsDir = path.join(path.dirname(dbFilePath), 'snapshots');
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const snapshotsDir = path.join(path.dirname(dbFilePath), "snapshots");
   fs.mkdirSync(snapshotsDir, { recursive: true });
 
-  const snapshotFile = path.join(snapshotsDir, ts + '.db');
-  const relPath = path.join('snapshots', ts + '.db');
+  const snapshotFile = path.join(snapshotsDir, ts + ".db");
+  const relPath = path.join("snapshots", ts + ".db");
 
   // VACUUM INTO creates a consistent copy — safe during active writes
   // Unlike cp which copies wal + shm sidecars (potentially inconsistent)
@@ -253,31 +259,49 @@ export function createSnapshot(label = '') {
 
   // Record in map_versions table
   db.prepare(
-    'INSERT INTO map_versions (created_at, label, snapshot_path) VALUES (?, ?, ?)'
+    "INSERT INTO map_versions (created_at, label, snapshot_path) VALUES (?, ?, ?)",
   ).run(new Date().toISOString(), label, relPath);
 
   // Retention cleanup: remove oldest snapshots beyond limit
   const limit = getHistoryLimit();
-  const toDelete = db.prepare(
-    'SELECT id, snapshot_path FROM map_versions ORDER BY created_at DESC LIMIT -1 OFFSET ?'
-  ).all(limit);
+  const toDelete = db
+    .prepare(
+      "SELECT id, snapshot_path FROM map_versions ORDER BY created_at DESC LIMIT -1 OFFSET ?",
+    )
+    .all(limit);
 
   for (const row of toDelete) {
     const fullPath = path.join(path.dirname(dbFilePath), row.snapshot_path);
-    try { fs.unlinkSync(fullPath); } catch (_) {}
-    db.prepare('DELETE FROM map_versions WHERE id = ?').run(row.id);
+    try {
+      fs.unlinkSync(fullPath);
+    } catch (_) {}
+    db.prepare("DELETE FROM map_versions WHERE id = ?").run(row.id);
   }
 
   return snapshotFile;
 }
 
 // When run directly as a script, open the DB and report status
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+) {
   const db = openDb();
-  console.log('WAL:', db.pragma('journal_mode', { simple: true }));
-  console.log('FK:', db.pragma('foreign_keys', { simple: true }));
-  console.log('Tables:', db.prepare("SELECT name FROM sqlite_master WHERE type='table'").pluck().all().sort().join(', '));
-  const schemaVer = db.prepare('SELECT MAX(version) FROM schema_versions').pluck().get();
-  console.log('Schema version:', schemaVer);
+  console.log("WAL:", db.pragma("journal_mode", { simple: true }));
+  console.log("FK:", db.pragma("foreign_keys", { simple: true }));
+  console.log(
+    "Tables:",
+    db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+      .pluck()
+      .all()
+      .sort()
+      .join(", "),
+  );
+  const schemaVer = db
+    .prepare("SELECT MAX(version) FROM schema_versions")
+    .pluck()
+    .get();
+  console.log("Schema version:", schemaVer);
   db.close();
 }

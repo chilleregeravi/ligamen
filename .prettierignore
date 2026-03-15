@@ -1,0 +1,12 @@
+# Vendored submodules
+tests/bats/
+tests/test_helper/
+
+# Planning docs (GSD-managed, not source code)
+.planning/
+
+# Node modules
+node_modules/
+
+# Build artifacts
+dist/

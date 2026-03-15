@@ -12,12 +12,12 @@
  * agent invocations run in the foreground via the MCP server's agentRunner.
  */
 
-import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join, basename, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join, basename, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { parseAgentOutput } from './findings-schema.js';
+import { parseAgentOutput } from "./findings-schema.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -58,35 +58,35 @@ export function getChangedFiles(repoPath, sinceCommit) {
     if (sinceCommit === null) {
       // Full scan — return all tracked files as "modified"
       output = execSync(`git -C ${JSON.stringify(repoPath)} ls-files`, {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
       });
-      const files = output.trim().split('\n').filter(Boolean);
+      const files = output.trim().split("\n").filter(Boolean);
       return { modified: files, deleted: [], renamed: [] };
     }
 
     // Incremental — diff since the given commit
     output = execSync(
       `git -C ${JSON.stringify(repoPath)} diff --name-status ${sinceCommit} HEAD`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
     );
 
     const modified = [];
     const deleted = [];
     const renamed = [];
 
-    for (const line of output.trim().split('\n').filter(Boolean)) {
-      if (line.startsWith('D\t')) {
+    for (const line of output.trim().split("\n").filter(Boolean)) {
+      if (line.startsWith("D\t")) {
         deleted.push(line.slice(2));
       } else if (line.match(/^R\d*\t/)) {
         // Rename: "R100\told/path\tnew/path"
-        const parts = line.split('\t');
+        const parts = line.split("\t");
         if (parts.length >= 3) {
           renamed.push({ from: parts[1], to: parts[2] });
         }
       } else {
         // M (modified), A (added), C (copied), T (type change), U (unmerged), X (unknown)
-        const parts = line.split('\t');
+        const parts = line.split("\t");
         if (parts.length >= 2) {
           modified.push(parts[1]);
         }
@@ -95,7 +95,7 @@ export function getChangedFiles(repoPath, sinceCommit) {
 
     return { modified, deleted, renamed };
   } catch (_err) {
-    return { error: 'not a git repo' };
+    return { error: "not a git repo" };
   }
 }
 
@@ -110,7 +110,7 @@ export function getChangedFiles(repoPath, sinceCommit) {
  */
 function getCurrentHead(repoPath) {
   return execSync(`git -C ${JSON.stringify(repoPath)} rev-parse HEAD`, {
-    encoding: 'utf8',
+    encoding: "utf8",
   }).trim();
 }
 
@@ -130,24 +130,24 @@ function getCurrentHead(repoPath) {
 export function buildScanContext(repoPath, repoId, queryEngine, options = {}) {
   // Explicit full-scan override
   if (options.full === true) {
-    return { mode: 'full', files: null };
+    return { mode: "full", files: null };
   }
 
   // First scan — no repo_state entry → always full (SCAN-06)
   const repoState = queryEngine.getRepoState(repoId);
   if (repoState === null) {
-    return { mode: 'full', files: null };
+    return { mode: "full", files: null };
   }
 
   // Compare stored commit with current HEAD
   const currentHead = getCurrentHead(repoPath);
   if (repoState.last_scanned_commit === currentHead) {
-    return { mode: 'skip', files: null };
+    return { mode: "skip", files: null };
   }
 
   // Incremental scan — diff since last scanned commit
   const files = getChangedFiles(repoPath, repoState.last_scanned_commit);
-  return { mode: 'incremental', files };
+  return { mode: "incremental", files };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,12 +178,12 @@ export function buildScanContext(repoPath, repoId, queryEngine, options = {}) {
  */
 export async function scanRepos(repoPaths, options = {}, queryEngine) {
   if (agentRunner === null) {
-    throw new Error('agentRunner not initialized — call setAgentRunner first');
+    throw new Error("agentRunner not initialized — call setAgentRunner first");
   }
 
   // Load the agent prompt template once
-  const promptTemplatePath = join(__dirname, 'agent-prompt.md');
-  const promptTemplate = readFileSync(promptTemplatePath, 'utf8');
+  const promptTemplatePath = join(__dirname, "agent-prompt.md");
+  const promptTemplate = readFileSync(promptTemplatePath, "utf8");
 
   /** @type {ScanResult[]} */
   const results = [];
@@ -194,23 +194,23 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     const repo = queryEngine.upsertRepo({
       path: repoPath,
       name: basename(repoPath),
-      type: 'single',
+      type: "single",
     });
 
     // 2. Determine scan mode
     const ctx = buildScanContext(repoPath, repo.id, queryEngine, options);
 
     // 3. Skip — no scan needed
-    if (ctx.mode === 'skip') {
-      results.push({ repoPath, mode: 'skip', findings: null });
+    if (ctx.mode === "skip") {
+      results.push({ repoPath, mode: "skip", findings: null });
       continue;
     }
 
     // 4. Interpolate prompt
     const serviceHint = basename(repoPath);
     const interpolatedPrompt = promptTemplate
-      .replaceAll('{{REPO_PATH}}', repoPath)
-      .replaceAll('{{SERVICE_HINT}}', serviceHint);
+      .replaceAll("{{REPO_PATH}}", repoPath)
+      .replaceAll("{{SERVICE_HINT}}", serviceHint);
 
     // 5. Invoke agent (foreground — agentRunner injected by MCP server or test)
     const rawResponse = await agentRunner(interpolatedPrompt, repoPath);
@@ -220,7 +220,12 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
 
     if (result.valid === false) {
       // Error per repo — one bad agent result does not stop other repos
-      results.push({ repoPath, mode: ctx.mode, findings: null, error: result.error });
+      results.push({
+        repoPath,
+        mode: ctx.mode,
+        findings: null,
+        error: result.error,
+      });
       continue;
     }
 
