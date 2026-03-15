@@ -36,6 +36,30 @@ if [[ -n "$SESSION_ID" ]]; then
   touch "$FLAG_FILE"
 fi
 
+# INTG-01: Worker auto-start — source worker-client.sh if available
+WORKER_CLIENT_LIB=""
+if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]] && [[ -f "${CLAUDE_PLUGIN_ROOT}/lib/worker-client.sh" ]]; then
+  WORKER_CLIENT_LIB="${CLAUDE_PLUGIN_ROOT}/lib/worker-client.sh"
+else
+  SCRIPT_DIR="$(dirname "$0")"
+  WORKER_CLIENT="${SCRIPT_DIR}/../lib/worker-client.sh"
+  [[ -f "$WORKER_CLIENT" ]] && WORKER_CLIENT_LIB="$WORKER_CLIENT"
+fi
+
+WORKER_STATUS=""
+if [[ -n "$WORKER_CLIENT_LIB" ]]; then
+  # shellcheck source=lib/worker-client.sh
+  source "$WORKER_CLIENT_LIB"
+  CONFIG_FILE="${CWD}/allclear.config.json"
+  if [[ -f "$CONFIG_FILE" ]] && jq -e '.["impact-map"]' "$CONFIG_FILE" >/dev/null 2>&1; then
+    if ! worker_running 2>/dev/null; then
+      worker_start_background 2>/dev/null || true
+    else
+      WORKER_STATUS=$(worker_status_line 2>/dev/null || echo "")
+    fi
+  fi
+fi
+
 # SSTH-02: Project detection — source shared library
 # Use CLAUDE_PLUGIN_ROOT if set, otherwise fall back to script-relative path
 DETECT_LIB=""
@@ -65,7 +89,8 @@ CONTEXT="AllClear active."
 if [[ -n "$PROJECT_TYPES" ]]; then
   CONTEXT="AllClear active. Detected: ${PROJECT_TYPES}."
 fi
-CONTEXT="${CONTEXT} Commands: /allclear (quality gate), /allclear impact (cross-repo), /allclear drift, /allclear pulse, /allclear deploy."
+CONTEXT="${CONTEXT} Commands: /allclear:quality-gate, /allclear:cross-impact, /allclear:drift, /allclear:pulse, /allclear:deploy-verify."
+[[ -n "$WORKER_STATUS" ]] && CONTEXT="${CONTEXT} ${WORKER_STATUS}"
 
 # SSTH-01: Output hookSpecificOutput.additionalContext JSON to stdout
 # Use jq -Rs . for safe escaping of the context string (handles quotes, backslashes, newlines)
