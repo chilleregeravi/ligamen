@@ -19,7 +19,8 @@ function resolveDbPath(projectRoot = process.cwd()) {
   return path.join(dataDir, 'projects', hash, 'impact-map.db');
 }
 
-const dbPath = process.env.ALLCLEAR_DB_PATH || resolveDbPath();
+const dbPath = process.env.ALLCLEAR_DB_PATH
+  || resolveDbPath(process.env.ALLCLEAR_PROJECT_ROOT || process.cwd());
 
 /**
  * Open the SQLite database in read-only mode.

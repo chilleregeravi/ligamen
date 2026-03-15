@@ -11,10 +11,12 @@ import { createHttpServer } from './http-server.js';
 const args = process.argv.slice(2);
 let port = 37888;
 let dataDir = process.env.ALLCLEAR_DATA_DIR || path.join(os.homedir(), '.allclear');
+let projectRoot = process.env.ALLCLEAR_PROJECT_ROOT || process.cwd();
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--port') port = parseInt(args[i + 1], 10);
   if (args[i] === '--data-dir') dataDir = args[i + 1];
+  if (args[i] === '--project-root') projectRoot = args[i + 1];
 }
 
 // ---------------------------------------------------------------------------
@@ -66,9 +68,9 @@ function log(level, msg, extra = {}) {
 // ---------------------------------------------------------------------------
 let queryEngine = null;
 try {
-  const db = openDb();
+  const db = openDb(projectRoot);
   queryEngine = new QueryEngine(db);
-  log('INFO', 'database initialized');
+  log('INFO', 'database initialized', { projectRoot });
 } catch (err) {
   log('WARN', 'database initialization failed — routes will return 503', { error: err.message });
   // Worker still starts — /api/readiness works, data routes return 503
