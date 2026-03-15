@@ -150,6 +150,82 @@ function runMigrations(db) {
   }
 }
 
+/**
+ * Returns the configured snapshot retention limit.
+ * Reads from allclear.config.json "impact-map": { "history-limit": N }.
+ * Falls back to 10 if config is absent or unreadable.
+ *
+ * @returns {number}
+ */
+function getHistoryLimit() {
+  try {
+    const configPath = path.join(process.cwd(), 'allclear.config.json');
+    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return cfg['impact-map']?.['history-limit'] ?? 10;
+  } catch (_) { return 10; }
+}
+
+/**
+ * Returns true if no map versions have been recorded yet (i.e., this is the first scan).
+ * Call before writeScan() to detect the first-map-build scenario.
+ *
+ * @returns {boolean}
+ */
+export function isFirstScan() {
+  const db = getDb();
+  const row = db.prepare('SELECT COUNT(*) as cnt FROM map_versions').get();
+  return (row?.cnt ?? 0) === 0;
+}
+
+/**
+ * Creates a consistent SQLite snapshot of the current database using VACUUM INTO.
+ * Stores the snapshot in a snapshots/ subdirectory adjacent to the DB file.
+ * Records the snapshot in map_versions with a relative path.
+ * Runs retention cleanup after every snapshot (default limit: 10).
+ *
+ * VACUUM INTO is used (not cp) because it creates an atomic, consistent copy
+ * even during active writes, without copying WAL/SHM sidecar files.
+ *
+ * @param {string} [label=''] - Optional label stored in map_versions.
+ * @returns {string} Absolute path to the created snapshot file.
+ * @throws {Error} If VACUUM INTO fails.
+ */
+export function createSnapshot(label = '') {
+  const db = getDb();
+
+  // Determine the DB file path from the open database
+  const dbFilePath = db.name; // better-sqlite3 exposes the DB path as db.name
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const snapshotsDir = path.join(path.dirname(dbFilePath), 'snapshots');
+  fs.mkdirSync(snapshotsDir, { recursive: true });
+
+  const snapshotFile = path.join(snapshotsDir, ts + '.db');
+  const relPath = path.join('snapshots', ts + '.db');
+
+  // VACUUM INTO creates a consistent copy — safe during active writes
+  // Unlike cp which copies wal + shm sidecars (potentially inconsistent)
+  db.exec(`VACUUM INTO '${snapshotFile}'`);
+
+  // Record in map_versions table
+  db.prepare(
+    'INSERT INTO map_versions (created_at, label, snapshot_path) VALUES (?, ?, ?)'
+  ).run(new Date().toISOString(), label, relPath);
+
+  // Retention cleanup: remove oldest snapshots beyond limit
+  const limit = getHistoryLimit();
+  const toDelete = db.prepare(
+    'SELECT id, snapshot_path FROM map_versions ORDER BY created_at DESC LIMIT -1 OFFSET ?'
+  ).all(limit);
+
+  for (const row of toDelete) {
+    const fullPath = path.join(path.dirname(dbFilePath), row.snapshot_path);
+    try { fs.unlinkSync(fullPath); } catch (_) {}
+    db.prepare('DELETE FROM map_versions WHERE id = ?').run(row.id);
+  }
+
+  return snapshotFile;
+}
+
 // When run directly as a script, open the DB and report status
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const db = openDb();
