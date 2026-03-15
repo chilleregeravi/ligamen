@@ -119,7 +119,13 @@ export function listProjects() {
         repoCount,
       };
     })
-    .filter((p) => p.serviceCount > 0);
+    .filter(
+      (p) =>
+        p.serviceCount > 0 &&
+        p.projectRoot &&
+        p.projectRoot !== "/" &&
+        !p.projectRoot.startsWith("/tmp"),
+    );
 }
 
 /**
