@@ -15,15 +15,15 @@ AllClear is built as independent components that compose when assembled. Every p
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Plugin Skeleton** - Directory structure, plugin.json manifest, and git-clone installation
-- [ ] **Phase 2: Shared Libraries** - Project type detection (detect.sh) and sibling repo discovery (siblings.sh)
+- [x] **Phase 1: Plugin Skeleton** - Directory structure, plugin.json manifest, and git-clone installation (completed 2026-03-15)
+- [x] **Phase 2: Shared Libraries** - Project type detection (detect.sh) and sibling repo discovery (siblings.sh) (completed 2026-03-15)
 - [x] **Phase 3: Format Hook** - Auto-format on every Claude edit for Python, Rust, TypeScript, Go, JSON, YAML (completed 2026-03-15)
-- [ ] **Phase 4: Lint Hook** - Auto-lint on every Claude edit with per-language linter invocation
+- [x] **Phase 4: Lint Hook** - Auto-lint on every Claude edit with per-language linter invocation (completed 2026-03-15)
 - [x] **Phase 5: Guard Hook** - Hard-block and soft-warn PreToolUse hook for sensitive and generated files (completed 2026-03-15)
 - [x] **Phase 6: Session Hook** - Session-start context injection with project type and available commands (completed 2026-03-15)
-- [ ] **Phase 7: Quality Gate Skill** - `/allclear` slash-command for full quality checks and subcommands
+- [x] **Phase 7: Quality Gate Skill** - `/allclear` slash-command for full quality checks and subcommands (completed 2026-03-15)
 - [x] **Phase 8: Config Layer** - allclear.config.json overrides and environment variable toggles (completed 2026-03-15)
-- [ ] **Phase 9: Impact Skill** - `/allclear impact` cross-repo reference scanning
+- [x] **Phase 9: Impact Skill** - `/allclear impact` cross-repo reference scanning (completed 2026-03-15)
 - [x] **Phase 10: Drift Skill** - `/allclear drift` version and type consistency checking across repos (completed 2026-03-15)
 - [x] **Phase 11: Pulse Skill** - `/allclear pulse` live service health checking via kubectl (completed 2026-03-15)
 - [x] **Phase 12: Deploy Skill** - `/allclear deploy` expected-vs-actual cluster state verification (completed 2026-03-15)
