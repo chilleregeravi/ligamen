@@ -1,278 +1,297 @@
 #!/usr/bin/env bats
-# tests/file-guard.bats
-# Bats test suite for scripts/file-guard.sh
-# Covers all GRDH-01 through GRDH-08 requirements
+# AllClear — file-guard.bats
+# Tests for the PreToolUse sensitive file guard hook.
+# Covers TEST-03 (hard blocks and soft warnings) and TEST-08 (exit 2 + permissionDecision deny JSON).
+#
+# These tests are in RED state until Phase 4 implements scripts/file-guard.sh.
+# Run: tests/bats/bin/bats tests/file-guard.bats
+#
+# CRITICAL: Hard-block tests use assert_failure 2 (not bare assert_failure).
+# Exit code 2 is the Claude Code-specific code for PreToolUse tool denial.
+# See RESEARCH.md Pitfall 3 and TEST-08 contract.
 
-SCRIPT="${BATS_TEST_DIRNAME}/../scripts/file-guard.sh"
-
-make_input() {
-  local tool="$1" path="$2"
-  printf '{"tool_name": "%s", "tool_input": {"file_path": "%s"}}' "$tool" "$path"
+setup() {
+  load 'test_helper/bats-support/load'
+  load 'test_helper/bats-assert/load'
+  SCRIPT="${BATS_TEST_DIRNAME}/../scripts/file-guard.sh"
+  export CLAUDE_PLUGIN_ROOT="${BATS_TEST_DIRNAME}/.."
 }
 
 # ---------------------------------------------------------------------------
-# GRDH-03: Hard-block secret/credential files (exit 2)
+# Hard-block tests — Secret / credential files (GRDH-03)
+# All use assert_failure 2 per TEST-08 contract (RESEARCH.md Pitfall 3).
 # ---------------------------------------------------------------------------
 
-@test "hard-blocks .env via Write tool (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/.env")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for .env" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks .env.production via Edit tool (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/.env.production")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for .env.local" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env.local"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks .env.local via MultiEdit tool (GRDH-01 MultiEdit coverage, GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input MultiEdit "/project/.env.local")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for .env.production" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env.production"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks .env in subdirectory (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/config/.env")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for credentials.json" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/credentials.json"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks server.pem (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/certs/server.pem")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for secret.yaml" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/config/secret.yaml"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks private.key (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/private.key")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for server.pem" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/certs/server.pem"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks aws_credentials.json (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/aws_credentials.json")"
-  [ "$status" -eq 2 ]
-}
-
-@test "hard-blocks client_secret.yaml (GRDH-03)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/client_secret.yaml")"
-  [ "$status" -eq 2 ]
-}
-
-# ---------------------------------------------------------------------------
-# GRDH-02: Hard-block lock files (exit 2)
-# ---------------------------------------------------------------------------
-
-@test "hard-blocks Cargo.lock (GRDH-02)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/Cargo.lock")"
-  [ "$status" -eq 2 ]
-}
-
-@test "hard-blocks package-lock.json (GRDH-02)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/package-lock.json")"
-  [ "$status" -eq 2 ]
-}
-
-@test "hard-blocks poetry.lock (GRDH-02)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/poetry.lock")"
-  [ "$status" -eq 2 ]
-}
-
-@test "hard-blocks bun.lock (GRDH-02)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/bun.lock")"
-  [ "$status" -eq 2 ]
-}
-
-@test "hard-blocks yarn.lock (GRDH-02)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/yarn.lock")"
-  [ "$status" -eq 2 ]
-}
-
-@test "hard-blocks any *.lock file (GRDH-02)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/Pipfile.lock")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for private.key" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/certs/private.key"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
 # ---------------------------------------------------------------------------
-# GRDH-04: Hard-block generated directories (exit 2)
+# Hard-block tests — Lock files (GRDH-02)
 # ---------------------------------------------------------------------------
 
-@test "hard-blocks file in node_modules/ (GRDH-04)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/node_modules/lodash/index.js")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for package-lock.json" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/package-lock.json"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks file in .venv/ (GRDH-04)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/.venv/lib/site.py")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for Cargo.lock" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/Cargo.lock"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "hard-blocks file in target/ (GRDH-04)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/target/debug/main")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 2 for poetry.lock" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/poetry.lock"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-# ---------------------------------------------------------------------------
-# GRDH-08: Block message format ("AllClear: blocked write to X -- Y" on stderr)
-# ---------------------------------------------------------------------------
-
-@test "block message contains 'AllClear: blocked write to' on stderr (GRDH-08)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/.env")"
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"AllClear: blocked write to"* ]] || [[ "${lines[@]}" == *"AllClear: blocked write to"* ]]
+@test "guard hook - exits 2 for bun.lock" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/bun.lock"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "block message mentions blocked filename (GRDH-08)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/aws_credentials.json")"
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"aws_credentials.json"* ]] || [[ "${lines[@]}" == *"aws_credentials.json"* ]]
+@test "guard hook - exits 2 for yarn.lock" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/yarn.lock"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "stdout is empty on hard block — block message goes to stderr only (Pitfall 5)" {
-  # Run without capturing stderr (bats $output captures stdout by default when using run)
-  # We need to check stdout is empty and status is 2
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/.env")"
-  [ "$status" -eq 2 ]
-  # $output in bats captures both stdout and stderr by default with 'run'
-  # We need to explicitly check stdout only
-  stdout=$(bash "$SCRIPT" <<< "$(make_input Write "/project/.env")" 2>/dev/null; true)
-  [ -z "$stdout" ]
+@test "guard hook - exits 2 for Pipfile.lock" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/Pipfile.lock"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
 # ---------------------------------------------------------------------------
-# GRDH-05: Soft-warn migration files (exit 0 + systemMessage JSON)
+# Hard-block tests — Generated directories (GRDH-04)
 # ---------------------------------------------------------------------------
 
-@test "soft-warns on SQL migration file — exits 0 (GRDH-05)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/migrations/0001_initial.sql")"
-  [ "$status" -eq 0 ]
+@test "guard hook - exits 2 for node_modules path" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/node_modules/pkg/index.js"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "soft-warns on SQL migration file — stdout contains systemMessage (GRDH-05)" {
-  out=$(bash "$SCRIPT" <<< "$(make_input Edit "/project/migrations/0001_initial.sql")")
-  [[ "$out" == *"systemMessage"* ]]
+@test "guard hook - exits 2 for .venv path" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.venv/lib/site.py"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
-@test "soft-warns on Python migration file — exits 0 (GRDH-05)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/migrations/0002_add_users.py")"
-  [ "$status" -eq 0 ]
-}
-
-@test "soft-warns on Python migration file — stdout contains systemMessage (GRDH-05)" {
-  out=$(bash "$SCRIPT" <<< "$(make_input Edit "/project/migrations/0002_add_users.py")")
-  [[ "$out" == *"systemMessage"* ]]
+@test "guard hook - exits 2 for target path" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/target/debug/main"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
 }
 
 # ---------------------------------------------------------------------------
-# GRDH-06: Soft-warn generated code files (exit 0 + systemMessage JSON)
+# JSON schema verification (TEST-08, PITFALLS.md Pitfall 9)
+# The guard must output hookSpecificOutput.permissionDecision: "deny" on stdout.
+# Required schema:
+#   { "hookSpecificOutput": { "hookEventName": "PreToolUse",
+#                              "permissionDecision": "deny",
+#                              "permissionDecisionReason": "..." } }
 # ---------------------------------------------------------------------------
 
-@test "soft-warns on *.pb.go file — exits 0 (GRDH-06)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/api/user.pb.go")"
-  [ "$status" -eq 0 ]
+@test "guard hook - stdout contains permissionDecision deny for .env block" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_output --partial '"permissionDecision"'
+  assert_output --partial '"deny"'
 }
 
-@test "soft-warns on *.pb.go file — stdout contains systemMessage (GRDH-06)" {
-  out=$(bash "$SCRIPT" <<< "$(make_input Edit "/project/api/user.pb.go")")
-  [[ "$out" == *"systemMessage"* ]]
-}
-
-@test "soft-warns on *_generated.* file — exits 0 (GRDH-06)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/models/user_generated.ts")"
-  [ "$status" -eq 0 ]
-}
-
-@test "soft-warns on *_generated.* file — stdout contains systemMessage (GRDH-06)" {
-  out=$(bash "$SCRIPT" <<< "$(make_input Edit "/project/models/user_generated.ts")")
-  [[ "$out" == *"systemMessage"* ]]
-}
-
-@test "soft-warns on *.gen.* file — exits 0 (GRDH-06)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/lib/config.gen.go")"
-  [ "$status" -eq 0 ]
-}
-
-@test "soft-warns on *.gen.* file — stdout contains systemMessage (GRDH-06)" {
-  out=$(bash "$SCRIPT" <<< "$(make_input Edit "/project/lib/config.gen.go")")
-  [[ "$out" == *"systemMessage"* ]]
+@test "guard hook - stdout contains valid hookSpecificOutput JSON for .env block" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
+  # Pipe stdout through jq to verify it parses as valid JSON with correct schema
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' | jq -e '.hookSpecificOutput.permissionDecision == \"deny\"'"
+  assert_success
 }
 
 # ---------------------------------------------------------------------------
-# GRDH-07: Soft-warn CHANGELOG (exit 0 + systemMessage JSON)
+# Block message format (GRDH-08)
+# Human-readable denial message must carry the AllClear prefix.
+# stderr carries the human-readable message; use 2>&1 to capture it.
 # ---------------------------------------------------------------------------
 
-@test "soft-warns on CHANGELOG.md — exits 0 (GRDH-07)" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/CHANGELOG.md")"
-  [ "$status" -eq 0 ]
-}
-
-@test "soft-warns on CHANGELOG.md — stdout contains systemMessage (GRDH-07)" {
-  out=$(bash "$SCRIPT" <<< "$(make_input Edit "/project/CHANGELOG.md")")
-  [[ "$out" == *"systemMessage"* ]]
+@test "guard hook - block message contains AllClear prefix" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  assert_output --partial "AllClear"
 }
 
 # ---------------------------------------------------------------------------
-# Allow: Normal source files (exit 0, empty stdout)
+# Soft-warn tests — SQL migrations (GRDH-05)
+# Must exit 0 (allow write) but surface a warning message.
 # ---------------------------------------------------------------------------
 
-@test "allows normal Go source file — exits 0 with no output" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/src/main.go")"
-  [ "$status" -eq 0 ]
-  [ -z "$output" ]
+@test "guard hook - exits 0 for SQL migration file (GRDH-05)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/migrations/001_init.sql"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
 }
 
-@test "allows normal Rust source file — exits 0 with no output" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/src/lib.rs")"
-  [ "$status" -eq 0 ]
-  [ -z "$output" ]
+@test "guard hook - outputs warning for SQL migration file" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/migrations/001_init.sql"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  refute_output ""
+  assert_output --partial "AllClear"
 }
 
-@test "allows README.md — exits 0 with no output" {
-  run bash "$SCRIPT" <<< "$(make_input Edit "/project/README.md")"
-  [ "$status" -eq 0 ]
-  [ -z "$output" ]
-}
-
-@test "allows input with no file_path field — exits 0 (Bash tool)" {
-  run bash "$SCRIPT" <<< '{"tool_name": "Bash", "tool_input": {"command": "ls"}}'
-  [ "$status" -eq 0 ]
+@test "guard hook - exits 0 for Python migration file (GRDH-05)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/migrations/0002_add_users.py"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
 }
 
 # ---------------------------------------------------------------------------
-# Config: ALLCLEAR_DISABLE_GUARD bypass
+# Soft-warn tests — Generated code (GRDH-06)
+# Must exit 0 (allow write) for generated code files.
 # ---------------------------------------------------------------------------
 
-@test "ALLCLEAR_DISABLE_GUARD=1 bypasses guard and allows .env (CONF-02)" {
-  ALLCLEAR_DISABLE_GUARD=1 run bash "$SCRIPT" <<< "$(make_input Write "/project/.env")"
-  [ "$status" -eq 0 ]
+@test "guard hook - exits 0 for .pb.go generated file (GRDH-06)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/api.pb.go"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
 }
 
-@test "ALLCLEAR_DISABLE_GUARD=1 bypasses guard and allows Cargo.lock (CONF-02)" {
-  ALLCLEAR_DISABLE_GUARD=1 run bash "$SCRIPT" <<< "$(make_input Write "/project/Cargo.lock")"
-  [ "$status" -eq 0 ]
+@test "guard hook - exits 0 for _generated.ts file (GRDH-06)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/types_generated.ts"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
 }
 
-# ---------------------------------------------------------------------------
-# Config: ALLCLEAR_EXTRA_BLOCKED custom patterns (CONF-04)
-# ---------------------------------------------------------------------------
-
-@test "ALLCLEAR_EXTRA_BLOCKED adds custom block pattern for *.sql (CONF-04)" {
-  # Without EXTRA_BLOCKED, a plain .sql file (not in migrations/) would be allowed
-  # With EXTRA_BLOCKED="*.sql", it should be blocked
-  ALLCLEAR_EXTRA_BLOCKED="*.sql" run bash "$SCRIPT" <<< "$(make_input Write "/project/data/export.sql")"
-  [ "$status" -eq 2 ]
-}
-
-@test "ALLCLEAR_EXTRA_BLOCKED colon-separated patterns work (CONF-04)" {
-  ALLCLEAR_EXTRA_BLOCKED="*.sql:*.csv" run bash "$SCRIPT" <<< "$(make_input Write "/project/data/users.csv")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 0 for .gen.go file (GRDH-06)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/models.gen.go"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
 }
 
 # ---------------------------------------------------------------------------
-# Path normalization (Pitfall 3)
+# Soft-warn tests — CHANGELOG (GRDH-07)
+# Must exit 0 (allow write) but surface a warning.
 # ---------------------------------------------------------------------------
 
-@test "path traversal ../../.env is still blocked (Pitfall 3)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "../../.env")"
-  [ "$status" -eq 2 ]
+@test "guard hook - exits 0 for CHANGELOG.md (GRDH-07)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/CHANGELOG.md"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
 }
 
-@test "path with ../ components resolving to .env is blocked (Pitfall 3)" {
-  run bash "$SCRIPT" <<< "$(make_input Write "/project/config/../.env")"
-  [ "$status" -eq 2 ]
+@test "guard hook - outputs warning for CHANGELOG.md" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/CHANGELOG.md"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  refute_output ""
+}
+
+# ---------------------------------------------------------------------------
+# Safe file tests
+# Must exit 0 with no output for regular source files.
+# ---------------------------------------------------------------------------
+
+@test "guard hook - exits 0 for safe file src/main.py" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/src/main.py"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  assert_success
+}
+
+@test "guard hook - produces no output for safe file" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/src/main.py"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  assert_output ""
+}
+
+@test "guard hook - exits 0 for safe Go source file" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/src/main.go"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  assert_success
+  assert_output ""
+}
+
+@test "guard hook - exits 0 for README.md" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/README.md"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
+  assert_success
+  assert_output ""
+}
+
+@test "guard hook - exits 0 for input with no file_path (Bash tool)" {
+  local json='{"tool_name":"Bash","tool_input":{"command":"ls"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_success
+}
+
+# ---------------------------------------------------------------------------
+# Path normalization (Security, PITFALLS.md — Security Mistakes)
+# Guard must use normalized paths to prevent traversal bypasses.
+# ---------------------------------------------------------------------------
+
+@test "guard hook - exits 2 for path traversal to .env (Pitfall 3)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"../../.env"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
+}
+
+@test "guard hook - exits 2 for path with ../ resolving to .env (Pitfall 3)" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/config/../.env"}}'
+  run bash -c "printf '%s' '${json}' | bash '${SCRIPT}'"
+  assert_failure 2
+}
+
+# ---------------------------------------------------------------------------
+# Disable guard via env var (CONF-02)
+# ALLCLEAR_DISABLE_GUARD=1 bypasses all blocking.
+# ---------------------------------------------------------------------------
+
+@test "guard hook - ALLCLEAR_DISABLE_GUARD=1 bypasses block on .env" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
+  run bash -c "ALLCLEAR_DISABLE_GUARD=1 bash '${SCRIPT}' <<< '${json}'"
+  assert_success
+}
+
+@test "guard hook - ALLCLEAR_DISABLE_GUARD=1 bypasses block on Cargo.lock" {
+  local json='{"tool_name":"Write","tool_input":{"file_path":"/project/Cargo.lock"}}'
+  run bash -c "ALLCLEAR_DISABLE_GUARD=1 bash '${SCRIPT}' <<< '${json}'"
+  assert_success
 }

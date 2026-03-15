@@ -25,8 +25,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 8: Config Layer** - allclear.config.json overrides and environment variable toggles
 - [ ] **Phase 9: Impact Skill** - `/allclear impact` cross-repo reference scanning
 - [ ] **Phase 10: Drift Skill** - `/allclear drift` version and type consistency checking across repos
-- [ ] **Phase 11: Pulse Skill** - `/allclear pulse` live service health checking via kubectl
-- [ ] **Phase 12: Deploy Skill** - `/allclear deploy` expected-vs-actual cluster state verification
+- [x] **Phase 11: Pulse Skill** - `/allclear pulse` live service health checking via kubectl (completed 2026-03-15)
+- [x] **Phase 12: Deploy Skill** - `/allclear deploy` expected-vs-actual cluster state verification (completed 2026-03-15)
 - [ ] **Phase 13: Tests** - Bats test suite for all hooks, exit codes, and library functions
 
 ## Phase Details
@@ -178,7 +178,7 @@ Plans:
   1. `/allclear pulse` reports health endpoint status (alive, ready, components) for each service and compares running image version to latest git tag
   2. `/allclear pulse --env staging` (or dev/prod) targets the specified environment
   3. `/allclear pulse` with no kubectl available outputs a single clear skip message and exits cleanly with no error
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 11-01-PLAN.md — Pulse skill helper script and SKILL.md orchestration prompt
 
@@ -190,7 +190,7 @@ Plans:
   1. `/allclear deploy` compares expected state (kustomize/helm overlays) to actual cluster state and reports image tag and configmap mismatches
   2. `/allclear deploy --diff` shows the specific differences between expected and actual state
   3. `/allclear deploy` with no kubectl available outputs a single clear skip message and exits cleanly
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 12-01-PLAN.md — Create deploy-verify SKILL.md with kubectl diff, image tag comparison, configmap checks, and graceful skip
 
@@ -230,6 +230,6 @@ All phases are independent and can execute in parallel. No ordering constraints.
 | 8. Config Layer | 0/1 | Planned | - |
 | 9. Impact Skill | 0/1 | Planning complete | - |
 | 10. Drift Skill | 0/2 | Planning complete | - |
-| 11. Pulse Skill | 0/1 | Planning complete | - |
-| 12. Deploy Skill | 0/1 | Planning complete | - |
+| 11. Pulse Skill | 1/1 | Complete   | 2026-03-15 |
+| 12. Deploy Skill | 1/1 | Complete   | 2026-03-15 |
 | 13. Tests | 0/3 | Planning complete | - |

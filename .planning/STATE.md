@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: "Completed 01-01-PLAN.md (Task 3 checkpoint:human-verify pending)"
+last_updated: "2026-03-15T10:11:04.985Z"
+last_activity: 2026-03-15 — Roadmap revised to parallel structure, 7 sequential phases replaced with 13 independent phases
+progress:
+  total_phases: 13
+  completed_phases: 7
+  total_plans: 17
+  completed_plans: 8
+  percent: 29
+---
+
 # Project State
 
 ## Project Reference
@@ -14,7 +30,7 @@ Plan: 0 of TBD in current phase
 Status: Ready to plan any phase
 Last activity: 2026-03-15 — Roadmap revised to parallel structure, 7 sequential phases replaced with 13 independent phases
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 29%
 
 ## Performance Metrics
 
@@ -34,6 +50,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: n/a
 
 *Updated after each plan completion*
+| Phase 12-deploy-skill P01 | 2 | 2 tasks | 1 files |
+| Phase 06-session-hook P01 | 1min | 2 tasks | 2 files |
+| Phase 11-pulse-skill P01 | 2m | 2 tasks | 2 files |
+| Phase 01-plugin-skeleton P01 | 8 | 2 tasks | 17 files |
+| Phase 03-format-hook P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -47,6 +68,15 @@ Recent decisions affecting current work:
 - [Init]: Only `plugin.json` goes inside `.claude-plugin/`; skills/, hooks/, scripts/, lib/ go at plugin root
 - [Init]: PULS/DPLY skills ship in v1 with graceful kubectl skip — they're optional/advanced, not blocked
 - [Revision 2026-03-15]: Roadmap restructured to 13 fully parallel phases — all phases are independent file writes with no build-order dependencies; parallelization: true, granularity: fine
+- [Phase 12-deploy-skill]: Single SKILL.md for deploy-verify — no supporting scripts needed; Claude executes Bash directly from skill steps
+- [Phase 12-deploy-skill]: kubectl diff -k exit code 1 is informational (diffs found), not an error — must be explicitly handled in skill prompt
+- [Phase 06-session-hook]: No source matcher on SessionStart: registers for all sources so bug #10373 fix is transparent when shipped
+- [Phase 06-session-hook]: Dynamic hookEventName from stdin prevents silent discard when UserPromptSubmit triggers same script (Pitfall 3)
+- [Phase 11-pulse-skill]: pulse-check.sh as sourceable library (not inline bash) enables bats testability for PULS-02 through PULS-05
+- [Phase 11-pulse-skill]: Health endpoint priority: /health, /healthz, /actuator/health, /ready (application-first order)
+- [Phase 01-plugin-skeleton]: Only plugin.json goes inside .claude-plugin/; skills/, hooks/, scripts/, lib/ go at plugin root
+- [Phase 01-plugin-skeleton]: All hooks.json path references use ${CLAUDE_PLUGIN_ROOT} — zero hardcoded absolute paths (PLGN-04)
+- [Phase 01-plugin-skeleton]: PascalCase event names in hooks.json: PostToolUse, PreToolUse, SessionStart
 
 ### Pending Todos
 
@@ -60,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15
-Stopped at: Roadmap revised to parallel structure
+Last session: 2026-03-15T10:10:58.815Z
+Stopped at: Completed 01-01-PLAN.md (Task 3 checkpoint:human-verify pending)
 Resume file: None
