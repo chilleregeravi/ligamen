@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Service Dependency Intelligence
 status: planning
-stopped_at: Completed 18-02-PLAN.md — scan-manager with incremental/full scan and repo_state integration
-last_updated: "2026-03-15T19:25:59.845Z"
+stopped_at: "Completed 20-01-PLAN.md — /allclear:map command with full 10-step orchestration pipeline"
+last_updated: "2026-03-15T19:30:42.506Z"
 last_activity: 2026-03-15 — Roadmap created, 8 phases defined (14-21)
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 19
-  completed_plans: 13
+  completed_plans: 15
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-repo-discovery-user-confirmation P01 | 2min | 2 tasks | 2 files |
 | Phase 18-agent-scanning P01 | 3min | 2 tasks | 3 files |
 | Phase 18-agent-scanning P02 | 3.5min | 2 tasks | 3 files |
+| Phase 20-command-layer P01 | 2min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 18-agent-scanning]: getChangedFiles uses git ls-files (not diff) for sinceCommit=null — returns all tracked files for full scan
 - [Phase 18-agent-scanning]: agentRunner injection pattern: setAgentRunner(fn) decouples scan-manager.js from Claude Task tool — MCP server injects real invoker, tests inject mock
 - [Phase 18-agent-scanning]: Rename detection: baseCommit must be after file-to-rename is committed — diff from before add shows A new.txt not R old.txt->new.txt
+- [Phase 20-command-layer]: commands/map.md is a pure orchestration prompt — all heavy lifting delegated to Phase 15/17/18/19 infrastructure
+- [Phase 20-command-layer]: First-build detection: versions list empty before Step 7 persist triggers MCP instructions + impact-map section write to allclear.config.json
 
 ### Pending Todos
 
@@ -117,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T19:25:51.335Z
-Stopped at: Completed 18-02-PLAN.md — scan-manager with incremental/full scan and repo_state integration
+Last session: 2026-03-15T19:30:42.503Z
+Stopped at: Completed 20-01-PLAN.md — /allclear:map command with full 10-step orchestration pipeline
 Resume file: None

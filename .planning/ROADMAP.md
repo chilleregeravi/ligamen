@@ -36,7 +36,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 17: HTTP Server & Web UI** — Fastify REST API, D3 Canvas force-directed graph, single-file UI (completed 2026-03-15)
 - [x] **Phase 18: Agent Scanning** — Claude agent orchestration, structured findings extraction, incremental scan (completed 2026-03-15)
 - [x] **Phase 19: Repo Discovery & User Confirmation** — repo discovery flow, confirmation UX grouped by confidence, config persistence (completed 2026-03-15)
-- [ ] **Phase 20: Command Layer** — /allclear:map orchestration, /allclear:cross-impact redesign with fallback
+- [x] **Phase 20: Command Layer** — /allclear:map orchestration, /allclear:cross-impact redesign with fallback (completed 2026-03-15)
 - [ ] **Phase 21: Integration & Config** — session hook auto-start, ChromaDB async sync, E2E tests
 
 ## Phase Details
@@ -178,5 +178,5 @@ Plans:
 | 17. HTTP Server & Web UI | 2/2 | Complete   | 2026-03-15 | - |
 | 18. Agent Scanning | 2/2 | Complete   | 2026-03-15 | - |
 | 19. Repo Discovery & User Confirmation | 2/2 | Complete   | 2026-03-15 | - |
-| 20. Command Layer | v2.0 | 0/2 | Planned | - |
+| 20. Command Layer | 2/2 | Complete   | 2026-03-15 | - |
 | 21. Integration & Config | v2.0 | 0/4 | Planned | - |

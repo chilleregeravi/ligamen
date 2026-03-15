@@ -78,7 +78,7 @@
 
 ### Command Layer
 
-- [ ] **CMDL-01**: `/allclear:map` orchestrates full flow: discover repos → confirm → scan → validate → persist → open UI
+- [x] **CMDL-01**: `/allclear:map` orchestrates full flow: discover repos → confirm → scan → validate → persist → open UI
 - [ ] **CMDL-02**: `/allclear:cross-impact` queries impact map for services affected by current changes
 - [ ] **CMDL-03**: `/allclear:cross-impact` auto-detects changes from git diff when no args provided
 - [ ] **CMDL-04**: `/allclear:cross-impact` walks graph transitively and classifies impact as CRITICAL/WARN/INFO
@@ -174,7 +174,7 @@
 | DISC-04 | Phase 19 | Complete |
 | DISC-05 | Phase 19 | Complete |
 | DISC-06 | Phase 19 | Complete |
-| CMDL-01 | Phase 20 | Pending |
+| CMDL-01 | Phase 20 | Complete |
 | CMDL-02 | Phase 20 | Pending |
 | CMDL-03 | Phase 20 | Pending |
 | CMDL-04 | Phase 20 | Pending |
