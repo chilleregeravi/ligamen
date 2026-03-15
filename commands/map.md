@@ -1,7 +1,7 @@
 ---
 description: Build or refresh the service dependency map by scanning linked repos with Claude agents. Use when the user runs /allclear:map to build the impact map for the first time or re-scan after changes.
 allowed-tools: Bash, Read, Write, AskUserQuestion, Agent
-argument-hint: "[--view] [--full]"
+argument-hint: "[view|full]"
 ---
 
 # AllClear Map — Service Dependency Scanner
@@ -13,12 +13,12 @@ This command scans linked repositories using Claude agents to discover services,
 ## Quick Reference
 
 - `/allclear:map` — scan repos and build the dependency graph
-- `/allclear:map --view` — just open the graph UI (no scanning)
-- `/allclear:map --full` — force full re-scan of all files
+- `/allclear:map view` — just open the graph UI (no scanning)
+- `/allclear:map full` — force full re-scan of all files
 
 ---
 
-## If `--view` flag: Open Graph UI and Exit
+## If `view` flag: Open Graph UI and Exit
 
 ```bash
 source ${CLAUDE_PLUGIN_ROOT}/lib/worker-client.sh
@@ -70,17 +70,17 @@ Save confirmed list to `allclear.config.json`.
 
 **This is the main task.** For each confirmed repo, spawn an agent to analyze the code.
 
-**Scan mode:** If `--full` flag is present OR this is the first scan (no existing data), scan all files in every repo. Otherwise, only scan repos with changes since last scan — check git HEAD against the last scanned commit.
+**Scan mode:** If `full` flag is present OR this is the first scan (no existing data), scan all files in every repo. Otherwise, only scan repos with changes since last scan — check git HEAD against the last scanned commit.
 
 **For each repo:**
 
-1. **Check if scan is needed** (skip for `--full` or first scan):
+1. **Check if scan is needed** (skip for `full` or first scan):
 
    ```bash
    LAST_COMMIT=$(git -C "${REPO_PATH}" rev-parse HEAD 2>/dev/null)
    ```
 
-   Compare with the repo's `last_scanned_commit` from the database. If they match and `--full` is not set, skip this repo and print: "Skipping <repo> (no changes since last scan)".
+   Compare with the repo's `last_scanned_commit` from the database. If they match and `full` is not set, skip this repo and print: "Skipping <repo> (no changes since last scan)".
 
 2. Read the agent prompt template:
 
@@ -163,6 +163,6 @@ Repeat for each repo. Print: "Dependency map saved. N services, M connections."
 If this was the **first map build**, add `"impact-map": {"history": true}` to `allclear.config.json` and print:
 
 ```
-Map built successfully. View it with /allclear:map --view
+Map built successfully. View it with /allclear:map view
 To enable agent-based impact checking, add the AllClear MCP server to your .mcp.json.
 ```
