@@ -475,7 +475,24 @@ async function init() {
     return;
   }
 
-  graphData = await resp.json();
+  const raw = await resp.json();
+
+  // Map API response shape to UI expected shape
+  // API returns { services, connections, repos }
+  // UI expects { nodes: [{id, name, language}], edges: [{source_service_id, target_service_id, protocol}] }
+  const serviceNameToId = {};
+  graphData.nodes = (raw.services || raw.nodes || []).map(s => {
+    serviceNameToId[s.name] = s.id;
+    return { id: s.id, name: s.name, language: s.language, repo_name: s.repo_name };
+  });
+  graphData.edges = (raw.connections || raw.edges || []).map(c => ({
+    source_service_id: c.source_service_id ?? serviceNameToId[c.source],
+    target_service_id: c.target_service_id ?? serviceNameToId[c.target],
+    protocol: c.protocol || 'internal',
+    method: c.method,
+    path: c.path,
+  }));
+
   document.getElementById('node-info').textContent =
     `${graphData.nodes.length} services, ${graphData.edges.length} connections`;
 
