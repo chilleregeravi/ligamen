@@ -104,10 +104,10 @@
 
 ### Configuration
 
-- [ ] **CONF-01**: Plugin supports allclear.config.json for overriding sibling repo paths
-- [ ] **CONF-02**: Plugin supports environment variables for hook toggles (ALLCLEAR_DISABLE_FORMAT, ALLCLEAR_DISABLE_LINT, ALLCLEAR_DISABLE_GUARD)
-- [ ] **CONF-03**: Plugin supports ALLCLEAR_LINT_THROTTLE for configuring clippy throttle interval
-- [ ] **CONF-04**: Plugin supports ALLCLEAR_EXTRA_BLOCKED for additional blocked file patterns
+- [x] **CONF-01**: Plugin supports allclear.config.json for overriding sibling repo paths
+- [x] **CONF-02**: Plugin supports environment variables for hook toggles (ALLCLEAR_DISABLE_FORMAT, ALLCLEAR_DISABLE_LINT, ALLCLEAR_DISABLE_GUARD)
+- [x] **CONF-03**: Plugin supports ALLCLEAR_LINT_THROTTLE for configuring clippy throttle interval
+- [x] **CONF-04**: Plugin supports ALLCLEAR_EXTRA_BLOCKED for additional blocked file patterns
 
 ### Testing
 
@@ -193,10 +193,10 @@
 | GATE-03 | Phase 7 | Pending |
 | GATE-04 | Phase 7 | Pending |
 | GATE-05 | Phase 7 | Pending |
-| CONF-01 | Phase 8 | Pending |
-| CONF-02 | Phase 8 | Pending |
-| CONF-03 | Phase 8 | Pending |
-| CONF-04 | Phase 8 | Pending |
+| CONF-01 | Phase 8 | Complete |
+| CONF-02 | Phase 8 | Complete |
+| CONF-03 | Phase 8 | Complete |
+| CONF-04 | Phase 8 | Complete |
 | IMPT-01 | Phase 9 | Pending |
 | IMPT-02 | Phase 9 | Pending |
 | IMPT-03 | Phase 9 | Pending |
