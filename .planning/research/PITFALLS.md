@@ -1,293 +1,380 @@
 # Pitfalls Research
 
-**Domain:** Claude Code plugin development — quality gate + cross-repo hooks with shell scripts and npx CLI installer
+**Domain:** Service dependency intelligence — adding Node.js worker, SQLite + ChromaDB storage, MCP server, D3 graph UI, and agent-based scanning to an existing shell-based Claude Code plugin
 **Researched:** 2026-03-15
-**Confidence:** HIGH (official docs verified + real plugin inspection + hook behavior confirmed)
+**Confidence:** HIGH (SQLite official docs + better-sqlite3 confirmed; MCP spec official; ChromaDB GitHub issues; D3 performance research 2025; Claude Code GitHub issues confirmed)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Misplaced Component Directories
+### Pitfall 1: Worker Process Orphaning After Shell Script Exit
 
 **What goes wrong:**
-`commands/`, `agents/`, `skills/`, and `hooks/` directories end up inside `.claude-plugin/` alongside `plugin.json`. Claude Code silently ignores them. The plugin installs without error but no skills, hooks, or commands appear.
+The shell-based `/allclear:map` command starts the Node.js worker process, then the command exits. If the worker was started as a fire-and-forget subprocess without proper PID tracking, it becomes an orphan — running but invisible to the user. Re-running `/allclear:map` starts a second worker on the same port, causing an EADDRINUSE error or silent split-brain where two processes share one SQLite file.
 
 **Why it happens:**
-The manifest lives at `.claude-plugin/plugin.json`, so developers intuit that all plugin files should live under `.claude-plugin/`. The official warning exists precisely because this is the most common structural mistake.
+Shell scripts spawn background processes with `&` without persisting the PID. The plugin command exits and the PID is lost. On the next invocation, there is no way to know whether a worker is already running on the configured port.
 
 **How to avoid:**
-Only `plugin.json` belongs inside `.claude-plugin/`. Every other directory — `skills/`, `hooks/`, `commands/`, `agents/`, `scripts/` — must be at the plugin root:
-
-```
-allclear/
-├── .claude-plugin/
-│   └── plugin.json       <- only this here
-├── skills/
-├── hooks/
-│   └── hooks.json
-└── scripts/
-```
-
-**Warning signs:**
-- Plugin installs without error but `/allclear` doesn't appear in the skill list
-- `claude --debug` shows the plugin loading but no components registered
-- `claude plugin validate` passes but skills are absent
-
-**Phase to address:**
-Phase 1 (Foundation). Establish canonical directory structure before writing any skill or hook content.
-
----
-
-### Pitfall 2: Hook Scripts Without Executable Permissions
-
-**What goes wrong:**
-Shell scripts in `scripts/` are committed without the executable bit. Hooks silently fail to fire. PostToolUse auto-format and auto-lint hooks do nothing, and the user sees no error.
-
-**Why it happens:**
-`git add` does not preserve the executable bit across all clone environments. File permissions are easy to overlook during development when running from the same machine where the file was created.
-
-**How to avoid:**
-- Add `chmod +x scripts/*.sh` as a step in the install script AND document it in README
-- For the `npx @allclear/cli init` installer, explicitly `chmod +x` each script after copying it
-- Verify with a post-install smoke test: `[ -x scripts/format.sh ] && echo OK || echo BROKEN`
-- Use `.gitattributes` to preserve executable bits: `scripts/*.sh text eol=lf`
-
-**Warning signs:**
-- Hook commands registered in `hooks.json` but PostToolUse events produce no output
-- Running hook script manually works, but it doesn't fire inside Claude Code
-- `ls -la scripts/` shows `-rw-r--r--` instead of `-rwxr-xr-x`
-
-**Phase to address:**
-Phase 1 (Foundation) — add executable enforcement to installer. Phase 3 (Hooks) — add bats test verifying `chmod +x` is applied on install.
-
----
-
-### Pitfall 3: Absolute Paths Instead of `${CLAUDE_PLUGIN_ROOT}`
-
-**What goes wrong:**
-Hook commands and MCP server configs use hardcoded absolute paths like `/Users/ravi/.claude/plugins/...`. The plugin works on the author's machine but breaks for every other user because the path doesn't exist.
-
-**Why it happens:**
-Developers test locally with `--plugin-dir` pointing to a local directory. Absolute paths work perfectly during development. The plugin cache copies files to a content-addressed path (`~/.claude/plugins/cache/marketplace/plugin/VERSION/`) that differs from the development path, breaking all hardcoded paths.
-
-**How to avoid:**
-Use `${CLAUDE_PLUGIN_ROOT}` for every path inside hook commands, MCP configs, and script references:
-
-```json
-{
-  "type": "command",
-  "command": "${CLAUDE_PLUGIN_ROOT}/scripts/format.sh"
-}
-```
-
-Confirm this with the real claude-mem pattern — it even adds a fallback:
-```bash
-_R="${CLAUDE_PLUGIN_ROOT}"; [ -z "$_R" ] && _R="$HOME/.claude/..."; "$_R/scripts/run.sh"
-```
-
-**Warning signs:**
-- Plugin works when loaded via `--plugin-dir` but hooks fail after marketplace install
-- Debug logs show `command not found` or `No such file or directory`
-- Paths in error messages reference the author's home directory
-
-**Phase to address:**
-Phase 3 (Hooks). Enforce `${CLAUDE_PLUGIN_ROOT}` in all hook commands from the start. Add bats test with a path-validation check.
-
----
-
-### Pitfall 4: Non-Zero Exit Codes Blocking on PostToolUse (Format/Lint Hooks)
-
-**What goes wrong:**
-Auto-format and auto-lint hooks use `exit 1` when the formatter fails (e.g., file has syntax errors, tool not installed). This blocks Claude's edit cycle. The PROJECT.md constraint explicitly requires non-blocking hooks — this directly violates it.
-
-**Why it happens:**
-Standard shell scripting convention is `exit 1` on failure. Developers apply that same pattern without knowing that in `PostToolUse` context, exit code 2 produces a blocking error shown to Claude.
-
-**How to avoid:**
-Wrap every format/lint hook in a try-catch pattern that always exits 0:
+Write the worker PID to `.allclear/worker.pid` immediately after spawn. Before starting a new worker, check if the PID in `worker.pid` is still alive (`kill -0 $PID 2>/dev/null`). If alive, skip spawn. If dead, remove the stale PID file and start fresh. The HTTP server should also register a `SIGTERM`/`SIGINT` handler that removes `worker.pid` on clean shutdown.
 
 ```bash
-#!/bin/bash
-FILE=$(jq -r '.tool_input.file_path // empty' < /dev/stdin 2>/dev/null)
-if [ -z "$FILE" ]; then exit 0; fi
-
-# Run formatter, capture output, never block on failure
-if command -v ruff &>/dev/null; then
-  ruff format "$FILE" 2>&1 >&2 || true
+# In /allclear:map command script
+PIDFILE=".allclear/worker.pid"
+if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
+  echo "Worker already running (PID $(cat $PIDFILE))" >&2
+else
+  node worker/server.js &
+  echo $! > "$PIDFILE"
 fi
-exit 0   # Always 0 — non-blocking
 ```
 
-Print errors to stderr (they become informational messages, not blockers). Never use `exit 1` or `exit 2` in PostToolUse format/lint hooks.
-
 **Warning signs:**
-- Edits intermittently fail with formatter error messages
-- `PostToolUse` hook fires but subsequent Claude actions are blocked
-- Users report AllClear "breaking" their session when they edit a file with syntax errors
+- `Error: listen EADDRINUSE :::37888` on second invocation of `/allclear:map`
+- Two `node worker/server.js` processes visible in `ps aux`
+- SQLite `SQLITE_BUSY` errors immediately after starting `/allclear:map`
 
 **Phase to address:**
-Phase 3 (Hooks). Non-blocking exit policy must be a bats test requirement for every format/lint hook.
+Worker foundation phase. PID file management must be implemented before any other worker functionality.
 
 ---
 
-### Pitfall 5: Hook stdin/stdout Mixing — Debug Output Pollutes JSON
+### Pitfall 2: SQLite WAL File Growing Without Bound
 
 **What goes wrong:**
-Hook scripts print debug statements or status messages to stdout, corrupting the JSON response that Claude Code parses. This causes JSON parse errors, hook failures, or silent misbehavior.
+The worker uses SQLite in WAL mode for concurrency. If any reader holds a long-lived transaction — even a simple read that stays open while agent scanning runs — the WAL checkpoint cannot complete. The WAL file grows unboundedly. With large service maps and frequent scans, the `.allclear/impact-map.db-wal` file can reach hundreds of megabytes and slow all queries.
 
 **Why it happens:**
-Bash scripts naturally use `echo "Processing..."` for feedback. Developers don't realize that for hooks, stdout is a structured channel — only valid JSON (or empty output) should appear there.
+WAL mode checkpointing requires that no readers hold open snapshots. When agent scans run over many repos simultaneously while the HTTP server is also serving read queries, there are always concurrent readers. The default auto-checkpoint at 1000 pages is blocked by these long-lived reads, so the WAL never resets.
 
 **How to avoid:**
-Always route debug output to stderr:
+- Set `PRAGMA journal_size_limit = 67108864` (64 MB cap even if checkpoint fails)
+- Use `better-sqlite3`'s synchronous API — it never holds connections open across the event loop tick
+- Run explicit `db.checkpoint('TRUNCATE')` after every scan completes (scans are write-heavy, readers will be idle momentarily)
+- Set `busyTimeout: 5000` on the connection so reads don't fail on transient locks
+- Never open a prepared SELECT statement and leave it un-finalized across an async boundary
 
-```bash
-# BAD:
-echo "Formatting $FILE..."
-run_formatter "$FILE"
-
-# GOOD:
-echo "Formatting $FILE..." >&2
-run_formatter "$FILE" >&2 || true
+```javascript
+const db = new Database('.allclear/impact-map.db');
+db.pragma('journal_mode = WAL');
+db.pragma('journal_size_limit = 67108864');
+db.pragma('busy_timeout = 5000');
 ```
 
-If the hook returns structured data (e.g., `additionalContext`), produce JSON on stdout only on exit 0, and only when needed. For pure side-effect hooks (format/lint), produce no stdout at all.
-
 **Warning signs:**
-- Hooks produce output like `JSON parse error` in debug mode
-- Hook fires but Claude receives garbled tool context
-- Adding `echo` debugging statements to a hook causes it to stop working
+- `.allclear/impact-map.db-wal` file larger than 50 MB between scans
+- Query latency increasing over time without schema growth
+- `SQLITE_BUSY` errors in worker logs despite WAL mode being enabled
 
 **Phase to address:**
-Phase 3 (Hooks). Establish stderr-only logging as a bats test assertion.
+SQLite/storage phase. WAL pragma configuration must be in the initial database setup, not added later.
 
 ---
 
-### Pitfall 6: Incorrect Event Name Casing Breaks Hooks Silently
+### Pitfall 3: ChromaDB Assumed Present — Hard Failure Instead of Graceful Skip
 
 **What goes wrong:**
-Hooks registered with `"postToolUse"` or `"sessionstart"` simply don't fire. No error. No warning. The hook is registered but never invoked because event names are case-sensitive.
+ChromaDB is optional, but code that calls the ChromaDB client without checking availability first will throw on connection refused. If ChromaDB sync is inline with the scan persist path, a ChromaDB outage silently prevents all findings from being written to SQLite — or crashes the worker entirely.
 
 **Why it happens:**
-Hook event names look like camelCase or other conventions, leading to guessing. The correct names are PascalCase: `PostToolUse`, `PreToolUse`, `SessionStart`.
+Developers wire ChromaDB into the save flow early. It works during development where ChromaDB is running. In production, ChromaDB may not be configured, may fail to start, or may crash mid-session. The design document's fallback chain (ChromaDB → FTS5 → direct SQL) is easy to spec but easy to skip in implementation.
 
 **How to avoid:**
-Copy event names exactly from the reference. The full list from official docs: `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `UserPromptSubmit`, `Notification`, `Stop`, `SubagentStart`, `SubagentStop`, `SessionStart`, `SessionEnd`, `TeammateIdle`, `TaskCompleted`, `PreCompact`.
+ChromaDB sync must be on a completely separate async path from SQLite writes. The sequence must always be: write to SQLite first, confirm success, then attempt ChromaDB sync asynchronously. Any ChromaDB error must be caught, logged to stderr, and not bubble up to the caller. On startup, probe ChromaDB with a health check and set a `chromaAvailable` flag — don't probe on every query.
 
-Validate with `claude plugin validate` after any hooks.json change.
+```javascript
+async function persistFindings(findings) {
+  // Always succeeds or throws for real errors
+  await db.writeScan(findings);
 
-**Warning signs:**
-- Hook added to hooks.json but never fires
-- `claude --debug` doesn't show the hook in the registered list
-- All other hooks in the same hooks.json work correctly
-
-**Phase to address:**
-Phase 3 (Hooks). Add `claude plugin validate` to CI and document correct event names in inline comments.
-
----
-
-### Pitfall 7: Version Not Bumped — Users Never Get Updates
-
-**What goes wrong:**
-Plugin code changes ship without a version bump in `plugin.json`. Existing users are stuck on the old version because the plugin cache is keyed on version number. New installs get the new code; existing users do not.
-
-**Why it happens:**
-It's easy to push code changes to the marketplace repository and forget that Claude Code uses version numbers to trigger cache invalidation. This is different from standard npm packages where the registry enforces version uniqueness.
-
-**How to avoid:**
-Make version bump a mandatory checklist item before any release. The official docs explicitly warn: "If you change your plugin's code but don't bump the version in `plugin.json`, your plugin's existing users won't see your changes due to caching."
-
-Use a release checklist or CI check: `git diff main..HEAD -- .claude-plugin/plugin.json | grep version || echo "VERSION NOT BUMPED"`.
-
-**Warning signs:**
-- Bug is fixed and pushed but users still report the bug
-- New skill added but doesn't appear for users who already have the plugin installed
-- `claude plugin update allclear` reports "already up to date" despite code changes
-
-**Phase to address:**
-Phase 5 (Distribution). Build version-bump verification into the release process before marketplace submission.
-
----
-
-### Pitfall 8: Cross-Repo Discovery Assuming a Flat Parent Directory Layout
-
-**What goes wrong:**
-AllClear's cross-repo scanning (`/allclear impact`, `/allclear drift`) auto-discovers sibling repos by scanning the parent directory. This breaks for users who do not use a flat layout (e.g., deeply nested monorepo structures, custom workspace root in a non-parent dir, WSL path mappings).
-
-**Why it happens:**
-The Edgeworks ecosystem that spawned AllClear uses a flat layout (`~/sources/repo1`, `~/sources/repo2`). This pattern is natural to the authors but not universal.
-
-**How to avoid:**
-- Auto-detect from parent directory as the default path
-- Always provide `allclear.config.json` as a first-class override with explicit `repos` array
-- When no sibling repos are found, degrade gracefully with a clear message: "No sibling repos detected. Add repos to allclear.config.json to enable cross-repo scanning."
-- Document the expected layout in README prominently
-
-**Warning signs:**
-- Cross-repo skills return "no repos found" on machines with non-flat layouts
-- Users in monorepos report that impact scanning only sees the current repo
-- Tests pass locally but fail in CI because CI uses a different workspace structure
-
-**Phase to address:**
-Phase 2 (Skills) — build config override from day one, not as an afterthought.
-
----
-
-### Pitfall 9: PreToolUse vs PostToolUse Decision Output Format Confusion
-
-**What goes wrong:**
-Hooks that need to block dangerous operations (e.g., the sensitive file guard) use the wrong JSON format. A `PreToolUse` hook that sends `{"decision": "block"}` (the PostToolUse format) has no effect. The sensitive file write proceeds silently.
-
-**Why it happens:**
-The two events use completely different JSON schemas for control decisions:
-- `PreToolUse` requires `hookSpecificOutput.permissionDecision: "deny"`
-- `PostToolUse` uses top-level `decision: "block"`
-
-This asymmetry is surprising and underdocumented.
-
-**How to avoid:**
-For PreToolUse (sensitive file guard):
-```json
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PreToolUse",
-    "permissionDecision": "deny",
-    "permissionDecisionReason": "Sensitive file protected by AllClear"
+  // Fire-and-forget — ChromaDB is optional acceleration
+  if (chromaAvailable) {
+    syncToChroma(findings).catch(err => {
+      console.error('[chroma] sync failed, continuing without vectors:', err.message);
+    });
   }
 }
 ```
 
-Include the correct format as a comment in the hook script. Add a bats test that mocks the hook invocation and verifies the output schema.
-
 **Warning signs:**
-- Sensitive file guard hook fires (visible in debug logs) but writes are not blocked
-- Testing blocking logic locally seems to work but fails in real usage
-- The hook script exits 0 with JSON but the action proceeds anyway
+- Worker crashes with `ECONNREFUSED localhost:8000` when ChromaDB is not running
+- Scan results disappear when ChromaDB goes offline mid-scan
+- Cross-impact queries fail instead of falling back to FTS5
 
 **Phase to address:**
-Phase 3 (Hooks) — sensitive file guard phase. This is the highest-security pitfall in the project.
+ChromaDB integration phase. The fallback chain must be tested explicitly: disable ChromaDB and verify all queries still return results via FTS5.
 
 ---
 
-### Pitfall 10: `npx @allclear/cli init` Scoped Package Name Already Taken
+### Pitfall 4: MCP Server stdout Pollution Breaks the Protocol
 
 **What goes wrong:**
-The npm package name `@allclear/cli` is claimed by another party before AllClear publishes. The installer command in documentation and README breaks. Users can't install via the documented npx path.
+The MCP server uses stdio transport. Any `console.log()` or debug output that goes to stdout instead of stderr breaks the JSON-RPC framing. Claude Code receives malformed messages and either ignores all MCP tool calls or crashes the MCP connection entirely. This is silent — no visible error to the user.
 
 **Why it happens:**
-Scoped npm packages under `@allclear` require owning the `allclear` organization on npm. If the org isn't claimed before publishing, someone else can take it.
+Node.js developers default to `console.log()` for debugging. In an HTTP server context this is fine. In an MCP stdio transport, stdout is a structured protocol channel — every byte must be a valid JSON-RPC message. Adding a single `console.log('Server started')` line breaks the entire MCP session.
 
 **How to avoid:**
-Claim the `allclear` npm organization immediately in Phase 1 (before any public announcement). Publish a placeholder `@allclear/cli` package (even `0.0.1` with a README) to reserve the name. Verify the package name is available NOW before it appears in any documentation.
+Redirect all logging to stderr from the very first line of the MCP server. Wrap `console.log` to write to stderr in the MCP server module:
+
+```javascript
+// At top of mcp-server.js — before any other code
+const log = (...args) => process.stderr.write(args.join(' ') + '\n');
+// Never use console.log in MCP server code
+```
+
+Add a CI lint rule: `grep -rn "console\.log" mcp-server.js && exit 1 || exit 0`.
 
 **Warning signs:**
-- `npm publish --access public` fails with "organization does not exist"
-- `npx @allclear/cli` resolves to a different package
-- The npm org page at npmjs.com/org/allclear doesn't exist under your account
+- MCP tools registered but never return results
+- Claude Code logs show JSON parse errors in MCP communication
+- Adding debug statements to MCP server causes all tools to stop working
+- `impact_query` tool appears in tool list but calling it hangs
 
 **Phase to address:**
-Phase 1 (Foundation) — reserve npm org and package name before any other work proceeds.
+MCP server phase. Establish the stderr-only logging convention before writing any tool handlers. Add a bats/jest test that runs the MCP server and verifies stdout contains only valid newline-delimited JSON.
+
+---
+
+### Pitfall 5: Background Subagents Cannot Access MCP Tools
+
+**What goes wrong:**
+The scan manager spawns Claude agents to scan repos. If those agents are spawned as background subagents (using `run_in_background: true`), they cannot access MCP tools — including the `impact_scan` and `impact_query` tools exposed by the AllClear MCP server. Scan results either never arrive or fall back to a degraded mode silently.
+
+**Why it happens:**
+This is a confirmed Claude Code bug/limitation: background subagents do not inherit MCP tool access from the parent session. Issue #13254 on the claude-code GitHub repo documents this behavior. Agents spawned in the foreground have MCP access; background agents do not.
+
+**How to avoid:**
+Do not use `run_in_background: true` for agents that need to call MCP tools. Instead, run agents sequentially in the foreground within the scan manager, or use a queue approach where the main process dispatches work and collects results. If parallel scanning is needed, implement it within the Node.js worker using the Claude SDK directly (not via Claude Code's agent spawning), where MCP tool access is explicit.
+
+**Warning signs:**
+- Agent scans complete but return no results
+- Worker logs show agents were spawned but no findings were written to SQLite
+- Switching from foreground to background agent spawn causes silent scan failures
+
+**Phase to address:**
+Agent scanning phase. Validate agent MCP tool access in the first agent scan prototype before building the full scan pipeline.
+
+---
+
+### Pitfall 6: Agent Scanning Hallucinating Endpoints That Don't Exist
+
+**What goes wrong:**
+Claude agents scanning codebases for service connections are prone to hallucination — particularly when code uses indirect patterns like dynamic routing, string interpolation for endpoint paths, or convention-over-configuration frameworks. Agents invent endpoint paths, infer connections that don't exist, or miss connections hidden in configuration files. The result: the dependency graph contains false edges that cause false-positive impact alerts.
+
+**Why it happens:**
+LLMs fill gaps in context with plausible-sounding completions. When an HTTP client call looks like `client.get('/users/' + id)`, the agent may invent a canonical endpoint path. Framework-specific patterns (e.g., FastAPI decorators, Express router chaining, Spring Boot annotations) require framework knowledge to parse correctly, and agents may misinterpret them.
+
+**How to avoid:**
+- Require agents to report confidence levels per finding (HIGH/MEDIUM/LOW) based on evidence quality
+- LOW confidence findings must be surfaced separately with the evidence that produced them
+- Never persist LOW confidence findings without explicit user confirmation
+- Include specific prompting in agent instructions: "Only report endpoints you found literal string definitions for. Do not infer from usage patterns. If you see a dynamic path, report the template, not a specific instance."
+- Validate reported connections with a secondary check: does the claimed file/function actually exist? (simple file-existence check in the worker before persisting)
+
+**Warning signs:**
+- Impact reports flagging services that have no code relationship
+- Agent reports endpoint paths containing template variables like `{id}` mixed with specific paths
+- Re-scanning the same repo produces different sets of connections each time
+
+**Phase to address:**
+Agent scanning phase. Build confidence-level requirements and secondary validation into the agent prompt template and persistence layer from the start.
+
+---
+
+### Pitfall 7: Incremental Scan Missing Renamed or Deleted Files
+
+**What goes wrong:**
+The incremental scan uses `git diff` to find changed files since the last scan commit. When a service file is renamed (`git mv`), `git diff` shows a deletion + addition. The scan processes the new file but does not clean up connections that referenced the old file path. Over time, the dependency graph accumulates ghost connections pointing to file paths that no longer exist.
+
+**Why it happens:**
+`git diff` reports rename as two separate events (delete + add) unless `--find-renames` is specified. Even with rename detection, the incremental scan logic typically processes "changed files" without a cleanup pass for "deleted source files."
+
+**How to avoid:**
+After every incremental scan, run a cleanup pass: for each connection whose `source_file` or `target_file` no longer exists on disk, mark it stale (do not delete — show as `status: stale` in the UI). On full re-scan, purge all stale connections. Parse `git diff --name-status` (not just `--name-only`) to detect `D` (deleted) and `R` (renamed) entries and trigger targeted cleanup for those file paths.
+
+```bash
+# Get file status changes since last scan
+git diff --name-status $LAST_COMMIT HEAD
+# R100  old/path/service.py  new/path/service.py
+# D     removed/endpoint.ts
+```
+
+**Warning signs:**
+- Impact graph showing connections to files that no longer exist
+- `source_file` entries in connections table pointing to git-deleted paths
+- Graph UI showing phantom nodes after a service directory restructuring
+
+**Phase to address:**
+Incremental scan phase. Build stale-connection detection into the first incremental scan implementation, not as a follow-up cleanup task.
+
+---
+
+### Pitfall 8: Transitive Graph Walk Hitting Cycles and Infinite Recursion
+
+**What goes wrong:**
+The cross-impact query walks the dependency graph transitively (A calls B calls C). If any cycle exists in the graph — even an indirect one (A → B → C → A) — a naive recursive CTE or application-level traversal will loop forever, exhausting memory or hitting SQLite's default 1000-recursion limit with an opaque error.
+
+**Why it happens:**
+Service graphs can legitimately contain cycles (mutual authentication, callback patterns, event loops). The design calls for transitive traversal but cycle detection is easy to forget in the initial recursive CTE implementation.
+
+**How to avoid:**
+Use SQLite's recursive CTE with an explicit visited-set pattern to detect cycles:
+
+```sql
+WITH RECURSIVE transitive(service_id, path, depth) AS (
+  SELECT target_service_id, ',' || target_service_id || ',', 1
+  FROM connections WHERE source_service_id = :start
+  UNION ALL
+  SELECT c.target_service_id,
+         t.path || c.target_service_id || ',',
+         t.depth + 1
+  FROM connections c
+  JOIN transitive t ON c.source_service_id = t.service_id
+  WHERE t.path NOT LIKE '%,' || c.target_service_id || ',%'  -- cycle detection
+    AND t.depth < 10  -- safety depth limit
+)
+SELECT DISTINCT service_id FROM transitive;
+```
+
+Cap traversal depth at a configurable limit (default: 5, configurable up to 10) to prevent runaway queries on deeply connected graphs.
+
+**Warning signs:**
+- `cross-impact` queries hanging on graphs with more than 10 services
+- SQLite error: `SQLITE_ERROR: too many levels of trigger recursion`
+- Memory usage spiking during transitive graph walk
+
+**Phase to address:**
+Query engine phase. Cycle detection and depth limits must be in the first recursive CTE implementation. Test with a deliberately cyclic graph.
+
+---
+
+### Pitfall 9: User Confirmation Fatigue Causing Rubber-Stamping
+
+**What goes wrong:**
+The design requires user confirmation for ALL agent findings before persistence. If the confirmation flow presents 50+ individual findings across 6 repos, users will approve everything without reading — rubber-stamping inaccurate results into the database. This defeats the entire validation purpose and populates the graph with LLM-hallucinated connections.
+
+**Why it happens:**
+The design principle "user confirms everything" is correct for safety, but the UX implementation matters. Presenting every finding individually in a long sequential confirmation dialog causes decision fatigue. Users click confirm on everything to get through it.
+
+**How to avoid:**
+Group findings by confidence and type. Present HIGH confidence findings as a collapsible summary with a single "Confirm all high-confidence" action. Present LOW confidence findings individually with specific evidence and a require-action flag. Give users an "Edit" action that opens a text representation of the findings they can modify. Never present more than 5-7 individual confirmation decisions in a single flow.
+
+Structure the confirmation UI:
+1. Summary: "Found N connections across X repos — N HIGH confidence, N MEDIUM, N LOW"
+2. HIGH confidence batch: show grouped by repo, single confirm
+3. MEDIUM confidence: show with evidence, allow per-repo confirm
+4. LOW confidence: show each with specific question ("Did you intend service A to call service B?")
+
+**Warning signs:**
+- Users report scan takes too long and they "just hit confirm"
+- Impact graph contains connections that don't match actual code
+- Users disable the map feature because confirmation is too tedious
+
+**Phase to address:**
+Confirmation flow / map command phase. Design the grouped confirmation UX before implementing it — do not build sequential confirmation and refactor later.
+
+---
+
+### Pitfall 10: D3 Force Graph Rendering Freezing on Large Service Maps
+
+**What goes wrong:**
+The D3.js force-directed graph uses SVG rendering. With 50+ services and 200+ connections, the force simulation runs on the main thread and locks the browser tab during layout calculation. The user sees an unresponsive UI for 3-10 seconds on every graph load or re-layout. At 100+ nodes, the tab becomes completely unresponsive.
+
+**Why it happens:**
+D3 force simulations are CPU-intensive. SVG rendering is significantly slower than Canvas for large node counts. The default force simulation runs synchronously on the main browser thread with no virtualization. Research shows performance degrades sharply beyond 2,000 SVG nodes, but even at 50-100 nodes with heavy link force calculations, the UI blocks noticeably.
+
+**How to avoid:**
+- Use Canvas rendering (not SVG) for nodes and edges when node count > 30
+- Run force simulation in a Web Worker so the main thread stays responsive
+- Cap the simulation to 100 alpha decay iterations with `simulation.stop()` after reaching a stable layout, then resume only on user interaction
+- Implement zoom-based level-of-detail: only render node labels when zoomed in past a threshold
+- For graphs > 100 services, cluster by repo and show a collapsed cluster node with expand-on-click
+
+```javascript
+// Use canvas renderer for performance
+const canvas = document.getElementById('graph-canvas');
+const ctx = canvas.getContext('2d');
+
+// Run simulation in Web Worker
+const worker = new Worker('force-worker.js');
+worker.onmessage = ({ data: positions }) => renderFrame(ctx, positions);
+```
+
+**Warning signs:**
+- Browser tab becomes unresponsive for 2+ seconds after loading the graph page
+- Chrome DevTools shows force simulation consuming 100% CPU for multiple seconds
+- User reports graph "freezes" when switching between services in the graph UI
+- requestAnimationFrame callbacks are dropping below 10 fps
+
+**Phase to address:**
+Graph UI phase. Choose Canvas vs SVG rendering and Web Worker simulation before writing any graph rendering code — retrofitting Canvas rendering onto an SVG implementation requires a rewrite.
+
+---
+
+### Pitfall 11: Shell-to-Node.js Handoff Race Condition
+
+**What goes wrong:**
+The shell command `/allclear:map` starts the Node.js worker with `node worker/server.js &` and immediately sends an HTTP request to start scanning. The HTTP server hasn't finished binding to its port yet. The request fails with `ECONNREFUSED`, the shell script reports an error, and the user sees a failure even though the worker started successfully.
+
+**Why it happens:**
+Node.js servers take 100-500ms to start and bind. Shell scripts have no async/await — they can't `await server.ready()`. Simple `sleep 1` workarounds are fragile and slow.
+
+**How to avoid:**
+Implement a readiness probe in the shell script: poll the worker's `GET /health` endpoint with retries until it responds 200 or a timeout (5 seconds) is exceeded.
+
+```bash
+wait_for_worker() {
+  local port=$1
+  local retries=20
+  for i in $(seq 1 $retries); do
+    if curl -sf "http://localhost:$port/health" > /dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  echo "Worker failed to start within 5s" >&2
+  return 1
+}
+
+node worker/server.js &
+wait_for_worker 37888 || exit 1
+```
+
+The worker's `/health` endpoint must be the very first route registered, before any DB initialization.
+
+**Warning signs:**
+- `/allclear:map` fails with `Connection refused` on first invocation but succeeds if run again immediately after
+- Scan start command fails but `ps aux | grep node` shows worker is running
+- Tests pass when run sequentially but fail when run quickly in CI
+
+**Phase to address:**
+Worker foundation phase. Readiness probe must be part of the initial worker startup flow, not added after observing the race condition.
+
+---
+
+### Pitfall 12: SQLite Snapshot Copies Bloating Disk with No Cleanup
+
+**What goes wrong:**
+The versioning system copies the entire SQLite database file to `.allclear/snapshots/` on every scan. For a project with 10 repos and 3 months of weekly scans, this generates 12+ snapshot files. If each snapshot is 50 MB, that is 600 MB of snapshot history in the working directory — committed to git by accident or just filling disk.
+
+**Why it happens:**
+Snapshots are full file copies. The design doesn't specify a retention policy. Developers add snapshots without adding cleanup. `.allclear/` may not be gitignored.
+
+**How to avoid:**
+- Add `.allclear/` to `.gitignore` automatically during first `/allclear:map` run
+- Default snapshot retention policy: keep last 10 snapshots (configurable via `history-limit` in config)
+- After writing each snapshot, run cleanup: `ls -t .allclear/snapshots/*.db | tail -n +11 | xargs rm -f`
+- Display snapshot disk usage in the `/allclear:map --view` output so users are aware
+
+**Warning signs:**
+- `.allclear/snapshots/` directory growing unboundedly
+- `git status` shows `.allclear/` as untracked (not gitignored)
+- Disk usage alerts from machines running automated map updates
+
+**Phase to address:**
+Versioning / storage phase. Gitignore and retention policy must be part of the initial snapshot implementation.
 
 ---
 
@@ -295,12 +382,13 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Inline hook commands in hooks.json (one-liners) | No separate script files | Impossible to test with bats, hard to debug, breaks on quoting edge cases | Never — always use script files |
-| Hardcode tool commands (`ruff`, `cargo fmt`) without `command -v` guards | Simpler hook scripts | Hook crashes when tool not installed; blocks edits if exit code not 0 | Never — always guard with `command -v` |
-| Single hooks.json with all hooks | Simpler structure | Hard to test individual hooks; no separation of concerns | MVP only — split by hook type before v1 release |
-| Skip `allclear.config.json` support in first cross-repo skill | Ship faster | First real user with non-flat layout files a bug immediately | Never — config override is load-bearing for real-world use |
-| Publish to npm registry without reserving the org first | Save time | Package name squatting; installer URL documented before name is secured | Never |
-| Skip bats tests for hooks (test manually) | Faster initial development | Shell scripts regress silently; non-blocking guarantee breaks | Never — hooks require bats tests per constraints |
+| Skip Web Worker for D3 force simulation | Simpler graph UI implementation | Browser tab freezes on graphs > 30 nodes; requires Canvas rewrite later | Never — choose Canvas + Web Worker from the start |
+| ChromaDB sync inline with SQLite persist | Simpler code path | ChromaDB outage blocks all scan persistence; hard to separate later | Never — always async/separate |
+| PID tracking without readiness probe | Faster first implementation | Race conditions on every cold start; intermittent CI failures | Never — readiness probe is a 10-line fix |
+| Single recursive CTE without cycle detection | Simpler initial query | Infinite loop on any cyclic graph; emergency hotfix required | Never — add depth limit and visited-set from day one |
+| Sequential agent scanning (one repo at a time) | Simpler orchestration | Scan of 10 repos takes 10x longer; users abandon the feature | Acceptable for MVP; parallelize in a follow-up phase |
+| Store snapshot path as relative in `map_versions` table | Works in dev | Breaks when `.allclear/` is moved or repo is cloned to a different path | Never — use paths relative to DB file location |
+| Skip `status: stale` for deleted file connections | Simpler data model | Ghost connections accumulate; no way to distinguish fresh vs orphaned data | Never — stale flag is required for correctness |
 
 ---
 
@@ -308,12 +396,13 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Claude Code plugin cache | Referencing files outside plugin root with `../shared` paths | All paths must stay within plugin root; symlinks are honored but cross-directory refs are not copied to cache |
-| Claude plugin marketplace | Pushing code changes without version bump | Bump `version` in plugin.json with every release; cache is version-keyed |
-| npx installer | Using `npm link` during development then shipping relative paths | Use `${CLAUDE_PLUGIN_ROOT}` in all plugin paths; test via `--plugin-dir` |
-| `jq` in hook scripts | Assuming `jq` is installed on all user machines | Guard with `command -v jq` or use a pure-bash alternative for simple JSON parsing |
-| kubectl for pulse/deploy skills | Hard-failing when kubectl not found | Skip gracefully: `command -v kubectl || { echo "kubectl not found, skipping" >&2; exit 0; }` |
-| git for cross-repo discovery | Assuming `git` root == project root | Use `git rev-parse --show-toplevel` to find actual repo root; repos may be nested |
+| better-sqlite3 + WAL | Opening multiple `Database()` instances in the same process | Use a single shared Database instance as a module singleton; WAL still allows concurrent reads |
+| ChromaDB HTTP client | Assuming the client constructor validates connectivity | ChromaDB client constructor never throws; connection errors surface only on the first query. Always run an explicit ping before marking `chromaAvailable = true` |
+| MCP stdio transport | Using `process.stdout.write()` for any non-JSON-RPC output | All logging must go to `process.stderr`; stdout is exclusively for MCP protocol messages |
+| Claude Code MCP config | Expecting MCP server to auto-register after editing `settings.json` | Claude Code must be fully restarted (not just refreshed) after MCP server config changes |
+| D3 force simulation + Canvas | Using SVG element selectors for node click/hover in Canvas mode | Canvas has no DOM elements; hit detection requires manual point-in-circle math on `mousemove` |
+| Git diff for incremental scan | Using `--name-only` instead of `--name-status` | `--name-only` misses deleted/renamed files; `--name-status` provides D/R/M/A status codes needed for correct cleanup |
+| SQLite snapshot copy | Using `cp` to copy a live database | WAL mode databases have a `-wal` and `-shm` sidecar file; snapshot must use SQLite's `VACUUM INTO` or the Online Backup API to get a consistent snapshot |
 
 ---
 
@@ -321,10 +410,12 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| PostToolUse hooks running on every single file edit | Noticeable lag on every keystroke/edit in Claude | Use specific matchers: `"matcher": "Write|Edit"` and filter by file extension inside the script | Immediately noticeable with any real workload |
-| Cross-repo scan on every `/allclear` invocation without caching | `/allclear` takes 5+ seconds in repos with 10+ siblings | Cache sibling repo list in `allclear.config.json` or a temp file; re-scan only when config changes | 8+ sibling repos |
-| `git status` and `git log` called in hooks synchronously | Each edit stalls for 100-500ms as git commands run | Run expensive git operations async or skip in hooks entirely; reserve for skill invocations | Any project with >1000 commits or slow disk |
-| SessionStart hook scanning all sibling repos on startup | Session startup takes 3-10 seconds | Lazy-load repo discovery; only scan when a cross-repo skill is actually invoked | Flat layouts with 5+ sibling repos |
+| D3 SVG rendering at scale | Tab unresponsive for 2-10 seconds on graph load | Use Canvas renderer for node count > 30; Web Worker for simulation | > 30 nodes with default SVG |
+| Recursive CTE without depth cap | Query hangs indefinitely on cyclic graphs | Add `depth < 10` termination condition and visited-set cycle detection | First time a graph contains any cycle |
+| WAL file growth from long-lived reads | Queries slow as WAL grows to 100+ MB | Set `journal_size_limit`, run `checkpoint(TRUNCATE)` after every scan | After 50+ scans without restart |
+| Agent spawning without backpressure | Worker spawns 10 agents simultaneously; API rate limits hit | Use a concurrency queue — max 2-3 agents in parallel | On first multi-repo scan in a rate-limited environment |
+| Snapshot copy using `cp` on live DB | Corrupt snapshot (WAL not checkpointed) | Use `VACUUM INTO 'snapshot.db'` for atomic consistent copy | On any active write transaction |
+| MCP tool context window bloat | Claude's context window consumed before conversation starts | Limit MCP tool descriptions to essential fields; do not include examples in tool schemas | With > 5 tools each having verbose descriptions |
 
 ---
 
@@ -332,11 +423,11 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Sensitive file guard using path substring match (`grep ".env"`) | Guard bypassed with `../.env`, `.env.local`, `.ENV`, or path traversal | Use normalized absolute paths and match against an allowlist of patterns; use `realpath` to resolve before comparing |
-| Hook scripts that `eval` or `bash -c` with tool input data | Claude Code tool inputs can contain arbitrary strings; code injection if unsanitized | Never use `eval` in hook scripts; use `jq -r` to extract specific fields, not raw substitution |
-| npx installer running as `sudo` without explicit user consent | Privilege escalation during install | Installer must never require sudo; install to user-local paths only (`~/.claude/plugins/`) |
-| Publishing secrets in `allclear.config.json` examples | Users copy examples with real credentials | Config examples must use placeholder values; document that config.json should be gitignored |
-| Hook outputs leaking file contents to stdout | Tool input (including file contents) visible in Claude's context unexpectedly | Hooks should never echo tool input back to stdout; only emit structured JSON or nothing |
+| Worker HTTP server listening on `0.0.0.0` instead of `127.0.0.1` | Remote machines on the local network can query or trigger scans on the user's codebase | Always bind to `127.0.0.1` (localhost only). The design specifies "localhost:PORT" — enforce this in code, not just docs |
+| Agent instructions containing repo path passed without sanitization | If config file is compromised, arbitrary shell commands can be injected into agent prompts | Sanitize all config-derived values before interpolating into agent instructions; reject paths containing shell metacharacters |
+| `.allclear/impact-map.db` committed to git | Service topology, endpoint paths, and internal architecture are exposed in the public repo | Write `.allclear/` to `.gitignore` automatically on first run; display a prominent warning if `.allclear/` appears in `git status` |
+| ChromaDB API key stored in `allclear.config.json` in plaintext | Config files are often committed to git, exposing credentials | Support `ALLCLEAR_CHROMA_API_KEY` env var override; warn in docs that the `api-key` config field should not be committed |
+| MCP server accepting requests without any auth | Any process on the local machine can call `impact_scan` to trigger agent execution | While full auth is heavy for localhost, add a shared secret token set on startup that callers must pass in the `Authorization` header |
 
 ---
 
@@ -344,26 +435,27 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| `/allclear:quality` instead of `/allclear` for the main command | Unexpected namespace prefix surprises users expecting `/allclear` | Test exactly how the skill name appears in `/help` after namespacing; document the full command in README |
-| Format/lint hook running on every `.md` or `.json` edit | Annoying false positives; linting markdown with Python tools | Filter by file extension inside hook script; only run relevant formatters per file type |
-| `npx @allclear/cli init` requiring interactive prompts | Breaks in CI/automated environments | All prompts must have `--yes` / non-interactive flag defaults |
-| Cross-repo drift output wall of text | Users overwhelmed; ignore the output | Structure output with severity levels; surface only actionable differences by default |
-| Sensitive file guard blocking legitimate operations with no explanation | User confused why their edit was rejected | Guard must output a clear explanation: "AllClear blocked write to .env — add to allowlist in allclear.config.json to permit" |
+| Presenting all scan findings as a flat list for confirmation | Users rubber-stamp without reading; hallucinated connections enter the graph | Group by confidence level; HIGH confidence as single batch confirm; LOW confidence as individual questions |
+| Map UI opening in background tab without focus | User doesn't know the graph is ready; dismisses browser notification | Print the URL in the terminal and indicate it has been opened: "Graph ready at http://localhost:37888 — opening in browser" |
+| Re-scan prompt after every cross-impact query | Developer workflow interrupted by repeated "re-scan?" questions | Only suggest re-scan when git diff shows significant changes since last scan; suppress after clean-state checks |
+| Snapshot history not visible by default | Users don't know they can compare graph versions; feature is discoverable only in docs | Show "N snapshots available — run /allclear:map --history to compare" in the scan summary output |
+| Worker running silently in background with no status | Users don't know if the worker has crashed or is healthy | SessionStart hook should check worker health and print a one-line status: "AllClear worker: running (port 37888, last scan: 2h ago)" |
+| Confirmation dialog for 50+ low-confidence findings | Users abandon the scan midway; partial data entered | Cap max LOW confidence findings presented per scan at 10; batch the rest as "N additional uncertain connections found — confirm to review later" |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Auto-detect project type:** Verify it handles mixed-language repos (e.g., TypeScript frontend + Python backend in the same repo) — test with `package.json` AND `pyproject.toml` present simultaneously
-- [ ] **Non-blocking hooks:** Verify format/lint hooks exit 0 when the formatter is not installed on the test machine — don't just test with all tools present
-- [ ] **Cross-repo discovery:** Verify it returns empty results gracefully when no sibling repos exist — not just when they do
-- [ ] **Sensitive file guard:** Verify it actually blocks writes (using PreToolUse correct schema) — test with a real edit to `.env`, not just a dry run
-- [ ] **npx installer:** Verify it works on a clean machine without the plugin pre-installed — test in a fresh Docker container or VM
-- [ ] **Plugin version bump:** Verify that after `npm publish`, existing users who run `claude plugin update allclear` actually receive the new version
-- [ ] **SKILL.md descriptions:** Verify Claude auto-invokes skills in the right context — test `/allclear impact` is NOT auto-triggered during normal edits
-- [ ] **kubectl graceful skip:** Verify `/allclear pulse` and `/allclear deploy` produce clear skip messages when kubectl is absent, not errors
-- [ ] **Symlink installation path:** Verify git clone + symlink path works when the clone directory is not in the user's default plugin path
-- [ ] **`${CLAUDE_PLUGIN_ROOT}` in all hooks:** Verify by grepping hooks.json — zero hardcoded paths
+- [ ] **Worker PID management:** Verify second invocation of `/allclear:map` does NOT start a second worker — test with `ps aux | grep node` count before and after
+- [ ] **WAL mode setup:** Verify `journal_mode = WAL` and `journal_size_limit` are set on every database open, not just on creation — check with `PRAGMA journal_mode;` after reopening existing DB
+- [ ] **ChromaDB fallback:** Verify cross-impact queries return results when ChromaDB is not running — test by stopping ChromaDB while worker is running
+- [ ] **MCP stdout cleanliness:** Verify MCP server stdout contains only newline-delimited JSON — run `node mcp-server.js | grep -v '^\{' | head -5` and expect no output
+- [ ] **Incremental scan deleted files:** Verify connections to deleted files are marked stale after a scan that includes a `git rm` — check `connections` table for `status = stale`
+- [ ] **Transitive traversal cycles:** Verify `impact_query` returns without hanging on a manually-created cyclic graph (A→B→C→A in the connections table)
+- [ ] **D3 graph at scale:** Verify graph UI remains responsive with a synthetic dataset of 100 nodes and 300 edges — measure time to first interactive frame
+- [ ] **Snapshot integrity:** Verify snapshot copy is readable as a valid SQLite database using `sqlite3 snapshot.db .schema` after a copy during an active scan
+- [ ] **Gitignore for .allclear/:** Verify that running `/allclear:map` for the first time writes `.allclear/` to `.gitignore` — check with `git status` after first map run
+- [ ] **Worker localhost binding:** Verify worker cannot be accessed from another machine on the local network — test from a second machine: `curl http://[dev-machine-ip]:37888/graph` must fail
 
 ---
 
@@ -371,13 +463,14 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Misplaced component directories | LOW | Move directories to plugin root; run `claude plugin validate`; bump patch version; republish |
-| Hook scripts not executable | LOW | `chmod +x scripts/*.sh`; update installer to enforce permissions; bump version |
-| Absolute paths in hooks | MEDIUM | Find/replace all hardcoded paths with `${CLAUDE_PLUGIN_ROOT}`; test on clean install; bump version |
-| Non-blocking hooks became blocking | LOW | Add `exit 0` at end of each format/lint hook; add bats test; bump version |
-| npm package name squatted | HIGH | Rename to `@allclear-dev/cli` or similar; update all documentation; republish; redirect old README |
-| Version not bumped | LOW | Bump version in plugin.json; republish; instruct users to run `claude plugin update allclear` |
-| Sensitive file guard not blocking | HIGH | Fix PreToolUse JSON schema; add bats test with mock; bump version and notify users of security fix |
+| Orphaned worker processes | LOW | Kill all `node worker/server.js` processes; delete `.allclear/worker.pid`; restart with `/allclear:map` |
+| Corrupted SQLite WAL file | MEDIUM | Stop worker; run `sqlite3 impact-map.db 'PRAGMA wal_checkpoint(TRUNCATE);'`; restart; if corrupt, restore from latest snapshot |
+| Ghost connections from deleted files | LOW | Run `/allclear:map --full` to perform a complete re-scan; this purges all stale connections and rebuilds from current file state |
+| ChromaDB desync from SQLite | LOW | Disable ChromaDB in config, restart worker (queries continue via FTS5); re-enable and run `/allclear:map --full` to resync vectors |
+| Cyclic graph causing query hang | LOW | Worker has query timeout; query will fail after timeout; fix the cycle by running `/allclear:map --full` to regenerate connections from fresh scans |
+| Bloated snapshot directory | LOW | `rm .allclear/snapshots/*.db`; snapshot history is cosmetic, not required for current operation |
+| MCP server not responding | MEDIUM | Restart worker; verify MCP config in Claude Code `settings.json`; fully restart Claude Code after config change |
+| Agent hallucinated connections in graph | MEDIUM | Delete specific connections via `DELETE FROM connections WHERE id IN (...)` using the worker's REST API; run targeted partial re-scan for affected repos |
 
 ---
 
@@ -385,31 +478,41 @@ Phase 1 (Foundation) — reserve npm org and package name before any other work 
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Misplaced component directories | Phase 1 (Foundation) | `claude plugin validate` passes; all 5 skills appear in `/help` |
-| Hook scripts not executable | Phase 1 (Foundation) + Phase 3 (Hooks) | `ls -la scripts/` shows executable bit; bats test asserts chmod |
-| Absolute paths in hooks | Phase 3 (Hooks) | `grep -r '/Users/' hooks/` returns no matches |
-| Non-blocking PostToolUse hooks | Phase 3 (Hooks) | Bats test: hook exits 0 when formatter is absent |
-| stdout pollution in hooks | Phase 3 (Hooks) | Bats test: hook stdout is empty or valid JSON only |
-| Wrong event name casing | Phase 3 (Hooks) | `claude plugin validate` + smoke test each hook event |
-| Version not bumped on release | Phase 5 (Distribution) | CI lint: version in plugin.json must differ from published version |
-| Cross-repo flat layout assumption | Phase 2 (Skills) | Integration test with non-flat workspace config |
-| PreToolUse vs PostToolUse schema confusion | Phase 3 (Hooks) | Bats test mocking PreToolUse input; verify deny blocks write |
-| npm org not reserved | Phase 1 (Foundation) | `npm org ls allclear` confirms ownership before any code ships |
+| Worker process orphaning | Worker foundation | `ps aux` shows exactly one worker after multiple `/allclear:map` invocations |
+| WAL file unbounded growth | SQLite/storage setup | WAL file size after 100 writes is < 64 MB |
+| ChromaDB hard failure | ChromaDB integration | Worker stays healthy when ChromaDB process is killed |
+| MCP stdout pollution | MCP server setup | `node mcp-server.js \| grep -v JSON-RPC` produces no output |
+| Background subagents without MCP access | Agent scanning | Agent scan returns results when run both sequentially and via scan manager |
+| Agent hallucination | Agent scanning + confirmation flow | Manual review of 3 scan results confirms no invented endpoints |
+| Incremental scan missing deletions | Incremental scan | After `git rm` a file and re-scanning, the connection is marked stale |
+| Transitive traversal cycles | Query engine | Cyclic test graph returns in < 100ms without hanging |
+| Confirmation fatigue | Map command UX | User study / walkthrough confirms high-confidence batch confirm works correctly |
+| D3 performance at scale | Graph UI | 100-node synthetic graph renders first interactive frame in < 500ms |
+| Shell-to-Node.js race condition | Worker foundation | Cold-start test: 10 consecutive first-starts show 0 ECONNREFUSED errors |
+| Snapshot bloat | Versioning/storage | Snapshot count never exceeds configured retention limit after 20 scans |
 
 ---
 
 ## Sources
 
-- [Claude Code Plugins Reference — official docs](https://code.claude.com/docs/en/plugins-reference) — Directory structure, path traversal limitations, version caching behavior, `${CLAUDE_PLUGIN_ROOT}` spec
-- [Claude Code Create Plugins — official docs](https://code.claude.com/docs/en/plugins) — Structure overview, common mistakes warning, migration guide
-- [Claude Code Skills — official docs](https://code.claude.com/docs/en/skills) — SKILL.md frontmatter, `disable-model-invocation`, description quality, invocation control
-- [Claude Code Hooks — official docs](https://code.claude.com/docs/en/hooks) — PreToolUse vs PostToolUse JSON schemas, exit code semantics, stdin/stdout handling, async hook limitations
-- claude-mem plugin v10.5.5 (local cache at `~/.claude/plugins/cache/thedotmack/claude-mem/`) — Real-world `${CLAUDE_PLUGIN_ROOT}` fallback pattern, hooks.json structure
-- code-review official plugin (local cache at `~/.claude/plugins/cache/claude-plugins-official/code-review/`) — Minimal plugin.json pattern without version field
-- [DataCamp: How to Build Claude Code Plugins](https://www.datacamp.com/tutorial/how-to-build-claude-code-plugins) — Community-confirmed structure mistakes
-- [awesome-claude-code GitHub](https://github.com/hesreallyhim/awesome-claude-code) — Community plugin patterns and known issues
-- PROJECT.md constraints — Non-blocking hooks requirement, bats test requirement, zero-config auto-detect requirement
+- [SQLite Write-Ahead Logging — official docs](https://sqlite.org/wal.html) — Checkpoint starvation, WAL growth, reader snapshot behavior
+- [SQLite User Forum: WAL File Grows Past Auto Checkpoint Limit](https://sqlite.org/forum/info/a188951b80292831794256a5c29f20f64f718d98ed0218bf44b51dd5907f1c39) — Real-world unbounded growth scenarios
+- [better-sqlite3 Performance docs](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/performance.md) — WAL mode setup, checkpoint API
+- [PhotoStructure: How to VACUUM SQLite in WAL Mode](https://photostructure.com/coding/how-to-vacuum-sqlite/) — Checkpoint and snapshot best practices
+- [ChromaDB Library Mode Stale Data — Medium](https://medium.com/@okekechimaobi/chromadb-library-mode-stale-rag-data-never-use-it-in-production-heres-why-b6881bd63067) — Stale data in ChromaDB library vs server mode
+- [ChromaDB Issue #346: Remote end closed connection](https://github.com/chroma-core/chroma/issues/346) — Connection reliability failure modes
+- [MCP Transports — official spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) — stdio stdout/stderr protocol requirements
+- [MCPcat: Error Handling in MCP Servers](https://mcpcat.io/guides/error-handling-custom-mcp-servers/) — isError flag, structured error responses
+- [MCP Python SDK Issue #396: Inconsistent exception handling](https://github.com/modelcontextprotocol/python-sdk/issues/396) — Client undetected server termination behavior
+- [Claude Code Issue #13254: Background subagents cannot access MCP tools](https://github.com/anthropics/claude-code/issues/13254) — Confirmed limitation on background agent MCP access
+- [Claude Code Issue #19097: Process lifecycle management for spawned background tasks](https://github.com/anthropics/claude-code/issues/19097) — Orphaned process behavior
+- [D3 Force Graph Performance — Medium: Best Libraries for Large Graphs](https://weber-stephen.medium.com/the-best-libraries-and-methods-to-render-large-network-graphs-on-the-web-d122ece2f4dc) — SVG vs Canvas vs WebGL performance thresholds
+- [PMC: Graph visualization efficiency 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC12061801/) — 2025 study on D3/ECharts/G6 with SVG/Canvas/WebGL at scale
+- [GitHub Dependency Graph Accuracy Study — ScienceDirect](https://www.sciencedirect.com/article/pii/S0950584925001934) — 27%+ inaccuracy in automated dependency extraction
+- [Nielsen Norman Group: Confirmation Dialogs](https://www.nngroup.com/articles/confirmation-dialog/) — Confirmation fatigue and overuse consequences
+- [Datadog: Using LLMs to filter out false positives from static code analysis](https://www.datadoghq.com/blog/using-llms-to-filter-out-false-positives/) — LLM hallucination in code analysis context
+- [Node.js Child Processes — DEV Community](https://dev.to/satyam_gupta_0d1ff2152dcc/mastering-child-processes-in-nodejs-a-complete-guide-32g3) — Zombie process prevention, process cleanup patterns
 
 ---
-*Pitfalls research for: Claude Code plugin (AllClear) — quality gates, cross-repo hooks, shell scripts, npx installer*
+*Pitfalls research for: AllClear v2.0 — service dependency intelligence (Node.js worker, SQLite + ChromaDB, MCP server, D3 graph UI, agent scanning)*
 *Researched: 2026-03-15*

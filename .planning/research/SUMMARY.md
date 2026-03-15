@@ -1,181 +1,231 @@
 # Project Research Summary
 
-**Project:** AllClear — Claude Code quality gate plugin
-**Domain:** Claude Code plugin (quality gates, cross-repo checks, auto-format/lint hooks)
+**Project:** AllClear — Claude Code Plugin (v2.0 Service Dependency Intelligence)
+**Domain:** Claude Code plugin — quality gates, cross-repo checks, auto-format/lint hooks, and service dependency graph intelligence
 **Researched:** 2026-03-15
 **Confidence:** HIGH
 
 ## Executive Summary
 
-AllClear is a Claude Code plugin delivering automatic code quality enforcement (format, lint, sensitive file protection) through the hooks system, and active cross-repo intelligence (impact scanning, drift detection) through the skills system. The plugin ecosystem is well-documented via official Anthropic sources and live plugin inspection, making the technical path clear. The canonical build pattern separates concerns into three layers: an event layer (hooks that fire deterministically on every Claude edit), a user layer (skills invoked interactively via slash-commands), and a shared library layer (bash scripts for project-type detection and sibling repo discovery). This separation is load-bearing — mixing concerns between layers is the primary source of failure in comparable plugins.
+AllClear v2.0 is a Claude Code plugin that evolves from v1.0 shell-based quality gates and hooks into a full service dependency intelligence layer for multi-repo polyglot teams. The v2.0 milestone centers on a locally-running Node.js worker process that builds and maintains a SQLite-backed dependency graph by spawning Claude agents to scan linked repos, then exposes that graph via a stdio MCP server (for agent-autonomous impact checking) and a D3.js web UI (for human visualization). The recommended approach is to layer the new capabilities directly onto the existing plugin structure — `worker/` alongside existing `scripts/`, `hooks/`, and `commands/` — with the worker acting as the shared service that all new commands and MCP tools delegate to.
 
-The recommended approach is to build foundation first (directory structure, npm org reservation, shared detection library), then hooks (auto-format, lint, file guard), then skills (quality gate, cross-repo impact), then tests and distribution. The architecture research confirms a natural 5-phase build order where each phase has no circular dependencies on later phases. The key differentiator — cross-repo impact scanning — is technically feasible using pure bash with local git operations, requires no external services, and addresses a gap that the closest competitor (Plankton) explicitly does not cover.
+The key architectural insight is that the worker must be the first thing built. Every v2.0 capability — MCP tools, graph visualization, incremental scanning, impact queries — is only reachable through the worker. This makes Phase 1 (storage foundation: SQLite schema and query engine) and Phase 2 (worker lifecycle: PID file management, readiness probes) the critical path. Everything else parallelizes once those two phases are solid. Agent-based scanning with no tree-sitter or external parsers is the primary differentiator over competitors like CodeLogic and Augment Code, and a user-confirmation hard gate before any SQLite write is the trust mechanism that makes probabilistic agent findings safe to act on.
 
-The critical risks are structural and operational, not conceptual. The top three: (1) misplaced component directories silently disable the entire plugin with no error output; (2) format/lint hooks that exit non-zero block Claude's edit cycle, violating the core non-blocking contract; and (3) the npm org `@allclear` must be reserved before any public announcement or documentation ships or it can be squatted. All three risks are preventable at low cost if addressed in Phase 1.
+The top risks are operational rather than architectural: worker process orphaning (no PID file), MCP stdout pollution (protocol corruption), ChromaDB hard failures (must be fully async), and agent hallucinations entering the graph unchecked (confirmation UX must group by confidence to prevent rubber-stamping). All are preventable by building the right primitives first. The one confirmed external limitation is that background subagents cannot access MCP tools (Claude Code issue #13254) — agent scanning must run in the foreground.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The plugin requires no external framework beyond the Claude Code plugin system itself. The core stack is: POSIX shell scripts for hooks, `jq` for stdin JSON parsing, SKILL.md files for slash-command definitions, and `hooks.json` for event wiring. The only runtime dependency for end users is the underlying formatters/linters they already have installed (ruff, cargo fmt, prettier, gofmt, go vet). The npx installer (`@allclear/cli`) uses Node.js 18+ for the setup script only — the plugin itself has zero Node.js runtime dependency. Tests use bats-core 1.13.0 as git submodules for reproducibility.
+The plugin continues to use the official Claude Code plugin format: `plugin.json` in `.claude-plugin/`, skills in `skills/<name>/SKILL.md`, and hooks configured via `hooks/hooks.json`. Shell and jq remain the right runtime for hooks and wrapper scripts; bats-core 1.13.0 remains the test framework. The v2.0 additions raise the Node.js minimum to 20+ (driven by `better-sqlite3` 12.x and Fastify 5.x).
 
 **Core technologies:**
-- `skills/<name>/SKILL.md`: Slash-command and autonomous skill definitions — official format supporting both `/allclear` and autonomous invocation; use `skills/` not legacy `commands/`
-- `hooks/hooks.json`: Lifecycle event bindings — canonical location; all event types available; event names are PascalCase and case-sensitive
-- POSIX bash + `jq`: Hook script runtime — `jq` parses hook stdin JSON; scripts must be `chmod +x`; always use `${CLAUDE_PLUGIN_ROOT}` never hardcoded paths
-- `lib/detect.sh` + `lib/siblings.sh`: Shared bash libraries — single source of truth for project-type detection and sibling repo discovery; sourced by hooks and injected into skills
-- `bats-core` 1.13.0: Hook test framework — mandatory per PROJECT.md constraints; add as git submodule with `bats-support` and `bats-assert`
-- `@allclear/cli` (Node.js 18+): npx installer — `#!/usr/bin/env node` entry, ES module syntax, installs plugin to `~/.claude/plugins/` via `claude plugin install` or git+symlink fallback
-- `.claude-plugin/plugin.json`: Plugin manifest — only this file goes inside `.claude-plugin/`; all other directories (skills/, hooks/, scripts/, lib/) go at plugin root
+- `better-sqlite3` 12.8.0 — synchronous SQLite with WAL + FTS5; single connection, single thread eliminates WAL checkpoint starvation
+- `fastify` 5.8.2 — HTTP server for REST API and static D3 UI; 2.4x faster than Express; built-in schema validation; requires Node.js 20+
+- `@modelcontextprotocol/sdk` 1.27.1 — official Anthropic TypeScript SDK; `McpServer` + `StdioServerTransport` is the canonical stdio MCP server pattern
+- `d3` 7.9.0 — force-directed graph visualization as a static single-file HTML page; no build step; Canvas renderer required for graphs above 30 nodes
+- `chromadb` 3.3.3 — optional vector search client (v3 is a complete rewrite; 70% smaller than v2); three-tier fallback chain: ChromaDB → FTS5 → direct SQL
+- `${CLAUDE_PLUGIN_ROOT}` — mandatory runtime path variable for all hook and script references; hardcoded paths break after plugin cache installation
+
+**Critical version requirements:**
+- Node.js 20+ is the v2.0 minimum (better-sqlite3 12.x and Fastify 5.x both require it; v1.0 required 18+)
+- Claude Code 1.0.33+ for plugin system support
+- `skills/` format only for new skills — `commands/` is legacy and does not support autonomous invocation
 
 ### Expected Features
 
-The feature research confirms a clear MVP boundary. Project-type auto-detection is the single foundational feature that all others depend on; it must ship first. The non-blocking hook behavior (warn, never interrupt) is both a PROJECT.md constraint and a user expectation set by the broader quality tooling ecosystem.
+AllClear v2.0 features are well-defined by the internal design document (`cross-impact-v2.md`). The feature dependency tree is clear: the worker is the load-bearing foundation; the SQLite schema must be stable before any scanning; the user confirmation gate is a hard constraint, not a toggle.
 
-**Must have (table stakes):**
-- Auto-format on file write (PostToolUse, non-blocking) — users expect this from any quality tool since 2020
-- Auto-lint on file write (PostToolUse, non-blocking) — paired with format; completes the "every edit is clean" promise
-- Sensitive file guard (PreToolUse, blocking on `.env`, `*.pem`, `secrets.*`) — security expectation; absence is a trust issue
-- Single-command quality gate (`/allclear`) — zero flags, auto-detects project type; missing this = feels incomplete
-- Project-type auto-detection from manifest files — zero-config is the baseline; required by all three above
-- `npx @allclear/cli init` installer — frictionless install is a table-stakes expectation for plugin distribution
+**Must have (table stakes for v2.0 launch):**
+- Worker process with HTTP server — all other v2.0 features are unreachable without it
+- Stable SQLite schema before scanning begins — `repos`, `services`, `connections`, `schemas`, `fields`, `map_versions`, `repo_state` tables
+- Agent-based scanning via `/allclear:map` — primary user-facing build flow; no external parser dependencies
+- User confirmation gate (hard, not optional) — ALL findings presented before any SQLite write, regardless of agent confidence
+- Incremental scanning (git diff since `last_scanned_commit`) — full re-scans are too slow for daily use; this is required at launch
+- Transitive impact traversal — blast radius is the core value; direct-only impact is insufficient
+- Breaking change classification (CRITICAL/WARN/INFO) — removed endpoints vs additive changes require different severity
+- `/allclear:cross-impact` redesign — uses worker graph queries when map exists; falls back to legacy grep scan when absent
+- D3 web UI (basic force-directed graph) — required for users to validate the dependency map visually
+- MCP server with `impact_query` and `impact_changed` tools — enables agents to check impact autonomously
 
-**Should have (competitive):**
-- Cross-repo sibling repo discovery — foundation for impact and drift; build even if /impact ships first
-- `/allclear impact` — primary differentiator; no existing Claude Code plugin detects cross-repo API breaks; directly addresses the Edgeworks pain case
-- `/allclear drift` — config consistency across repos; second cross-repo feature sharing discovery foundation
-- SessionStart context injection — primes Claude with repo topology; blocked by upstream bug (only fires on /clear, not brand-new sessions); use UserPromptSubmit fallback or document limitation
-- `allclear.config.json` override layer — escape hatch for non-flat repo layouts; load-bearing for real-world adoption
-- Go support — Plankton explicitly omits Go; AllClear covering Python, Rust, TypeScript, AND Go is a genuine differentiator
+**Should have (competitive differentiators):**
+- Protocol-aware connections: REST, gRPC, Kafka/RabbitMQ events, internal SDK — models the actual dependency, not just "service calls service"
+- Field-level schema tracking — discovers schemas from code regardless of whether an OpenAPI spec exists
+- Map versioning with snapshot history — SQLite file copy to `.allclear/snapshots/`; enables graph diff queries
+- ChromaDB optional semantic search — FTS5 keyword search misses "find services handling authentication"; semantic finds them
+- Mono-repo and multi-repo unified model — services are the graph nodes; `repos` is just a container
 
-**Defer (v2+):**
-- `/allclear pulse` (kubectl service health) — add when k8s users represent meaningful adoption share
-- `/allclear deploy` (deploy state verification) — same gate as pulse; advanced/optional
-- LSP server bundling — real-time diagnostics beyond hooks; high complexity; defer until hooks prove insufficient
+**Defer to v2.x (post-validation):**
+- `impact_graph` and `impact_search` MCP tools
+- D3 UI enhancements (protocol filtering, zoom, node detail pane)
+- Snapshot comparison UI (visual graph diff)
+- Graph export in JSON or dot format
+- ChromaDB cloud mode
+
+**Anti-features to explicitly reject:**
+- Auto-persist findings without user review — agent findings are probabilistic; unreviewed data corrupts blast radius calculations
+- Automatic re-scan on every file save — hooks fire synchronously; a slow hook blocks Claude Code
+- OpenAPI spec parsing as primary scanner — misses gRPC, internal SDKs, event producers; creates a false "complete" graph
+- Real-time WebSocket graph streaming — HTTP polling with `Last-Modified` is sufficient; WebSocket adds complexity for no gain
 
 ### Architecture Approach
 
-The architecture is a three-layer plugin with clean separation: a deterministic event layer (hooks that fire on every Claude tool call), an LLM-orchestrated user layer (skills that Claude executes when invoked), and a shared library layer that both consume. This separation is critical — format/lint logic belongs in hooks, not skills, because skills are LLM-executed and not guaranteed to fire on every edit. The build order is strictly sequential within phases: lib/ first, then scripts/ (hooks), then skills/, then tests/, then distribution.
+The v2.0 architecture adds a Worker Layer (Node.js process) and MCP Layer (stdio server) to the existing plugin structure, while keeping the existing Event Layer (hooks) and Support Layer (shell libs) unchanged. The worker runs as a project-scoped background daemon managed by PID file; the MCP server runs as a stdio subprocess spawned by Claude Code via `.mcp.json`. Both share the same SQLite connection and query engine within a single Node.js process. The database and all worker state live in `.allclear/` in the user's project repo, not in the plugin cache (which is immutable after installation).
 
 **Major components:**
-1. `lib/detect.sh` + `lib/siblings.sh` — shared bash libraries; single source of truth for project-type detection and cross-repo discovery; sourced by hooks and referenced via `!`command`` injection in skills
-2. `hooks/hooks.json` + `scripts/*.sh` — event layer; PreToolUse fires file-guard.sh (blocking); PostToolUse fires format.sh and lint.sh (non-blocking, always exit 0); SessionStart fires session-start.sh (context injection)
-3. `skills/*/SKILL.md` — user layer; five skills (quality-gate, cross-impact, drift, pulse, deploy-verify); each SKILL.md is a prompt playbook with live shell injection for context
-4. `bin/allclear-init.js` + `package.json` — distribution layer; npx installer; detects install method; published as `@allclear/cli`
-5. `tests/*.bats` — validation layer; one bats file per script; verifies exit codes, stdout/stderr separation, non-blocking behavior
+1. `worker/db.js` — SQLite connection with WAL mode, FTS5 indexes, schema migrations; the foundation for everything
+2. `worker/query-engine.js` — all SQLite read/write queries; recursive CTE graph traversal with cycle detection; breaking change classification
+3. `worker/mcp-server.js` — stdio MCP server; 5 tools; reads from query engine; logs to stderr only (stdout is protocol-exclusive)
+4. `worker/http-server.js` — Fastify REST API and static D3 UI; `/graph`, `/impact`, `/scan`, `/scan/confirm`, `/health`, `/versions`
+5. `worker/scan-manager.js` — spawns Claude agents into linked repos; collects findings; drives grouped user confirmation flow
+6. `scripts/worker-start.sh` and `worker-stop.sh` — PID file lifecycle management with stale-PID detection and readiness probe
+7. `lib/worker-client.sh` — shared bash HTTP client (`worker_running()`, `worker_call()`); all commands source this
+8. `commands/map.md` (new) and `commands/cross-impact.md` (modified) — thin user-facing orchestration shells
+
+**Build order is architecturally constrained:**
+Phase A (storage) → Phase C (MCP) and Phase D (HTTP) in parallel → Phase E (scan manager) → Phase F (commands) → Phase G (session hook)
 
 ### Critical Pitfalls
 
-1. **Misplaced component directories** — Only `plugin.json` belongs inside `.claude-plugin/`. Putting `skills/`, `hooks/`, or `scripts/` there causes silent failure with zero error output. Establish canonical directory structure in Phase 1 and validate with `claude plugin validate` before writing any content.
+1. **Worker process orphaning** — Always write PID to `.allclear/worker.pid` on spawn; use `kill -0 $PID` to distinguish stale from live PIDs before starting a second worker. Missing this causes EADDRINUSE errors and split-brain SQLite access. Address in worker foundation phase.
 
-2. **Non-zero exit codes in PostToolUse hooks** — Format/lint hooks that exit 1 or 2 block Claude's edit cycle, violating the PROJECT.md non-blocking constraint. Every PostToolUse hook must always exit 0; route errors to stderr as informational output; add a bats test asserting exit 0 when the formatter is absent.
+2. **Shell-to-Node.js race condition** — Never send HTTP requests immediately after spawning the worker. Implement a readiness probe: poll `GET /health` with 20 retries at 250ms intervals. The `/health` route must be registered as the very first Fastify route, before any DB initialization. Address in worker foundation phase.
 
-3. **Absolute paths instead of `${CLAUDE_PLUGIN_ROOT}`** — Hardcoded paths work locally but break after marketplace install because the plugin is copied to a content-addressed cache directory. Use `${CLAUDE_PLUGIN_ROOT}/scripts/...` in all hook commands from day one.
+3. **MCP stdout pollution** — The MCP stdio transport uses stdout exclusively for JSON-RPC. A single `console.log()` corrupts the entire MCP session silently — tools appear registered but never return results. All logging in `mcp-server.js` must go to stderr. Add a CI lint rule to catch `console.log` in mcp-server.js. Address at MCP server phase start.
 
-4. **PreToolUse vs PostToolUse JSON schema confusion** — The sensitive file guard uses PreToolUse blocking, which requires `hookSpecificOutput.permissionDecision: "deny"` — not the PostToolUse `decision: "block"` format. Using the wrong schema causes the hook to fire but writes to proceed silently. This is the highest-security pitfall in the project.
+4. **Transitive graph traversal cycles** — Any cycle in the service graph (mutual auth, callback patterns) will infinite-loop a naive recursive CTE. Use SQLite recursive CTE with visited-set pattern and a depth cap (default 5, max 10). Test with a deliberately cyclic graph. Address in query engine phase.
 
-5. **npm org not reserved before documentation ships** — `@allclear/cli` requires owning the `allclear` npm organization. Reserve it and publish a placeholder `0.0.1` package in Phase 1, before the package name appears in any README or docs.
+5. **ChromaDB hard failure blocking SQLite writes** — If ChromaDB sync is in the same code path as SQLite persistence, a ChromaDB outage silently prevents all scan findings from being saved. Always write SQLite first, confirm success, then fire ChromaDB sync asynchronously with `.catch()`. Address at ChromaDB integration phase.
+
+6. **Confirmation fatigue causing rubber-stamping** — Presenting 50+ individual findings for confirmation causes users to approve everything without reading, defeating the validation purpose. Group by confidence: HIGH = single batch confirm; MEDIUM = per-repo confirm; LOW = individual questions. Cap LOW confidence findings at 10 per scan. Address in map command UX design before implementation.
+
+7. **Background subagents cannot access MCP tools** — Confirmed Claude Code issue #13254. Agents spawned with `run_in_background: true` do not inherit MCP tool access. Scan manager must run agents sequentially in the foreground. Validate in first agent scan prototype before building the full scan pipeline.
 
 ## Implications for Roadmap
 
-Based on research, the architecture's build order directly maps to phases. The dependency graph has no cycles and the natural ordering is: foundation → hooks → skills → tests → distribution.
+Based on the combined research, the build order is architecturally constrained. The storage foundation and worker lifecycle are the critical path that unlocks all subsequent work.
 
-### Phase 1: Foundation
+### Phase 1: Storage Foundation
 
-**Rationale:** Three Phase 1 pitfalls (misplaced directories, non-executable scripts, npm org squatting) can permanently break the project if not resolved first. Directory structure and npm reservation are prerequisite to all other work.
-**Delivers:** Canonical plugin skeleton, shared detection library, npm org `@allclear` reserved, placeholder `0.0.1` published, `claude plugin validate` passing with no skills yet
-**Addresses:** Project-type auto-detection (`lib/detect.sh`), cross-repo sibling discovery (`lib/siblings.sh`), `.claude-plugin/plugin.json` manifest
-**Avoids:** Misplaced component directories pitfall, npm org squatting pitfall, absolute path pitfall (establish `${CLAUDE_PLUGIN_ROOT}` convention from first file)
+**Rationale:** Every v2.0 feature depends on the SQLite schema being stable. Schema migrations after agents have written data are painful and risky. This phase has no dependencies on any other phase and must come first.
+**Delivers:** `worker/db.js` (schema, WAL mode, FTS5 indexes, migrations), `worker/query-engine.js` (all queries including recursive CTE transitive traversal with cycle detection and depth cap), test suite exercising the query engine directly
+**Addresses features:** SQLite schema stability, transitive impact traversal, breaking change classification, incremental scan via `repo_state` table
+**Avoids pitfalls:** WAL file growth (set `journal_size_limit` and `busy_timeout` on first open — not patchable later), recursive CTE cycles (depth cap and visited-set from day one), snapshot corruption (use `VACUUM INTO` not `cp`)
 
-### Phase 2: Hooks (Event Layer)
+### Phase 2: Worker Lifecycle
 
-**Rationale:** Hooks deliver the highest-frequency user value (every edit auto-formatted and linted) and establish the non-blocking contract that everything else depends on. Building hooks before skills validates the hook architecture before adding skill complexity.
-**Delivers:** Auto-format hook (PostToolUse, Python/Rust/TypeScript/Go), auto-lint hook (PostToolUse), sensitive file guard (PreToolUse, blocking), SessionStart context injection
-**Addresses:** Auto-format on write, auto-lint on write, sensitive file guard, non-blocking hook behavior (all table-stakes features)
-**Avoids:** Non-blocking exit code pitfall, stdout pollution pitfall, wrong event name casing pitfall, PreToolUse/PostToolUse schema confusion pitfall
+**Rationale:** The worker process shell scripts have no Node.js code dependencies and unblock all subsequent phases that need a running worker. The readiness probe pattern must be established here and reused by all later phases.
+**Delivers:** `scripts/worker-start.sh`, `scripts/worker-stop.sh`, `lib/worker-client.sh`, PID file management with stale-PID detection, readiness probe (`wait_for_worker()`), port file pattern (`.allclear/worker.port`), per-project port configuration
+**Addresses features:** Worker process start/stop management, port-per-project configuration
+**Avoids pitfalls:** Worker orphaning (PID file plus `kill -0` check), shell-to-Node.js race condition (readiness probe built here), port conflicts from multiple simultaneous projects
 
-### Phase 3: Skills (User Layer)
+### Phase 3: MCP Server
 
-**Rationale:** Skills build on the shared libraries established in Phase 1 and complement the hooks established in Phase 2. The quality gate skill is the primary user-facing interface. Cross-repo impact scanning is the primary differentiator and should ship in v1 to validate the unique value proposition.
-**Delivers:** `/allclear` quality gate skill, `/allclear impact` cross-repo impact scanning, `/allclear drift` drift detection, `allclear.config.json` override layer
-**Addresses:** Single-command quality gate, cross-repo impact scanning, cross-repo drift detection, config override for non-flat layouts
-**Avoids:** Cross-repo flat layout assumption pitfall (build config override from day one, not as afterthought)
+**Rationale:** Depends only on Phase 1 (query engine). Can be built in parallel with Phase 4. MCP tools provide agent-autonomous impact checking — the most strategically important v2.0 capability. Establishing the stderr-only logging convention early prevents protocol corruption from ever entering the codebase.
+**Delivers:** `worker/mcp-server.js` (5 MCP tools), `.mcp.json` plugin registration, graceful behavior when DB does not yet exist
+**Addresses features:** MCP server for agent use, `impact_query` and `impact_changed` at launch
+**Avoids pitfalls:** MCP stdout pollution (stderr-only log wrapper before any tool handler code), graceful DB-absent startup (tools return empty results, not errors)
 
-### Phase 4: Tests (Validation Layer)
+### Phase 4: HTTP Server and Web UI
 
-**Rationale:** PROJECT.md mandates bats tests. Tests must cover the non-blocking guarantee (format/lint exit 0 when tools absent), the blocking guarantee (file guard exits 2 on sensitive paths), and the PreToolUse JSON schema correctness. Testing after hooks and skills are working enables integration-level coverage.
-**Delivers:** Full bats test suite (`tests/format.bats`, `lint.bats`, `file-guard.bats`, `session-start.bats`, `detect.bats`), CI integration, `claude plugin validate` in CI
-**Addresses:** Bats test suite (competitive differentiator — no competing plugin has one), non-blocking hook verification, security schema verification
-**Avoids:** All hook-layer pitfalls through test assertions; version-not-bumped pitfall via CI check
+**Rationale:** Depends only on Phase 1 (query engine). Can be built in parallel with Phase 3. The graph visualization is required for users to validate the dependency map. The Canvas rendering decision must be made before writing any graph code — retrofitting Canvas onto an SVG implementation requires a full rewrite.
+**Delivers:** `worker/http-server.js` (Fastify REST routes), `worker/web/index.html` and `graph.js` (D3 Canvas-based force-directed graph with Web Worker simulation), `GET /health` registered first
+**Addresses features:** D3 web UI (basic force-directed graph), `/allclear:map --view` shortcut
+**Avoids pitfalls:** D3 performance at scale (Canvas plus Web Worker from the start; SVG freezes above 30 nodes), `GET /health` as the very first route so the readiness probe from Phase 2 can detect it
 
-### Phase 5: Distribution
+### Phase 5: Scan Manager
 
-**Rationale:** Distribution comes last because the installer can only be tested against a working plugin. The marketplace submission requires a verified, tested plugin.
-**Delivers:** `npx @allclear/cli init` installer, marketplace.json, README with install paths, plugin registry submission
-**Addresses:** Installable via standard channels (table stakes), discoverability
-**Avoids:** Version-not-bumped pitfall (release checklist/CI check before marketplace push)
+**Rationale:** Depends on Phases 1 and 4 (needs HTTP API to receive POST /scan). This is the highest-risk phase — agent hallucination, confirmation fatigue, and background agent MCP limitations all live here. Validate agent MCP access in the first prototype before building the full pipeline.
+**Delivers:** `worker/scan-manager.js` (foreground agent orchestration, confidence scoring), grouped confirmation UX (HIGH batch / MEDIUM per-repo / LOW individual, cap 10 LOW per scan), snapshot creation after confirmed writes, incremental scan via `repo_state` and `git diff --name-status`
+**Addresses features:** Agent-based scanning, user confirmation gate (hard), incremental scanning, map versioning, stale connection cleanup for deleted/renamed files
+**Avoids pitfalls:** Background agents without MCP access (foreground-only agent spawning), agent hallucination (confidence levels, literal-string-only prompt instructions, file-existence secondary validation), confirmation fatigue (grouped UX), snapshot bloat (auto-gitignore `.allclear/`, 10-snapshot retention default), incremental scan missing renames (`--name-status` not `--name-only`)
+
+### Phase 6: Command Layer
+
+**Rationale:** Commands are thin orchestration shells over the worker API. Depends on all prior phases. Building commands last also prevents premature commitment to command UX before worker behavior is fully understood.
+**Delivers:** `commands/map.md` (new: repo discovery → scan → confirm → persist → browser open), `commands/cross-impact.md` (modified: worker-aware plus legacy grep fallback), first-run MCP registration instructions after first successful map build
+**Addresses features:** `/allclear:map`, `/allclear:cross-impact` redesign, graceful fallback to grep when map absent
+**Avoids pitfalls:** Graceful degradation ensures v2.0 upgrade does not break users who have not yet run `/allclear:map`
+
+### Phase 7: Session Hook Integration
+
+**Rationale:** A lightweight modification to an existing hook; intentionally last to keep risk isolated. Depends on Phase 2 (worker-start.sh).
+**Delivers:** Modified `scripts/session-start.sh` (conditional worker auto-start when `impact-map` section present in config, one-line worker health status in session context)
+**Addresses features:** Worker auto-start on session open, session context showing impact commands available
+**Avoids pitfalls:** Blocking hook startup (fire worker in background; hook exits immediately; first command polls readiness via Phase 2 probe)
+
+### Phase 8: End-to-End Tests and ChromaDB Integration
+
+**Rationale:** ChromaDB is optional acceleration and must not block any earlier phase. End-to-end tests validate the complete scan → query → impact flow after all components are integrated.
+**Delivers:** `worker/chroma-sync.js` (async, non-blocking, graceful skip), complete bats integration test suite, manual smoke test documentation for the full map-build-to-D3-UI flow
+**Addresses features:** ChromaDB optional semantic search, three-tier fallback chain validation, worker localhost-only binding security check
+**Avoids pitfalls:** ChromaDB hard failure (fully async with `.catch()`, health-check flag on startup), ChromaDB desync is non-fatal (FTS5 fallback always works)
 
 ### Phase Ordering Rationale
 
-- `lib/` before `scripts/` before `skills/` is dictated by the dependency graph in ARCHITECTURE.md — each phase sources or references the prior phase
-- Hooks before skills because hooks are deterministic (verifiable in isolation) while skills are LLM-orchestrated (harder to test) — validate the simpler layer first
-- Tests as a dedicated phase rather than inline because bats test structure benefits from testing completed scripts, not works-in-progress; the bats submodule setup is also a meaningful setup cost
-- Distribution last because `npx @allclear/cli init` installer requires a stable, marketplace-ready plugin to install; testing the installer against an unstable plugin wastes cycles
-- Phase 1 npm org reservation is a one-time action that must happen before Phase 5 distribution; embedding it in Phase 1 ensures it cannot be forgotten
+- **Storage before scanning:** The SQLite schema is the data model contract. Agents write to it; commands read from it; the MCP server exposes it. Any schema change after real data is written requires a migration. Locking in the schema in Phase 1 removes this risk for all subsequent phases.
+- **Worker lifecycle before worker code:** The PID file and readiness probe patterns are needed by every phase that starts or communicates with the worker. Building these as a foundation in Phase 2 means all subsequent phases use proven utilities rather than each reinventing the pattern.
+- **MCP and HTTP in parallel (Phases 3 and 4):** Both depend only on the query engine and are architecturally independent. Separating them enforces the clean boundary between the stdio MCP transport and the TCP HTTP server.
+- **Scan manager after HTTP:** The scan manager posts findings to the HTTP API (`POST /scan/confirm`). It needs a working HTTP server to write through.
+- **Commands after scan manager:** Commands are thin; they add value only when the underlying worker pipeline is tested and solid.
+- **ChromaDB last:** Optional feature. Its absence must not block any prior phase. Its failure mode (graceful skip) is tested explicitly in Phase 8 rather than assumed.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 3 (Skills):** SKILL.md `!`command`` injection syntax for referencing `lib/` from a skill subdirectory needs verification against current Claude Code runtime — the `${CLAUDE_SKILL_DIR}/../../lib/` relative path pattern should be confirmed before implementation
-- **Phase 3 (Skills):** SessionStart known bug (doesn't fire on brand-new sessions, only on /clear/compact/resume) — track upstream issue #10373; decide at planning time whether to implement UserPromptSubmit fallback or document the limitation
-- **Phase 5 (Distribution):** Marketplace submission process (`claude.ai/settings/plugins/submit`) — verify current submission requirements and review timeline before scheduling Phase 5
+- **Phase 5 (Scan Manager):** Agent scanning prompts and findings schema require iteration — hallucination rate is unknown until tested on real repos. Plan for a research-and-iterate loop on the agent prompt template. The Claude SDK direct approach for controlled parallelism was identified but not fully designed.
+- **Phase 3 (MCP Server):** The `.mcp.json` plugin registration convention and MCP tool description length limits warrant re-verification against Claude Code docs at implementation time; the MCP spec evolves.
+- **Phase 4 (D3 Web UI):** Canvas hit detection for node click/hover without DOM elements requires custom point-in-circle math on `mousemove`. Warrants a spike before committing to the full UI implementation.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1 (Foundation):** Directory structure and plugin.json manifest are fully documented in official docs with no ambiguity
-- **Phase 2 (Hooks):** Hook stdin/stdout JSON protocol, exit code semantics, and non-blocking patterns are all verified from official docs and live plugin inspection; patterns are copy/paste ready
-- **Phase 4 (Tests):** bats-core testing patterns are well-established; bats-support and bats-assert cover all hook assertion needs
+- **Phase 1 (Storage Foundation):** SQLite WAL mode, FTS5, and better-sqlite3 are fully documented with code examples in the stack research.
+- **Phase 2 (Worker Lifecycle):** PID file management and readiness probe are established shell patterns with direct code examples in the architecture research.
+- **Phase 6 (Command Layer):** Command markdown files follow the existing AllClear pattern; the worker client library provides the abstraction.
+- **Phase 7 (Session Hook):** Small modification to an existing hook; pattern is fully documented in the architecture research.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Sourced from official Claude Code docs + live plugin inspection of claude-mem and code-review plugins in local cache; all version requirements confirmed |
-| Features | HIGH | Table stakes verified against Plankton, Safety Net, sensitive-canary direct inspection; differentiators confirmed by competitor gap analysis; SessionStart bug confirmed via official issue tracker |
-| Architecture | HIGH | Build order validated by official plugin creation guide; component boundaries confirmed by live hookify and example-plugin inspection; anti-patterns sourced from official common mistakes documentation |
-| Pitfalls | HIGH | Critical pitfalls sourced from official docs warnings + live plugin pattern inspection; exit code semantics confirmed from hooks reference; PreToolUse JSON schema confirmed from official spec |
+| Stack | HIGH | Primary sources: official Claude Code docs, verified installed plugins in local cache, GitHub releases for exact versions. Node.js 20+ minimum is hard (better-sqlite3 12.x and Fastify 5.x both require it). |
+| Features | HIGH | Design document (`cross-impact-v2.md`) is the primary source. Competitor analysis confirms differentiators. Feature dependency tree is well-understood with no ambiguous ordering. |
+| Architecture | HIGH | Based on official Claude Code plugin docs, direct v1.0 codebase inspection, and verified MCP server patterns. Build order is architecturally constrained with a clear critical path. |
+| Pitfalls | HIGH | Most pitfalls backed by official SQLite docs, confirmed Claude Code GitHub issues, MCP spec, and 2025 D3 performance benchmarks. Background agent MCP limitation is confirmed via issue #13254. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **SessionStart new-session bug:** As of March 2026, SessionStart hooks do not fire on brand-new sessions (only /clear, /compact, resume). Decision needed at Phase 3 planning: implement UserPromptSubmit fallback or document limitation. Track upstream issue #10373.
-- **Skill namespace in `/help`:** The exact slash-command that appears to users (e.g., `/allclear` vs `/allclear:quality-gate`) depends on how Claude Code namespaces the plugin's skills. Verify in a dev session with `--plugin-dir` before finalizing skill names in SKILL.md frontmatter.
-- **`${CLAUDE_SKILL_DIR}` relative path to `lib/`:** Skills reference `lib/detect.sh` via shell injection. The path `${CLAUDE_SKILL_DIR}/../../lib/detect.sh` assumes a two-level skills directory layout. Confirm this resolves correctly at runtime — the alternative `${CLAUDE_PLUGIN_ROOT}/lib/detect.sh` may be more reliable.
-- **Mixed-language repo detection:** `lib/detect.sh` must handle repos containing both `package.json` and `pyproject.toml` (e.g., TypeScript frontend + Python backend). Priority logic for multi-manifest repos is not specified in research; needs a design decision.
+- **Agent hallucination rate in practice:** Research cites 27%+ inaccuracy in automated dependency extraction (ScienceDirect 2025). The actual rate for AllClear's agent-based approach is unknown until tested on real repos. Build confidence-level reporting into the agent prompt from day one and plan for prompt iteration during Phase 5.
+- **MCP tool context window impact:** Tool description verbosity can consume significant context window. Keep tool descriptions lean and validate against a real Claude Code session during Phase 3 before finalizing descriptions.
+- **Agent scan parallelism approach:** Sequential foreground scanning is the safe default (avoids background MCP limitation). For large multi-repo setups (10+ repos), scan latency may be unacceptable. The Claude SDK direct approach for controlled parallelism was noted but not fully designed — flag for Phase 5 design.
+- **Snapshot VACUUM INTO performance:** `VACUUM INTO` is correct for consistent snapshots but slower than `cp`. For large databases, this may add noticeable latency. Benchmark with representative data during Phase 5.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `https://code.claude.com/docs/en/plugins` — Plugin structure, SKILL.md format, hooks.json location, --plugin-dir flag, common structural mistakes warning
-- `https://code.claude.com/docs/en/plugins-reference` — Complete manifest schema, component paths, hook event types, `${CLAUDE_PLUGIN_ROOT}`, version caching behavior
-- `https://code.claude.com/docs/en/hooks` — Hook stdin JSON format, stdout fields, exit code semantics (blocking vs non-blocking), PreToolUse `permissionDecision` schema, PostToolUse `systemMessage` schema
-- `https://code.claude.com/docs/en/plugin-marketplaces` — marketplace.json schema, npm/github/git-subdir sources
-- `https://code.claude.com/docs/en/skills` — SKILL.md frontmatter, `disable-model-invocation`, `!`command`` injection, `CLAUDE_SKILL_DIR`
-- `/Users/ravichillerega/.claude/plugins/cache/thedotmack/claude-mem/10.5.5/` — Live `${CLAUDE_PLUGIN_ROOT}` fallback pattern, hooks.json structure, Node.js 18 engines field
-- `/Users/ravichillerega/.claude/plugins/cache/claude-plugins-official/code-review/d5c15b861cd2/` — Minimal plugin.json pattern, commands/code-review.md frontmatter
-- `https://github.com/bats-core/bats-core/releases/latest` — bats-core 1.13.0, released 2025-11-07
-- `https://github.com/anthropics/claude-code/issues/10373` — SessionStart hook new-session bug (confirmed via official repo)
+- `https://code.claude.com/docs/en/plugins` — Plugin structure, SKILL.md format, hooks.json location, --plugin-dir flag
+- `https://code.claude.com/docs/en/plugins-reference` — Complete manifest schema, component paths, hook event types, CLI commands
+- `https://code.claude.com/docs/en/hooks` — Hook stdin JSON format, stdout fields, exit code semantics, blocking vs non-blocking
+- `https://code.claude.com/docs/en/plugin-marketplaces` — marketplace.json schema, distribution patterns
+- `https://github.com/WiseLibs/better-sqlite3/releases` — v12.8.0 (2026-03-13), Node.js 20+ required, SQLite 3.51.3 bundled
+- `https://github.com/fastify/fastify/releases` — Fastify 5.8.2, Node.js 20+ required
+- `https://github.com/modelcontextprotocol/typescript-sdk/releases` — @modelcontextprotocol/sdk v1.27.1 current
+- `https://d3js.org/getting-started` — D3 v7.9.0 current stable, ESM import pattern
+- `https://www.trychroma.com/changelog/js-client-v3` — chromadb v3 rewrite, v3.3.3 current
+- `https://sqlite.org/wal.html` — WAL checkpoint starvation, WAL growth, reader snapshot behavior
+- `https://github.com/anthropics/claude-code/issues/13254` — Confirmed: background subagents cannot access MCP tools
+- `.planning/designs/cross-impact-v2.md` — AllClear v2.0 primary design document (internal)
+- `~/.claude/plugins/cache/thedotmack/claude-mem/10.5.5/` — Direct inspection of production plugin (PID patterns, SessionStart hooks, SKILL.md format)
 
 ### Secondary (MEDIUM confidence)
-- `https://github.com/alexfazio/plankton` — Competitor feature analysis; Go omission confirmed; three-phase lint architecture
-- `https://github.com/kenryu42/claude-code-safety-net` — Sensitive file guard patterns, destructive command guard
-- `https://dev.to/chataclaw/stop-claude-code-from-leaking-your-secrets-introducing-sensitive-canary-826` — Sensitive-canary feature comparison
-- `https://blakecrosley.com/blog/claude-code-hooks-tutorial` — Hook patterns (matches official docs, third-party confirmation)
-- `https://evilmartians.com/chronicles/six-things-developer-tools-must-have-to-earn-trust-and-adoption` — Non-blocking design principle, discoverability requirements
-- `https://composio.dev/content/top-claude-code-plugins` — Plugin ecosystem landscape, AllClear gap identification
-
-### Tertiary (LOW confidence)
-- `https://www.datacamp.com/tutorial/how-to-build-claude-code-plugins` — Community-confirmed structural mistakes (consistent with official docs warnings)
+- `https://modelcontextprotocol.info/docs/tutorials/building-a-client-node/` — StdioServerTransport pattern confirmed
+- `https://github.com/CodeLogicIncEngineering/codelogic-mcp-server` — Competitor MCP tool interface (direct inspection)
+- `https://sqlite.org/forum/info/a188951b80292831794256a5c29f20f64f718d98ed0218bf44b51dd5907f1c39` — Real-world WAL growth scenarios
+- `https://github.com/chroma-core/chroma/issues/346` — ChromaDB connection reliability failure modes
+- D3 force simulation performance: Canvas vs SVG vs WebGL thresholds (2025 benchmarks)
+- `https://www.sciencedirect.com/article/pii/S0950584925001934` — 27%+ inaccuracy in automated dependency extraction
+- `https://www.nngroup.com/articles/confirmation-dialog/` — Confirmation fatigue and overuse consequences
 
 ---
 *Research completed: 2026-03-15*

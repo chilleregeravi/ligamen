@@ -1,448 +1,597 @@
 # Architecture Research
 
-**Domain:** Claude Code plugin (skills + hooks + CLI installer)
+**Domain:** Claude Code plugin — v2.0 Service Dependency Intelligence integration
 **Researched:** 2026-03-15
-**Confidence:** HIGH — sourced from official Claude Code documentation and live installed plugin inspection
+**Confidence:** HIGH — based on official Claude Code plugin documentation, existing v1.0 codebase inspection, and verified MCP server patterns
+
+---
 
 ## Standard Architecture
 
 ### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        AllClear Plugin Root                          │
-├─────────────────────────────────────────────────────────────────────┤
-│  User Layer (invoke with /allclear:<name> or auto-trigger)           │
-│                                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ skill:       │  │ skill:       │  │ skill:       │              │
-│  │ quality-gate │  │ cross-impact │  │ drift        │              │
-│  │ SKILL.md     │  │ SKILL.md     │  │ SKILL.md     │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-│  ┌──────────────┐  ┌──────────────┐                                │
-│  │ skill:       │  │ skill:       │                                │
-│  │ pulse        │  │ deploy-verify│                                │
-│  │ SKILL.md     │  │ SKILL.md     │                                │
-│  └──────────────┘  └──────────────┘                                │
-│                                                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  Event Layer (fire automatically on Claude Code lifecycle events)    │
-│                                                                      │
-│  ┌────────────────────────────────────────────────────────────┐     │
-│  │  hooks/hooks.json                                          │     │
-│  │                                                            │     │
-│  │  PreToolUse  → file-guard.sh  (block sensitive files)     │     │
-│  │  PostToolUse → format.sh      (auto-format edited file)   │     │
-│  │  PostToolUse → lint.sh        (auto-lint edited file)     │     │
-│  │  SessionStart→ session-start.sh (context injection)       │     │
-│  └────────────────────────────────────────────────────────────┘     │
-│                                                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  Support Layer (shared by hooks and skills)                          │
-│                                                                      │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │
-│  │ scripts/      │  │ lib/          │  │ allclear.      │           │
-│  │ (shell hooks) │  │ (detect.sh,   │  │ config.json   │           │
-│  │               │  │  sibling.sh)  │  │ (optional)    │           │
-│  └───────────────┘  └───────────────┘  └───────────────┘           │
-│                                                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  Distribution Layer                                                  │
-│                                                                      │
-│  ┌────────────────────┐  ┌──────────────────────────────────┐      │
-│  │ .claude-plugin/    │  │ bin/allclear-init.js              │      │
-│  │ plugin.json        │  │ (npx @allclear/cli init)          │      │
-│  │ (registry entry)   │  │                                   │      │
-│  └────────────────────┘  └──────────────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          AllClear Plugin Root                              │
+├───────────────────────────────────────────────────────────────────────────┤
+│  User Layer (invoked by user or auto-triggered by Claude)                  │
+│                                                                            │
+│  ┌──────────────────┐  ┌────────────────────────────┐                     │
+│  │ commands/        │  │ commands/                   │                     │
+│  │ cross-impact.md  │  │ map.md  (NEW)               │                     │
+│  │ (MODIFIED)       │  │                             │                     │
+│  └──────────────────┘  └────────────────────────────┘                     │
+│                                                                            │
+├───────────────────────────────────────────────────────────────────────────┤
+│  MCP Layer (auto-started by Claude Code, available to ALL agents)          │
+│                                                                            │
+│  ┌──────────────────────────────────────────────────────────────────┐     │
+│  │  .mcp.json  (NEW)                                                 │     │
+│  │                                                                   │     │
+│  │  allclear-impact → worker/mcp-server.js  (stdio transport)       │     │
+│  │                                                                   │     │
+│  │  Tools: impact_query | impact_scan | impact_changed              │     │
+│  │         impact_graph | impact_search                             │     │
+│  └──────────────────────────────────────────────────────────────────┘     │
+│                                                                            │
+├───────────────────────────────────────────────────────────────────────────┤
+│  Event Layer (lifecycle hooks — unchanged from v1.0)                       │
+│                                                                            │
+│  ┌──────────────────────────────────────────────────────────────────┐     │
+│  │  hooks/hooks.json                                                 │     │
+│  │                                                                   │     │
+│  │  PreToolUse  → file-guard.sh                                     │     │
+│  │  PostToolUse → format.sh, lint.sh                                │     │
+│  │  SessionStart→ session-start.sh  (MODIFIED: checks worker state) │     │
+│  └──────────────────────────────────────────────────────────────────┘     │
+│                                                                            │
+├───────────────────────────────────────────────────────────────────────────┤
+│  Worker Layer (Node.js process, localhost, project-scoped)                 │
+│                                                                            │
+│  ┌──────────────────────────────────────────────────────────────────┐     │
+│  │  worker/  (NEW)                                                   │     │
+│  │                                                                   │     │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │     │
+│  │  │ http-server  │  │ mcp-server   │  │ scan-manager         │   │     │
+│  │  │ (D3 UI +     │  │ (stdio, MCP  │  │ (spawns agents per   │   │     │
+│  │  │  REST API)   │  │  protocol)   │  │  linked repo)        │   │     │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────┘   │     │
+│  │  ┌──────────────┐  ┌──────────────┐                             │     │
+│  │  │ query-engine │  │ chroma-sync  │                             │     │
+│  │  │ (SQLite +    │  │ (optional,   │                             │     │
+│  │  │  FTS5)       │  │  async)      │                             │     │
+│  │  └──────────────┘  └──────────────┘                             │     │
+│  └──────────────────────────────────────────────────────────────────┘     │
+│                                                                            │
+├───────────────────────────────────────────────────────────────────────────┤
+│  Support Layer (shared shell libraries — v1.0, unchanged)                  │
+│                                                                            │
+│  ┌───────────────┐  ┌───────────────┐  ┌──────────────────────────┐      │
+│  │ lib/config.sh │  │ lib/detect.sh │  │ lib/linked-repos.sh      │      │
+│  └───────────────┘  └───────────────┘  └──────────────────────────┘      │
+│                                                                            │
+├───────────────────────────────────────────────────────────────────────────┤
+│  Storage Layer (project-local, inside consuming repo)                      │
+│                                                                            │
+│  ┌──────────────────────────────────────────────────────────────────┐     │
+│  │  .allclear/  (lives in the repo where /allclear:map was run)     │     │
+│  │                                                                   │     │
+│  │  impact-map.db        (SQLite + WAL mode + FTS5)                 │     │
+│  │  worker.pid           (PID file for worker lifecycle)            │     │
+│  │  worker.port          (port file: actual bound port)             │     │
+│  │  snapshots/           (SQLite snapshots for map versioning)      │     │
+│  └──────────────────────────────────────────────────────────────────┘     │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Implementation |
-|-----------|---------------|----------------|
-| `skills/<name>/SKILL.md` | Prompt playbook for each quality-gate skill; tells Claude what to run, check, and report | Markdown with YAML frontmatter; references scripts in `${CLAUDE_SKILL_DIR}/scripts/` |
-| `hooks/hooks.json` | Declares which lifecycle events trigger which shell scripts | JSON config mapping event names to script commands via `${CLAUDE_PLUGIN_ROOT}` |
-| `scripts/format.sh` | Auto-format the file just edited; receives file path from hook stdin JSON | Shell script; reads `tool_input.file_path` from stdin; detects language and runs formatter |
-| `scripts/lint.sh` | Auto-lint the file just edited; non-blocking (warns, does not exit 2) | Shell script; same detection pattern as format; outputs `systemMessage` JSON on failure |
-| `scripts/file-guard.sh` | Block writes to sensitive paths (env files, secrets); runs PreToolUse | Shell script; exits 2 on match to deny the tool call; exits 0 to allow |
-| `scripts/session-start.sh` | Inject repo context at session open (project type, sibling repos, health state) | Shell script; runs on SessionStart; outputs `additionalContext` JSON |
-| `lib/detect.sh` | Shared language/project-type detection sourced by other scripts | Bash library; checks for pyproject.toml, Cargo.toml, package.json, go.mod |
-| `lib/siblings.sh` | Shared cross-repo discovery (parent dir scan + allclear.config.json override) | Bash library sourced by impact/drift skills |
-| `.claude-plugin/plugin.json` | Plugin identity, version, metadata for registry | Minimal JSON; name=allclear, version, author, license |
-| `bin/allclear-init.js` | npx installer: detects install method, runs `claude plugin install`, writes symlink | Node.js CLI entry; entry in `package.json` `bin` field; published as `@allclear/cli` |
-| `allclear.config.json` (project) | Optional project-level override: sibling repo paths, format/lint tool overrides | JSON; read by lib/detect.sh and lib/siblings.sh; absent = auto-detect only |
-| `tests/` | Bats test suite for all shell scripts | `.bats` files; one per script |
+| Component | Responsibility | New or Modified |
+|-----------|----------------|-----------------|
+| `commands/map.md` | New command: orchestrates repo discovery, agent scanning, user confirmation, and persistence | NEW |
+| `commands/cross-impact.md` | Modified: checks for worker + map data first; falls back to legacy grep scan if absent | MODIFIED |
+| `.mcp.json` | Registers the AllClear MCP server (`worker/mcp-server.js`) so all Claude Code agents get impact tools automatically | NEW |
+| `worker/mcp-server.js` | Standalone Node.js stdio MCP server; reads from SQLite via query engine; surfaces 5 MCP tools | NEW |
+| `worker/http-server.js` | Express HTTP server on configured port; serves D3 web UI and REST API (`/graph`, `/impact`, `/service/:name`, `/scan`, `/versions`) | NEW |
+| `worker/scan-manager.js` | Spawns Claude agents into each linked repo for scanning; collects and validates findings; writes confirmed results to SQLite | NEW |
+| `worker/query-engine.js` | All SQLite queries: recursive CTE graph traversal, FTS5 full-text search, breaking change detection | NEW |
+| `worker/db.js` | SQLite connection pool with WAL mode + FTS5 indexes; handles schema migration and snapshots | NEW |
+| `worker/chroma-sync.js` | Optional async ChromaDB sync; gracefully skips if ChromaDB unavailable | NEW |
+| `worker/web/` | Static D3.js graph UI assets served by http-server.js | NEW |
+| `scripts/worker-start.sh` | Shell wrapper: reads config, checks if worker already running (via PID file), starts Node.js worker if not | NEW |
+| `scripts/worker-stop.sh` | Shell wrapper: reads PID file, kills worker process, removes `.allclear/worker.pid` | NEW |
+| `scripts/session-start.sh` | Modified: after existing context injection, check if `impact-map` section in config and auto-start worker | MODIFIED |
+| `.allclear/impact-map.db` | SQLite primary storage for all scan data (lives in the consuming project repo, not the plugin) | NEW (project-side) |
+| `.allclear/worker.pid` | PID of the running worker process; used by scripts to detect and stop the worker | NEW (project-side) |
+| `.allclear/worker.port` | Port the worker is currently listening on; written at startup, read by commands | NEW (project-side) |
+| `lib/worker-client.sh` | Bash library: reads `.allclear/worker.port`, provides `worker_call()` helper for HTTP requests from shell commands | NEW |
+| `allclear.config.json` | Extended with `impact-map` section (`port`, `history`, `chroma`); presence of section triggers worker auto-start | MODIFIED (schema) |
 
-## Recommended Project Structure
+---
+
+## Recommended Project Structure (v2.0 additions)
 
 ```
 allclear/
 ├── .claude-plugin/
-│   └── plugin.json               # Plugin manifest (name, version, description, license)
+│   └── plugin.json                   # Plugin manifest (unchanged)
 │
-├── skills/
-│   ├── quality-gate/
-│   │   └── SKILL.md              # /allclear — run all quality checks for detected project type
-│   ├── cross-impact/
-│   │   └── SKILL.md              # /allclear impact — scan sibling repos for breaking changes
-│   ├── drift/
-│   │   └── SKILL.md              # /allclear drift — check consistency across sibling repos
-│   ├── pulse/
-│   │   └── SKILL.md              # /allclear pulse — live service health via kubectl
-│   └── deploy-verify/
-│       └── SKILL.md              # /allclear deploy — verify deploy state
+├── .mcp.json                         # NEW: MCP server registration
+│
+├── commands/
+│   ├── cross-impact.md               # MODIFIED: worker-aware + legacy fallback
+│   ├── deploy-verify.md              # unchanged
+│   ├── drift.md                      # unchanged
+│   ├── map.md                        # NEW: /allclear:map command
+│   ├── pulse.md                      # unchanged
+│   └── quality-gate.md               # unchanged
+│
+├── worker/                           # NEW: Node.js worker process
+│   ├── index.js                      # Entry point: starts http-server + optionally mcp-server
+│   ├── http-server.js                # Express HTTP + D3 UI serving
+│   ├── mcp-server.js                 # MCP stdio server (separate entry from HTTP)
+│   ├── scan-manager.js               # Agent spawning + findings collection
+│   ├── query-engine.js               # SQLite queries + FTS5 + breaking change detection
+│   ├── db.js                         # Database connection, WAL mode, schema, migrations
+│   ├── chroma-sync.js                # Optional ChromaDB sync
+│   └── web/                          # D3.js graph UI static assets
+│       ├── index.html
+│       ├── graph.js
+│       └── styles.css
 │
 ├── hooks/
-│   └── hooks.json                # Declares PreToolUse, PostToolUse, SessionStart bindings
+│   └── hooks.json                    # unchanged
 │
 ├── scripts/
-│   ├── format.sh                 # PostToolUse: auto-format edited file (non-blocking)
-│   ├── lint.sh                   # PostToolUse: auto-lint edited file (non-blocking)
-│   ├── file-guard.sh             # PreToolUse: block writes to sensitive paths (blocking)
-│   └── session-start.sh          # SessionStart: inject project/sibling repo context
+│   ├── drift-common.sh               # unchanged
+│   ├── drift-openapi.sh              # unchanged
+│   ├── drift-types.sh                # unchanged
+│   ├── drift-versions.sh             # unchanged
+│   ├── file-guard.sh                 # unchanged
+│   ├── format.sh                     # unchanged
+│   ├── impact.sh                     # unchanged (legacy grep fallback)
+│   ├── lint.sh                       # unchanged
+│   ├── pulse-check.sh                # unchanged
+│   ├── session-start.sh              # MODIFIED: worker auto-start check
+│   ├── worker-start.sh               # NEW: start Node.js worker
+│   └── worker-stop.sh                # NEW: stop Node.js worker
 │
 ├── lib/
-│   ├── detect.sh                 # Shared: detect project type from manifest files
-│   └── siblings.sh               # Shared: discover sibling repos from parent dir or config
+│   ├── config.sh                     # unchanged
+│   ├── detect.sh                     # unchanged
+│   ├── linked-repos.sh               # unchanged
+│   └── worker-client.sh              # NEW: bash HTTP client for worker API
+│
+├── skills/
+│   └── quality-gate/
+│       └── SKILL.md                  # unchanged
 │
 ├── tests/
-│   ├── format.bats
-│   ├── lint.bats
-│   ├── file-guard.bats
-│   ├── session-start.bats
-│   └── detect.bats
+│   ├── (existing bats tests)
+│   ├── worker-start.bats             # NEW
+│   ├── worker-stop.bats              # NEW
+│   └── worker-client.bats            # NEW
 │
 ├── bin/
-│   └── allclear-init.js          # npx @allclear/cli init — installs plugin into Claude Code
+│   └── allclear-init.js              # unchanged (no Node.js server dep at install time)
 │
-├── package.json                  # npm package: name="@allclear/cli", bin="bin/allclear-init.js"
-├── allclear.config.json.example  # Documented example of optional project config
-├── LICENSE                       # Apache 2.0
+├── package.json                      # MODIFIED: add worker dependencies
+├── allclear.config.json.example      # MODIFIED: add impact-map section example
+├── LICENSE
 └── README.md
 ```
 
 ### Structure Rationale
 
-- **skills/ at root:** Official Claude Code convention. Each subdirectory = one skill namespace under `/allclear:<name>`. Files beyond SKILL.md (scripts, references) can live alongside it.
-- **hooks/ at root:** Official location. Claude Code auto-discovers `hooks/hooks.json`. Scripts referenced from hooks.json must use `${CLAUDE_PLUGIN_ROOT}/scripts/...` to survive plugin cache relocation.
-- **scripts/ separate from skills/:** Hook scripts are invoked by the runtime, not loaded as skill content. Keeping them separate from skill directories avoids accidental inclusion as skill supporting files and clarifies the invocation path (runtime shell vs. LLM prompt).
-- **lib/ for shared logic:** detect.sh and siblings.sh are needed by both hook scripts and skill prompts (via shell injection with `!`command``). Centralizing them prevents drift between implementations.
-- **bin/ for npx entry:** Standard npm convention. `package.json` `bin` field points here. The installer runs `claude plugin install allclear@marketplace` or git-clone + symlink depending on detected environment.
-- **tests/ flat:** Bats tests are integration-level; one file per script under test is idiomatic.
+- **worker/ at root:** Keeps all Node.js worker code in one directory, cleanly separated from shell-based scripts/. The MCP server entry (`mcp-server.js`) and HTTP server entry (`http-server.js`) are separate entry points because they have different lifecycles — MCP server is stdio (one process per Claude Code invocation), HTTP server is long-lived daemon.
+- **.mcp.json at root:** Official Claude Code convention. Auto-discovered by Claude Code when plugin loads. Registers the MCP server so it auto-starts with the plugin, making impact tools available to all agents without any user action.
+- **worker/web/ inside worker/:** Static D3.js assets are served by the HTTP server. Keeping them co-located with the server code that serves them avoids path confusion and makes the worker directory self-contained.
+- **scripts/worker-start.sh and worker-stop.sh:** Shell wrappers (not Node.js scripts) for lifecycle management because: (1) session-start.sh is already shell and needs to trigger worker start; (2) `commands/*.md` reference shell scripts for consistency; (3) PID file management is natural in shell.
+- **.allclear/ in the consuming repo:** The database and worker state live where the user's project lives, not in the plugin cache. The plugin cache is immutable after installation. Worker state is per-project, so it belongs in the project.
+- **lib/worker-client.sh:** Shell commands need a consistent way to call the worker API without reimplementing HTTP logic. A shared bash library keeps this DRY and testable.
+
+---
 
 ## Architectural Patterns
 
-### Pattern 1: Hook Script communicates via JSON on stdout
+### Pattern 1: MCP Server as stdio Subprocess (Plugin-Registered)
 
-**What:** Every hook script reads Claude Code's event JSON from stdin, does its work, and writes a JSON decision object to stdout. Claude Code reads this output to decide whether to block the action, inject context, or show a message to the user.
+**What:** The `.mcp.json` file registers `worker/mcp-server.js` as a stdio MCP server. Claude Code spawns it as a child process when the plugin loads. The server communicates via stdin/stdout using the MCP JSON-RPC protocol. It reads from the SQLite database and exposes 5 tools to all Claude agents in the session.
 
-**When to use:** All four hooks (format, lint, file-guard, session-start) follow this pattern.
+**When to use:** For capabilities that all Claude agents (not just the user-invoked commands) should have access to automatically. Impact analysis is exactly this use case — any agent making changes should be able to check impact without the user invoking a command.
 
-**Trade-offs:** Requires understanding the JSON protocol per event type. Benefit: hooks compose cleanly and the contract is explicit. Failure to parse stdin should always exit 0 (allow) to avoid blocking Claude.
+**Trade-offs:** MCP server must never write to stdout for anything other than MCP protocol messages. Logging must go to stderr or a log file. The server starts with every Claude Code session when the plugin is enabled, so it must start quickly and fail gracefully if `.allclear/impact-map.db` does not exist.
 
-**Example (PostToolUse lint hook, non-blocking):**
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-INPUT=$(cat)  # read stdin once
-FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
-
-if [[ -z "$FILE" || ! -f "$FILE" ]]; then
-  exit 0  # nothing to lint
-fi
-
-# source shared detection
-source "${CLAUDE_PLUGIN_ROOT}/lib/detect.sh"
-LANG=$(detect_language "$FILE")
-
-if ! run_lint "$LANG" "$FILE" 2>/tmp/allclear_lint_err; then
-  MSG=$(cat /tmp/allclear_lint_err | head -20)
-  printf '{"systemMessage": "AllClear lint: %s"}' "$(echo "$MSG" | jq -Rs .)"
-fi
-# exit 0 always — PostToolUse can't block, so non-blocking warning only
-exit 0
+**Configuration in `.mcp.json`:**
+```json
+{
+  "mcpServers": {
+    "allclear-impact": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/worker/mcp-server.js"],
+      "env": {
+        "ALLCLEAR_DB_PATH": ".allclear/impact-map.db"
+      }
+    }
+  }
+}
 ```
 
-### Pattern 2: PreToolUse File Guard (blocking)
+**Key constraint:** `ALLCLEAR_DB_PATH` must be relative to the working directory (the user's project), not the plugin root. The MCP server reads the DB from the project being worked on, not from the plugin itself.
 
-**What:** PreToolUse hooks can deny a tool call by exiting with code 2. The file-guard hook checks the target path against a deny list and blocks writes to sensitive files.
+### Pattern 2: HTTP Worker as Shell-Managed Daemon (PID File)
 
-**When to use:** Only PreToolUse supports blocking. PostToolUse is reactive and cannot prevent execution.
+**What:** The Node.js HTTP server (`worker/http-server.js`) runs as a background daemon, started and stopped by shell scripts using a PID file in `.allclear/worker.pid`. The shell command reads the PID file to check if the worker is running before starting a new instance.
 
-**Trade-offs:** Effective protection, but must be carefully tuned to avoid false blocks. The deny list should be configurable via allclear.config.json.
+**When to use:** For long-lived state (SQLite writes, ChromaDB sync, web UI serving) that needs to persist across multiple command invocations within a working session. The worker is project-scoped — one worker per project, not one per Claude Code session.
 
-**Example (PreToolUse file-guard, blocking):**
+**Trade-offs:** PID files can go stale if the process crashes. Worker start scripts must handle stale PIDs by checking if the PID is actually alive (`kill -0 $PID`) before deciding the worker is running.
+
+**Worker start pattern (`scripts/worker-start.sh`):**
 ```bash
 #!/usr/bin/env bash
-INPUT=$(cat)
-FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+DB_DIR=".allclear"
+PID_FILE="${DB_DIR}/worker.pid"
+PORT_FILE="${DB_DIR}/worker.port"
 
-DENY_PATTERNS=('.env' '.env.*' '*.pem' '*.key' 'secrets.*' 'credentials.*')
+mkdir -p "$DB_DIR"
 
-for pat in "${DENY_PATTERNS[@]}"; do
-  if [[ "$(basename "$FILE")" == $pat ]]; then
-    echo "AllClear: blocked write to sensitive file: $FILE" >&2
-    exit 2  # deny the tool call
+# Check for live worker (stale PID guard)
+if [[ -f "$PID_FILE" ]]; then
+  PID=$(cat "$PID_FILE")
+  if kill -0 "$PID" 2>/dev/null; then
+    exit 0  # already running
   fi
-done
-exit 0
+  rm -f "$PID_FILE"  # stale PID
+fi
+
+# Read port from config (default 37888)
+PORT=$(jq -r '."impact-map".port // 37888' allclear.config.json 2>/dev/null || echo 37888)
+
+# Start worker in background
+node "${PLUGIN_ROOT}/worker/http-server.js" \
+  --port "$PORT" \
+  --db "${DB_DIR}/impact-map.db" \
+  --port-file "$PORT_FILE" \
+  >/dev/null 2>&1 &
+echo $! > "$PID_FILE"
 ```
 
-### Pattern 3: Skills as Orchestration Prompts
+### Pattern 3: Command-to-Worker Communication via Shell HTTP Client
 
-**What:** Each skill's SKILL.md is not a library — it is a prompt that tells Claude *what to do* when invoked. Skills can use `!`command`` to inject live shell output (current branch, project type, detected sibling repos) before Claude sees the prompt. Skills reference scripts in their own directory for complex logic.
+**What:** Shell-based commands (`commands/*.md`) need to query the worker API. Rather than embedding curl calls in every command markdown file, a shared bash library (`lib/worker-client.sh`) provides `worker_call()` and `worker_running()` helpers. Commands source this library via shell injection.
 
-**When to use:** All five quality-gate skills use this pattern. The prompt describes the check, the detection logic lives in lib/, and skill scripts handle heavy lifting.
+**When to use:** Any command that needs to check worker status or query the impact map.
 
-**Trade-offs:** Skills are LLM-executed, not deterministic shell. This is correct for quality-gate reporting (summarization, cross-repo reasoning) but wrong for the hook layer (format/lint must run deterministically). Keep these concerns separated.
+**Trade-offs:** Adds a curl dependency for shell commands (curl is universally available). Abstracts port discovery (reads `.allclear/worker.port`) from individual commands.
 
-**Example (quality-gate SKILL.md frontmatter):**
-```yaml
----
-name: quality-gate
-description: Run all quality checks for this project. Use when the user invokes /allclear, asks to run quality checks, or wants to verify code before commit.
-disable-model-invocation: true
-allowed-tools: Bash
-argument-hint: "[scope]"
----
+**Library pattern (`lib/worker-client.sh`):**
+```bash
+worker_running() {
+  local port_file=".allclear/worker.port"
+  [[ -f "$port_file" ]] || return 1
+  local port; port=$(cat "$port_file")
+  curl -s --max-time 1 "http://localhost:${port}/health" >/dev/null 2>&1
+}
 
-Run quality checks for this project.
-
-Project type: !`source ${CLAUDE_SKILL_DIR}/../../lib/detect.sh && detect_project_type .`
-
-## Steps
-1. Run tests (detect runner from project type above)
-2. Run linter (detect from project type)
-3. Run type checker if applicable
-4. Report results: pass/fail per check with counts
+worker_call() {
+  local endpoint="$1"; shift
+  local port; port=$(cat ".allclear/worker.port" 2>/dev/null) || return 1
+  curl -sf --max-time 5 "http://localhost:${port}${endpoint}" "$@"
+}
 ```
 
-### Pattern 4: Shared Library sourced by both hooks and skills
+### Pattern 4: SessionStart Hook with Conditional Worker Auto-Start
 
-**What:** `lib/detect.sh` and `lib/siblings.sh` are bash libraries that hook scripts source directly (`source "${CLAUDE_PLUGIN_ROOT}/lib/detect.sh"`) and that skills reference via `!`...`` shell injection. This is the single source of truth for project detection and sibling repo discovery.
+**What:** The existing `session-start.sh` hook is modified to detect the `impact-map` section in `allclear.config.json`. If present and the worker is not already running, it starts the worker as a background process before injecting session context. The hook must remain non-blocking (exit 0 always, 10s timeout constraint).
 
-**When to use:** Any time two components (hook + skill, or two skills) need the same detection logic.
+**When to use:** Auto-start on session open when the user has opted in to impact intelligence (presence of `impact-map` section in config = opt-in signal per design doc).
 
-**Trade-offs:** Shell libraries have no type system. Keep them small and focused. Test them independently with Bats.
+**Trade-offs:** Worker startup adds latency to `session-start.sh`. Mitigation: start the worker in background (`node ... &`), don't wait for it to be ready. The hook's job is to fire the worker, not confirm it started. The first command that needs the worker checks health before calling the API.
+
+**Modified section in `session-start.sh`:**
+```bash
+# Auto-start worker if impact-map section present in config
+if jq -e '."impact-map"' allclear.config.json >/dev/null 2>&1; then
+  bash "${PLUGIN_ROOT}/scripts/worker-start.sh" 2>/dev/null || true
+  CONTEXT="${CONTEXT} Impact map available: /allclear:cross-impact, /allclear:map."
+fi
+```
+
+### Pattern 5: Graceful Degradation in cross-impact.md
+
+**What:** The redesigned `cross-impact` command checks three conditions in sequence: (1) is the worker running? (2) does the impact map have data? The command falls back to legacy grep-based scan if the worker is absent, and suggests `/allclear:map` if the worker is running but no data exists.
+
+**When to use:** Required for the v2.0 design's graceful degradation table (see design doc).
+
+**Trade-offs:** More complex command logic, but essential for backwards compatibility — users who have v2.0 installed but haven't run `/allclear:map` yet must not experience a broken cross-impact command.
+
+---
 
 ## Data Flow
 
-### Skill Invocation Flow
+### Map Build Flow (`/allclear:map`)
 
 ```
-User types /allclear (or Claude auto-invokes)
+User invokes /allclear:map
     |
     v
-Claude Code loads skills/quality-gate/SKILL.md into context
+commands/map.md: read config, discover linked repos, present to user
     |
     v
-!`command` injections execute (detect project type, sibling repos)
+User confirms repo list → saved to allclear.config.json
     |
     v
-Claude receives rendered prompt with live data
+map.md: ensure worker running → bash ${CLAUDE_PLUGIN_ROOT}/scripts/worker-start.sh
     |
     v
-Claude invokes Bash tool to run linter/test/formatter
+map.md: POST /scan to worker HTTP API → scan-manager.js
     |
     v
-Claude synthesizes results and reports to user
+scan-manager.js: spawns Claude agents into each linked repo
+    |
+    v
+Agents analyze codebase → return findings (services, connections, schemas)
+    |
+    v
+map.md: receives findings, presents ALL to user for confirmation
+    |
+    v
+User confirms → map.md: POST /scan/confirm to worker with confirmed findings
+    |
+    v
+db.js: snapshot existing DB (if history=true) → write new findings to SQLite
+    |
+    v
+chroma-sync.js: async vector sync (if ChromaDB available) — does not block response
+    |
+    v
+map.md: open browser to http://localhost:PORT for D3 graph UI
 ```
 
-### Hook Execution Flow (PostToolUse format/lint)
+### MCP Impact Query Flow (agent-invoked)
 
 ```
-Claude calls Write or Edit tool on a file
+Claude agent decides to check impact before making a change
     |
     v
-Claude Code fires PostToolUse event
+Agent calls MCP tool: impact_changed (or impact_query)
     |
     v
-scripts/format.sh receives stdin JSON: {tool_name, tool_input: {file_path, ...}}
+mcp-server.js receives tool call via stdio MCP protocol
     |
     v
-lib/detect.sh detects language from file extension + project manifest
+query-engine.js: reads .allclear/impact-map.db via better-sqlite3
     |
     v
-Formatter/linter runs on file_path
+Recursive CTE query: walks connection graph transitively
     |
-    |-- success --> exit 0 (silent)
-    |-- failure --> stdout JSON {systemMessage: "..."} + exit 0 (non-blocking warn)
+    v
+Results classified: CRITICAL (removed endpoint) / WARN (schema change) / INFO (additive)
+    |
+    v
+mcp-server.js: returns structured result to agent via MCP protocol
+    |
+    v
+Agent incorporates impact assessment into its response
 ```
 
-### Hook Execution Flow (PreToolUse file-guard)
+### Worker Lifecycle Flow
 
 ```
-Claude calls Write/Edit/MultiEdit tool
+Claude Code session starts
     |
     v
-Claude Code fires PreToolUse event
+hooks/hooks.json: fires session-start.sh
     |
     v
-scripts/file-guard.sh receives stdin JSON: {tool_name, tool_input: {file_path}}
+session-start.sh: detects impact-map in allclear.config.json?
+    |-- No  → skip worker start, no change to context
+    |-- Yes → scripts/worker-start.sh (background, non-blocking)
+                |
+                v
+              Check .allclear/worker.pid — stale? alive?
+                |-- Alive → exit 0 (already running)
+                |-- Absent/stale → start Node.js, write PID + port files
     |
-    |-- safe path  --> exit 0 (allow)
-    |-- denied path --> stderr message + exit 2 (BLOCK — tool call denied)
+    v
+session-start.sh: includes impact commands in context string
+    |
+    v
+Worker runs until: session ends, user runs worker-stop, process killed
 ```
 
-### SessionStart Context Injection Flow
+### D3 Web UI Asset Serving
 
 ```
-Claude Code session begins
+User runs /allclear:map --view (or first map build completes)
     |
     v
-scripts/session-start.sh fires (no file_path — scans cwd)
+map.md: verify worker running + map data exists
     |
     v
-lib/detect.sh detects project type in cwd
-lib/siblings.sh discovers sibling repos from ../
+map.md: open browser → http://localhost:PORT/
     |
     v
-stdout JSON: {additionalContext: "Project: TypeScript\nSiblings: [api, ui, sdk]"}
+http-server.js: serves worker/web/index.html as static file
     |
     v
-Claude receives this context injected into session start
+Browser loads D3.js, calls GET /graph to fetch dependency data
+    |
+    v
+http-server.js: routes /graph to query-engine.js → SQLite query
+    |
+    v
+Returns JSON graph: {nodes: [...services], edges: [...connections]}
+    |
+    v
+D3.js renders interactive force-directed graph
 ```
 
-### npx Installer Flow
+---
+
+## Integration Points
+
+### New Component Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `commands/map.md` → `scripts/worker-start.sh` | Shell script invocation via Bash tool | Command ensures worker running before scan |
+| `commands/map.md` → worker HTTP API | `curl` via `lib/worker-client.sh` helper | POST /scan, POST /scan/confirm, GET /versions |
+| `commands/cross-impact.md` → `lib/worker-client.sh` | Shell source | worker_running() and worker_call() helpers |
+| `commands/cross-impact.md` → `scripts/impact.sh` | Shell script invocation (fallback only) | Legacy grep scan when no worker/map |
+| `.mcp.json` → `worker/mcp-server.js` | Claude Code spawns as stdio MCP subprocess | Auto-starts with plugin; communicates via MCP protocol |
+| `scripts/session-start.sh` → `scripts/worker-start.sh` | Shell script invocation | Auto-start trigger; non-blocking (background) |
+| `worker/mcp-server.js` → `worker/query-engine.js` | Direct Node.js module import | Same process; no IPC needed |
+| `worker/http-server.js` → `worker/query-engine.js` | Direct Node.js module import | Same process |
+| `worker/query-engine.js` → SQLite | `better-sqlite3` synchronous API | WAL mode enabled; FTS5 virtual tables for search |
+| `worker/chroma-sync.js` → ChromaDB | HTTP client to `localhost:8000` (or configured host) | Async, non-blocking; absence = graceful skip |
+| Worker process → `.allclear/impact-map.db` | File system (project repo) | DB lives in project, not plugin cache |
+| Worker process → `.allclear/worker.pid` | File system | Written at start; read by worker-start.sh for dedup |
+| Worker process → `.allclear/worker.port` | File system | Written at startup; read by lib/worker-client.sh |
+
+### Modified Existing Boundaries
+
+| Boundary | What Changes | Why |
+|----------|-------------|-----|
+| `hooks/hooks.json` → `scripts/session-start.sh` | session-start.sh adds worker auto-start | Worker must start early; session hook is the right trigger |
+| `commands/cross-impact.md` → `scripts/impact.sh` | No longer primary path; becomes fallback | v2.0 uses worker API; grep remains for graceful degradation |
+| `allclear.config.json` schema | Add `impact-map` section | Worker config (port, history, ChromaDB settings) |
+| `package.json` | Add Node.js worker dependencies | `better-sqlite3`, `express`, `@modelcontextprotocol/sdk` |
+
+### External Service Integrations
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| ChromaDB | HTTP client from `worker/chroma-sync.js` to configured host:port | Optional; skip gracefully if not available; never block on it |
+| SQLite | `better-sqlite3` embedded in worker process | No separate process; DB file lives in project repo |
+| Claude agents (scan) | `scan-manager.js` spawns agents into each linked repo | Agent-based scanning; no external tools (tree-sitter, etc.) |
+| D3.js (web UI) | Bundled static assets in `worker/web/` | No CDN; fully offline; served by HTTP worker |
+
+---
+
+## Build Order (v2.0 Phases)
+
+Dependencies determine phase ordering. The MCP server must be buildable and testable independently of the HTTP server and scan manager.
 
 ```
-Developer runs: npx @allclear/cli init
-    |
-    v
-bin/allclear-init.js checks for claude binary in PATH
-    |
-    v
-Detect install preference:
-  - Marketplace: claude plugin install allclear@official
-  - Git+symlink: git clone → ln -s plugin/ ~/.claude/plugins/allclear
-    |
-    v
-Write .claude/settings.json enabledPlugins entry (project scope)
-    |
-    v
-Print confirmation + /allclear:quality-gate usage hint
+Phase A — Storage Foundation (no dependencies):
+  worker/db.js                ← SQLite schema, WAL mode, FTS5 indexes, migrations
+  worker/query-engine.js      ← All read/write queries; depends only on db.js
+  (Tests: query accuracy, recursive CTEs, FTS5 search)
+
+Phase B — Worker Lifecycle (depends on: shell scripts, PID/port file pattern):
+  scripts/worker-start.sh     ← Start daemon, write PID + port files
+  scripts/worker-stop.sh      ← Stop daemon, clean up PID + port files
+  lib/worker-client.sh        ← Shell HTTP client helpers
+  (Tests: start/stop/stale-PID/already-running cases)
+
+Phase C — MCP Server (depends on Phase A):
+  worker/mcp-server.js        ← stdio MCP server; 5 tools; reads from query-engine
+  .mcp.json                   ← Plugin registration for Claude Code
+  (Tests: MCP tool responses, no-DB graceful fallback)
+
+Phase D — HTTP Server + Web UI (depends on Phase A):
+  worker/http-server.js       ← Express routes: /graph, /impact, /service, /scan, /versions
+  worker/web/                 ← D3.js UI static assets
+  (Tests: REST API response shapes, D3 data contract)
+
+Phase E — Scan Manager (depends on Phase A, D):
+  worker/scan-manager.js      ← Agent orchestration, findings collection
+  worker/chroma-sync.js       ← Optional async ChromaDB sync
+  (Tests: mock agent responses, confirm/reject flow, snapshot creation)
+
+Phase F — Command Layer (depends on Phases B, C, D, E):
+  commands/map.md             ← /allclear:map: discovery → scan → confirm → persist → UI
+  commands/cross-impact.md    ← MODIFIED: worker-aware + legacy fallback path
+  (Tests: command flows with mocked worker API)
+
+Phase G — Session Hook Integration (depends on Phase B):
+  scripts/session-start.sh    ← MODIFIED: add worker auto-start conditional
+  (Tests: session hook with/without impact-map in config)
+
+Phase H — End-to-End Tests (depends on all phases):
+  Bats integration tests for complete scan + query flow
+  Manual smoke test: /allclear:map on real repo, verify D3 UI
 ```
+
+**Critical path:** Phase A (storage) → Phase C (MCP server) → Phase F (commands). Everything else can be built in parallel once Phase A is done.
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Running the Worker Inside a Hook Script
+
+**What people do:** Start the Node.js worker process as a synchronous child in `session-start.sh` and wait for it to be ready.
+
+**Why it's wrong:** Hooks have a hard 10-second timeout. Node.js + SQLite startup (especially on first run with schema creation) can exceed this. A blocking hook start will time out and fail, leaving the worker not started and producing a confusing error in the session.
+
+**Do this instead:** Fire `node worker/http-server.js ... &` (background) from the hook. Write the PID file immediately. The first command that needs the worker calls `worker_running()` from `lib/worker-client.sh`, which polls with a short timeout (e.g., 3 retries at 500ms) to wait for the worker to be actually ready before calling the API.
+
+### Anti-Pattern 2: Putting the SQLite DB in the Plugin Cache
+
+**What people do:** Use `${CLAUDE_PLUGIN_ROOT}/.allclear/impact-map.db` for the database path.
+
+**Why it's wrong:** The plugin cache is immutable after installation. Writes will fail with a permission error or silently be lost on plugin update. Worse, the DB would be shared across all projects using the plugin, which breaks the per-project design.
+
+**Do this instead:** The DB always lives in `.allclear/` relative to the project's working directory (the repo where `/allclear:map` was invoked). The MCP server receives `ALLCLEAR_DB_PATH` as an environment variable resolved from the project CWD at startup time.
+
+### Anti-Pattern 3: MCP Server Writing to stdout for Logging
+
+**What people do:** Add `console.log()` debug statements in `mcp-server.js` for troubleshooting.
+
+**Why it's wrong:** The MCP stdio transport uses stdout exclusively for JSON-RPC messages. Any non-MCP output on stdout corrupts the protocol, causing Claude Code to silently drop the connection or produce JSON parse errors.
+
+**Do this instead:** All logging in `mcp-server.js` must go to stderr: `console.error()`. Use a log level flag controlled by an environment variable (e.g., `ALLCLEAR_MCP_DEBUG=1`). The HTTP server has no such constraint and can log freely.
+
+### Anti-Pattern 4: One Port Hardcoded for All Projects
+
+**What people do:** Hardcode port 37888 everywhere and skip the `worker.port` file.
+
+**Why it's wrong:** If a user is running two projects simultaneously (common for multi-repo work), both workers bind to the same port. The second worker silently fails to start, and commands in that project hit the wrong worker's data.
+
+**Do this instead:** Port is configured per-project in `allclear.config.json` (default 37888 but overridable). The worker writes its actual bound port to `.allclear/worker.port` at startup. All shell commands read this file for the port, not the config. This also handles port collision: if 37888 is taken, the worker can try the next port and write that to the port file.
+
+### Anti-Pattern 5: Blocking the Scan on ChromaDB Availability
+
+**What people do:** Make the scan flow synchronous: scan → write SQLite → sync ChromaDB → return success.
+
+**Why it's wrong:** ChromaDB sync is slow and optional. Making `/allclear:map` wait for ChromaDB makes the common case (ChromaDB not running) feel broken. The design doc is explicit that SQLite is the source of truth.
+
+**Do this instead:** ChromaDB sync is always async. After confirmed findings are written to SQLite, fire `chroma-sync.js` in the background. The map command returns success immediately after SQLite write. ChromaDB sync completion is not reported unless there's an error.
+
+---
 
 ## Scaling Considerations
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| Single-repo | All features work; cross-impact and drift skip gracefully if no siblings |
-| 5-10 sibling repos | lib/siblings.sh scans parent dir; session-start context may grow large; cap sibling count at 10 |
-| 50+ repos (monorepo-style) | allclear.config.json explicit list becomes required; auto-discovery too slow for SessionStart hook (10s timeout) |
+| 2-5 linked repos | Default configuration works; single SQLite file; single worker per project |
+| 5-15 linked repos | Incremental scan (git diff) becomes important; full re-scan is slow; FTS5 search adequate |
+| 15-50 repos (large monorepo) | ChromaDB vector search strongly recommended for semantic queries; SQLite FTS5 may struggle with very large graphs; consider SQLite WAL checkpoint interval tuning |
+| Multiple simultaneous projects | Each project has its own `.allclear/` dir and worker on its own port; no sharing between projects |
 
 ### Scaling Priorities
 
-1. **First bottleneck:** SessionStart hook timing. Claude Code enforces a timeout on hooks. With many siblings, the context injection script must complete quickly. Mitigation: cap sibling scan depth, cache detected project types in a temp file per session.
-2. **Second bottleneck:** Format/lint hook latency on large files. PostToolUse runs synchronously before Claude continues. Keep hooks fast (< 5s) by running only the formatter for the specific file, not the whole project.
+1. **First bottleneck:** Full scan latency. Scanning 10+ repos with agent-based analysis is slow. Incremental scan (Phase A: check `repo_state` table for last scanned commit) must be working before the product is usable for large setups.
+2. **Second bottleneck:** Graph query performance on large maps. Recursive CTEs with hundreds of services and thousands of connections can be slow. Ensure indexes on `connections.source_service_id`, `connections.target_service_id`, and `services.name` are created in Phase A.
 
-## Anti-Patterns
-
-### Anti-Pattern 1: Putting format/lint logic inside SKILL.md
-
-**What people do:** Write a skill prompt that tells Claude to run formatters after editing.
-
-**Why it's wrong:** Skills are LLM-executed — Claude decides when to invoke them. Hooks are runtime-executed — they fire deterministically on every matching tool call. Format/lint must be hooks, not skills, to guarantee they run on every edit.
-
-**Do this instead:** Put format and lint in PostToolUse hooks in `hooks/hooks.json`. Use skills only for interactive quality-gate reporting.
-
-### Anti-Pattern 2: Using absolute paths in hooks.json
-
-**What people do:** Write `"command": "/home/user/.claude/plugins/allclear/scripts/format.sh"`.
-
-**Why it's wrong:** The plugin cache copies plugin files to `~/.claude/plugins/cache/<hash>/`. Absolute paths to the original plugin directory break after installation.
-
-**Do this instead:** Always use `${CLAUDE_PLUGIN_ROOT}/scripts/format.sh`. This variable is set by Claude Code to the actual cache location.
-
-### Anti-Pattern 3: Exiting with code 2 in PostToolUse
-
-**What people do:** Exit 2 in a format or lint hook to block Claude after a failed format.
-
-**Why it's wrong:** PostToolUse hooks cannot prevent a tool call — the tool already ran. Exiting 2 produces an error that confuses Claude and may interrupt its workflow. The PROJECT.md constraint "non-blocking hooks" is explicit here.
-
-**Do this instead:** Exit 0 always from PostToolUse. Use `systemMessage` in stdout JSON to surface warnings to the user without blocking.
-
-### Anti-Pattern 4: Duplicating detect logic in each script
-
-**What people do:** Each hook script independently checks for pyproject.toml, Cargo.toml, etc.
-
-**Why it's wrong:** Detection logic drifts. Adding Go support requires touching every script.
-
-**Do this instead:** Centralise in `lib/detect.sh`, source it from every hook script and reference it from skill `!`command`` injections.
-
-### Anti-Pattern 5: Putting plugin.json at the plugin root instead of .claude-plugin/
-
-**What people do:** Place `plugin.json` directly in the plugin root directory.
-
-**Why it's wrong:** Claude Code only recognizes the manifest at `.claude-plugin/plugin.json`. A root-level `plugin.json` is treated as application config (e.g., for an npm package), not as a plugin manifest.
-
-**Do this instead:** Keep `.claude-plugin/plugin.json` for the Claude Code manifest. Keep `package.json` at the root for npm/npx distribution. They coexist without conflict.
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| kubectl | Bash invocation in `scripts/pulse.sh` and `scripts/deploy-verify.sh` | Gracefully skip if kubectl not in PATH; pulse/deploy are optional/advanced per PROJECT.md |
-| git | Bash invocation in all scripts | Required; cross-repo checks clone nothing, operate on local working trees only |
-| npm/npx | bin/allclear-init.js distribution | @allclear/cli published to npm registry; installer is pure Node.js, no build step needed at install time |
-| Claude Plugin Registry | `.claude-plugin/plugin.json` + marketplace.json | Submission via claude.ai/settings/plugins/submit |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| hooks/hooks.json → scripts/*.sh | JSON on stdin via `${CLAUDE_PLUGIN_ROOT}/scripts/` command paths | Scripts must be chmod +x; use `${CLAUDE_PLUGIN_ROOT}` not absolute paths |
-| scripts/*.sh → lib/*.sh | Bash `source` directive | lib/ scripts are libraries, not executables; no shebang required but add one for direct testing |
-| skills/*/SKILL.md → lib/*.sh | Shell injection via `!`source lib/detect.sh && ...`` | CLAUDE_SKILL_DIR points to skill subdirectory; use `../../lib/` relative path or `${CLAUDE_PLUGIN_ROOT}/lib/` |
-| bin/allclear-init.js → Claude Code CLI | Child process spawn of `claude plugin install` | Falls back to git clone if claude binary not found |
-| allclear.config.json → lib/siblings.sh, lib/detect.sh | File read at runtime | Optional; absence = auto-detect; presence = overrides |
-
-## Build Order Implications
-
-Dependencies determine which components can be built independently vs. which require prior components:
-
-```
-Phase 1 (Foundation — no dependencies):
-  lib/detect.sh       ← nothing depends on this existing first, but everything else needs it
-  lib/siblings.sh     ← same
-  .claude-plugin/plugin.json  ← pure metadata
-
-Phase 2 (Hooks — depend on lib/):
-  scripts/file-guard.sh   ← needs lib/detect.sh for language context
-  scripts/format.sh       ← needs lib/detect.sh
-  scripts/lint.sh         ← needs lib/detect.sh
-  scripts/session-start.sh ← needs lib/detect.sh + lib/siblings.sh
-  hooks/hooks.json         ← wires events to scripts; build last in this phase
-
-Phase 3 (Skills — depend on lib/, can reference scripts/):
-  skills/quality-gate/SKILL.md   ← needs lib/detect.sh for !`injection`
-  skills/cross-impact/SKILL.md   ← needs lib/siblings.sh
-  skills/drift/SKILL.md          ← needs lib/siblings.sh
-  skills/pulse/SKILL.md          ← standalone (kubectl optional)
-  skills/deploy-verify/SKILL.md  ← standalone (kubectl optional)
-
-Phase 4 (Tests — depend on all scripts):
-  tests/*.bats        ← test each script in isolation with mocked stdin
-
-Phase 5 (Distribution — wraps everything):
-  package.json        ← npm package metadata
-  bin/allclear-init.js ← installer; build after plugin is verified working
-```
+---
 
 ## Sources
 
 - Claude Code Plugins Reference (official): https://code.claude.com/docs/en/plugins-reference
-- Claude Code Skills Reference (official): https://code.claude.com/docs/en/skills
-- Claude Code Hooks Reference (official): https://code.claude.com/docs/en/hooks
-- Claude Code Plugin Creation Guide (official): https://code.claude.com/docs/en/plugins
-- hookify plugin (official marketplace, live example): `/Users/ravichillerega/.claude/plugins/marketplaces/claude-plugins-official/plugins/hookify/`
-- example-plugin (official marketplace, canonical reference): `/Users/ravichillerega/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin/`
-- thedotmack/openclaw (live npx installer example): `/Users/ravichillerega/.claude/plugins/marketplaces/thedotmack/`
+- MCP server plugin registration (official docs, `.mcp.json` convention): https://code.claude.com/docs/en/plugins-reference#mcp-servers
+- Claude Code MCP documentation: https://code.claude.com/docs/en/mcp
+- MCP Build Server guide: https://modelcontextprotocol.io/docs/develop/build-server
+- better-sqlite3 WAL mode and concurrency: https://github.com/WiseLibs/better-sqlite3
+- SQLite WAL documentation: https://sqlite.org/wal.html
+- ChromaDB client-server mode: https://docs.trychroma.com/docs/run-chroma/client-server
+- AllClear v2.0 design document: `.planning/designs/cross-impact-v2.md`
+- AllClear v1.0 codebase (inspected directly): `scripts/`, `hooks/`, `lib/`, `commands/`
 
 ---
-*Architecture research for: Claude Code plugin (AllClear — quality gates, hooks, CLI installer)*
+*Architecture research for: AllClear v2.0 Service Dependency Intelligence integration*
 *Researched: 2026-03-15*

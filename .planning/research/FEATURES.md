@@ -1,192 +1,230 @@
 # Feature Research
 
-**Domain:** Claude Code plugin — developer quality automation for multi-repo polyglot teams
+**Domain:** Claude Code plugin — service dependency intelligence for multi-repo polyglot teams (v2.0 milestone)
 **Researched:** 2026-03-15
-**Confidence:** HIGH (Claude Code plugin API verified via official docs; ecosystem via multiple confirmed sources)
+**Confidence:** HIGH (design document verified, ecosystem patterns confirmed via multiple sources)
+
+> **Scope note:** This document covers v2.0 new features only. v1.0 features (quality gate, format/lint hooks,
+> file guard, session context, pulse, deploy) are already shipped and are listed here only where they represent
+> dependencies for v2.0 features.
+
+---
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist. Missing these = product feels incomplete.
+Features a service dependency intelligence tool must have. Missing these = the product feels incomplete or
+untrustworthy for its stated purpose.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Auto-format on file write | Every quality tool since 2020 does this; Plankton, Prettier, Black set the expectation | LOW | PostToolUse on Write/Edit matcher; must be non-blocking (warn on failure, never block) |
-| Auto-lint on file write | Same expectation as format; Plankton, Biome, Ruff all do this | LOW | PostToolUse; collect violations as JSON; warn Claude, don't block |
-| Single-command quality gate | `/allclear` must run ALL checks with zero flags; users leave if they must configure per-check | MEDIUM | SKILL.md auto-detects project type via pyproject.toml, Cargo.toml, package.json, go.mod |
-| Project type auto-detection | Zero-config is now the baseline (Biome, Ultracite, Ruff all advertise it); requiring config = friction | MEDIUM | Detect from manifest files; fall back to file extensions; Python/Rust/TS/Go coverage required |
-| Sensitive file guard | Security hooks are now expected in serious quality plugins; sensitive-canary, Safety Net set precedent | MEDIUM | PreToolUse hook; block reads/writes to .env, credentials, secrets; exit code 2 to block |
-| Non-blocking hook behavior | Quality tools must never interrupt the flow of work — warn and continue is the standard | LOW | Exit code 1 = warn only; exit code 2 = block (reserved for hard security stops only) |
-| Installable via standard channels | Plugin registry + git clone are the two paths users check first | LOW | plugin.json manifest, npx @allclear/cli init, git clone + symlink — all three channels |
-| Help and discoverability | Users abandon tools that are hard to discover — discoverability is table stakes per Evil Martians research | LOW | SKILL.md descriptions must be clear; `/allclear` with no args should print usage |
+| Service-to-service dependency graph (stored) | Any dependency intelligence tool must persist its graph; in-memory-only is not queryable by agents | HIGH | SQLite as source of truth; WAL mode for concurrent reads; `repos`, `services`, `connections` tables per design |
+| API-level impact analysis (not symbol grep) | Symbol grep is v1 quality — users building real multi-service systems need endpoint/schema-level analysis | HIGH | `connections` table with protocol, method, path; `fields` table for schema fields; replaces v1 grep approach |
+| Incremental scan (git diff driven) | Full rescans are too slow for daily use; any modern static analysis tool (Aikido, Designite) does incremental by default | HIGH | `repo_state` table tracking last_scanned_commit; git diff since that commit drives what to scan |
+| Graceful fallback to grep when map is absent | Users must not hit a hard error before they have built a map; existing v1 behavior must remain accessible | MEDIUM | `/allclear:cross-impact` checks for worker + map data; falls back to grep-based scan if absent; suggests `/allclear:map` |
+| User confirmation before persisting findings | Agent findings are hypotheses, not facts; persisting unreviewed data breaks trust | MEDIUM | ALL findings presented to user before SQLite write, regardless of agent confidence level; this is a hard requirement per design |
+| Breaking vs additive change classification | Removing an endpoint is categorically different from adding a new field; treating them the same produces false alarm fatigue | MEDIUM | CRITICAL for removed endpoints; WARN for changed field types; INFO for additive fields; drives report severity |
+| Transitive impact traversal | Direct consumers are obvious; transitive consumers (A calls B calls C) are the dangerous blind spot | HIGH | Recursive CTE or BFS graph walk; depth must be bounded; `direction` parameter (upstream/downstream/both) |
+| Worker process start/stop management | A localhost process that doesn't reliably start and stop erodes trust fast | MEDIUM | Presence of `impact-map` section in config implies auto-start; remove section to disable; PID file management |
+| Graph visualization (browser-based) | Every mature dependency tool (Grafana Service Dependency Graph, Port.io, ReSharper dependency diagrams) provides a visual; text-only output is insufficient for graph comprehension | HIGH | D3.js force-directed graph; nodes = services; edges = connections colored by protocol; rendered on `localhost:PORT` |
+| MCP tools for agent use | MCP is the de-facto standard (as of 2025) for connecting agents to tools; not exposing impact data via MCP means agents cannot autonomously query it | HIGH | `impact_query`, `impact_changed`, `impact_graph`, `impact_scan`, `impact_search` per design document |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set the product apart. Not required, but valuable.
+Features that set AllClear v2.0 apart from the few tools that attempt service dependency intelligence.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Cross-repo impact scanning (`/allclear impact`) | No Claude Code plugin addresses multi-repo API break detection; directly solves the Edgeworks Governor/Supervisor removal pain | HIGH | Scan sibling repos for references to changed symbols; auto-detect repos from parent dir; configurable via allclear.config.json |
-| Cross-repo drift detection (`/allclear drift`) | Config and standards drift across repos is invisible until it causes incidents; no current Claude Code plugin addresses this | HIGH | Compare lock files, CI configs, lint rules, key deps across sibling repos; surface deltas |
-| Session start context injection (`/allclear` SessionStart hook) | Primes Claude with multi-repo topology at session start so it makes better decisions throughout; unique to AllClear | MEDIUM | SessionStart hook outputs sibling repo list, modified files, recent cross-repo changes as structured context; known bug: works on /clear/resume but not brand-new sessions — workaround needed |
-| Live service health check (`/allclear pulse`) | Surfaces service health before starting work — prevents wasted effort on broken dependencies; kubectl-aware but gracefully skips without it | MEDIUM | Optional kubectl dependency; graceful skip if not present; check pod readiness, recent restarts, error rates |
-| Deploy state verification (`/allclear deploy`) | Closes the "is my change actually running?" loop without leaving Claude Code; common pain point in k8s teams | MEDIUM | Verify deployed image tags match current git HEAD; diff env vs code; graceful skip without kubectl |
-| Go support | Plankton (the closest competitor) explicitly omits Go; AllClear covers Python, Rust, TypeScript, AND Go — rare in a single tool | MEDIUM | go vet, gofmt, golangci-lint detection via go.mod; adds meaningful differentiation for polyglot teams |
-| Bats test suite for hooks | Hook scripts are shell code — untested shell code rots fast; having a tested plugin is a trust signal in the open-source ecosystem | MEDIUM | bats-core; hooks have deterministic outputs on known inputs; tests run in CI |
-| allclear.config.json override layer | Zero-config default with escape hatch; teams with non-standard layouts (not flat parent-dir) can still use cross-repo features | LOW | Optional config file; override sibling repo paths, exclude repos, customize tool detection |
+| Agent-based scanning (no external parsers) | CodeLogic, Augment Code use language-specific parsers (tree-sitter, stack-graphs) that miss non-standard code; Claude agents read code like a human and handle any language/framework | HIGH | Spawn agents into each linked repo; agents extract endpoints, consumers, events, schemas and return structured findings; no tree-sitter dependency |
+| Protocol-aware connections (REST, gRPC, events, internal) | Most tools model "service calls service"; AllClear models the protocol, making Kafka/RabbitMQ event consumers visible alongside HTTP consumers | HIGH | `protocol` field on `connections` table: rest/grpc/kafka/rabbitmq/internal/sdk; impact analysis considers protocol semantics |
+| Field-level schema tracking | Breaking change tools (oasdiff, Buf) work on OpenAPI/proto files; AllClear discovers schemas from code regardless of whether an OpenAPI spec exists | HIGH | `schemas` and `fields` tables; `required` flag on fields; distinguishes field removal (breaking) from field addition (additive) |
+| Map versioning with snapshot history | Most dependency map tools have no concept of "what changed in the graph since last week"; AllClear snapshots SQLite files | MEDIUM | SQLite file copy to `.allclear/snapshots/`; `map_versions` table tracks metadata; enables graph diff queries |
+| ChromaDB optional semantic search | Keyword search (FTS5) misses "find services that handle user authentication" — semantic search finds them; optional so tool works without it | HIGH | ChromaDB local or remote; falls back to FTS5 if unavailable; falls back to direct SQL if FTS5 unavailable; three-tier fallback chain |
+| Mono-repo and multi-repo unified model | Most tools are mono-repo-only or multi-repo-only; AllClear models services, not repos — a mono-repo with 8 services and 4 separate repos with 2 services each are the same data model | MEDIUM | `repos` table is a container; `services` is the graph node; `repo.type` = mono/single but graph queries ignore this boundary |
+| First-run recommendations for MCP setup | New users don't know to add the MCP server to their Claude Code settings; AllClear prompts on first successful map build | LOW | After first `/allclear:map` completion, output instructions: add `allclear-mcp` to `.claude/settings.json`; one-time only |
+| `/allclear:map --view` shortcut | Users want to open the visualization without triggering a rescan; single flag skips straight to browser open | LOW | `--view` flag exits early if map data exists, opens browser; shows "no data yet" message if map is empty |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create problems.
-
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Issue tracker integration (Linear, GitHub Issues) | Teams want work items linked to quality gates | Adds external service dependency; violates "no external deps" constraint; other plugins (GitHub plugin) already do this better | Keep AllClear scoped to code and infrastructure only; rely on sibling plugins for issue tracking |
-| Blocking hooks for format/lint failures | Developers want hard enforcement | Blocks Claude's edit flow; creates frustrating interruptions when tools are misconfigured or slow; Evil Martians research confirms slow tools are abandoned | Non-blocking by default: warn Claude, let work continue; reserve exit 2 blocking for security stops only (secrets guard) |
-| Per-language configuration files (.allclear-python.json, etc.) | Developers expect to tune every rule | Config sprawl; zero-config is the differentiator; competing with the underlying tools (Ruff, golangci-lint) on config surface is losing battle | Delegate configuration to the underlying tools themselves; AllClear just orchestrates them |
-| CI/CD pipeline integration | Teams want the same checks in CI | Out of scope for a local dev plugin; CI is a separate concern with different tooling (GitHub Actions, CircleCI); duplicating this creates maintenance burden | Focus on local development loop; document how to run the same underlying tools in CI |
-| Monorepo-specific support (Nx, Turborepo, Bazel task graph) | Monorepo teams want build graph awareness | Monorepo orchestrators already solve this; AllClear is for multi-repo teams who explicitly rejected monorepo; trying to support both creates confused UX | Target multi-repo explicitly; if user is already using Nx/Turborepo, AllClear adds limited value there |
-| Real-time file watcher (always-on daemon) | Instant feedback on any file change | Daemons are hard to install, debug, and uninstall; they conflict with Claude Code's own lifecycle; hook-based PostToolUse already fires on every Claude edit | Use PostToolUse hooks — they fire on every Claude write/edit without requiring a daemon |
-| Automatic fix application without user review | One-click "fix everything" appeal | Auto-applying fixes for lint violations beyond formatting (e.g., logic changes) silently alters code semantics; format-only auto-apply is acceptable | Auto-apply formatting (idempotent, safe); present lint violations as warnings for human review |
-| Framework-specific rules (FastAPI validators, Next.js patterns) | Developers want framework intelligence | Tight coupling to frameworks means frequent breakage as frameworks evolve; violates "framework-agnostic" constraint | Detect the framework and run its native linter/validator if one exists; don't embed rules directly |
+| Auto-persist findings without user review | Speed — skip the confirmation step | Agent findings are probabilistic; unreviewed data in the graph silently propagates wrong edges to all downstream impact queries; one bad edge corrupts the whole blast radius calculation | Always present findings to user; make the confirmation fast (show summary for high-confidence, ask questions for low-confidence) — not slow |
+| OpenAPI spec parsing as primary scanner | OpenAPI gives structured schema data reliably | Services without OpenAPI specs (gRPC without reflection, internal SDKs, event producers) are invisible; creates a false "complete" graph that misses connections | Use agent scanning as primary; if an OpenAPI spec is found, use it as supporting evidence to increase confidence, not as the only source |
+| Automatic re-scan on every file edit | Always-fresh graph | A full repo scan after every file save is prohibitively slow; hooks fire synchronously — a slow hook blocks Claude Code | Incremental scan on demand (after git commit range); re-scan suggestion at end of `/allclear:cross-impact` when map is stale |
+| External service catalog integration (Backstage, Port.io) | Teams using Backstage want AllClear to read from it | Adds external service dependency; violates the "no external deps" constraint; Backstage schemas change without notice | Remain self-contained; AllClear's own SQLite is the catalog; document export path for teams wanting to push to Backstage |
+| Git blame / ownership tracking in impact reports | "Who owns the affected service?" is a useful question | Requires GitHub/GitLab API access; violates no-external-deps constraint; ownership data goes stale | Scope to code and file paths only; let users look up owners through their own tooling |
+| Auto-fix of breaking changes | "Just update all consumers for me" is appealing | Auto-updating consumer code is semantically unsafe; Claude making unsupervised changes to multiple repos is high-risk | Surface the affected files and what needs changing; let the user or Claude agent decide per-file with full context |
+| Real-time graph streaming (WebSocket) | Live dependency visualization as code changes | WebSocket server adds significant complexity to the worker; the graph changes slowly (not on every keystroke); polling is sufficient for the use case | HTTP polling on 30s interval from D3 UI; `Last-Modified` header allows efficient conditional requests |
+
+---
 
 ## Feature Dependencies
 
 ```
-[Project type auto-detection]
-    └──required by──> [Auto-format on write]
-    └──required by──> [Auto-lint on write]
-    └──required by──> [/allclear quality gate]
+[Worker process (Node.js, localhost)]
+    └──required by──> [SQLite storage]
+    └──required by──> [HTTP REST API]
+    └──required by──> [MCP server (stdio)]
+    └──required by──> [D3 web UI]
 
-[Cross-repo auto-detection (parent dir scan)]
-    └──required by──> [/allclear impact]
-    └──required by──> [/allclear drift]
-    └──required by──> [Session start context injection]
+[SQLite storage + schema]
+    └──required by──> [Service graph build (/allclear:map)]
+    └──required by──> [Impact query (/allclear:cross-impact)]
+    └──required by──> [MCP tool: impact_query]
+    └──required by──> [MCP tool: impact_changed]
+    └──required by──> [Map versioning / snapshots]
+    └──enhances──> [ChromaDB vector sync (optional)]
 
-[allclear.config.json override layer]
-    └──enhances──> [Cross-repo auto-detection]
-    └──enhances──> [/allclear impact]
-    └──enhances──> [/allclear drift]
+[Agent-based repo scanning]
+    └──required by──> [Service graph build]
+    └──required by──> [Incremental scanning]
+    └──feeds──> [User confirmation flow]
 
-[kubectl availability check]
-    └──gates──> [/allclear pulse]
-    └──gates──> [/allclear deploy]
-    (graceful skip when absent — not a hard dependency)
+[User confirmation flow]
+    └──required by──> [SQLite write (findings persistence)]
+    (hard gate — no writes bypass this)
 
-[Sensitive file guard hook]
-    └──independent──> all other features
-    (PreToolUse — fires regardless of project type)
+[Linked-repos config (v1.0, existing)]
+    └──required by──> [Repo discovery for /allclear:map]
+    └──enhances──> [/allclear:map — skips parent dir scan if config present]
 
-[Bats test suite]
-    └──validates──> [Auto-format hook scripts]
-    └──validates──> [Auto-lint hook scripts]
-    └──validates──> [Sensitive file guard]
-    └──validates──> [Session start hook]
+[Incremental scanning (git diff + repo_state)]
+    └──required by──> [Default scan mode after first map build]
+    └──depends on──> [repo_state table tracking last_scanned_commit]
 
-[/allclear quality gate (single command)]
-    └──composes──> [Auto-format]
-    └──composes──> [Auto-lint]
-    └──composes──> [/allclear impact] (optional, additive)
+[Breaking change classification]
+    └──required by──> [Impact report severity levels (CRITICAL/WARN/INFO)]
+    └──depends on──> [field-level schema tracking]
+
+[Transitive graph traversal]
+    └──required by──> [Full blast radius calculation]
+    └──depends on──> [connections table with source/target service IDs]
+
+[ChromaDB sync (optional)]
+    └──enhances──> [impact_search MCP tool (semantic)]
+    └──enhances──> [/allclear:cross-impact query quality]
+    (graceful skip when unavailable — SQLite + FTS5 fallback)
+
+[MCP server]
+    └──enhances──> [/allclear:cross-impact] (agents can query without manual command)
+    └──enables──> [autonomous agent impact checking before code changes]
 ```
 
 ### Dependency Notes
 
-- **Project type auto-detection is foundational**: The format hook, lint hook, and `/allclear` gate all fail gracefully if detection finds nothing, but they require the detection logic to exist first. This must ship in phase 1.
-- **Cross-repo detection enables three features**: Impact scanning, drift detection, and session start context all share the same sibling repo discovery logic. Build once, reuse across all three.
-- **kubectl is optional, not a dependency**: pulse and deploy skip gracefully when kubectl is absent. This makes them installable for everyone, useful only for k8s teams.
-- **SessionStart hook has a known bug**: As of March 2026, SessionStart hooks do not fire on brand-new sessions (only on /clear, /compact, resume). Context injection must either use UserPromptSubmit as a fallback or document the limitation clearly.
+- **Worker is the load-bearing foundation**: All v2.0 features require the Node.js worker process. It must be phase 1 of the v2.0 build.
+- **SQLite schema locks in the data model**: The `connections`, `schemas`, and `fields` tables must be stable before agents start scanning. Schema migrations are painful post-facto.
+- **User confirmation is a hard gate, not a feature toggle**: Bypassing it for "speed" breaks the trust contract. Build it into the core write path from day one.
+- **Incremental scanning requires repo_state seeded on first full scan**: First scan is always full; subsequent scans use `last_scanned_commit` from `repo_state`. Do not attempt incremental before the first full scan completes.
+- **ChromaDB is optional but the fallback chain must be tested**: Three-tier fallback (ChromaDB → FTS5 → direct SQL) must work correctly; ChromaDB unavailability cannot crash the worker.
+- **MCP server depends on worker being registered in Claude Code settings**: After first map build, recommend user add the MCP server entry. This is a one-time manual step — no way to auto-register.
 
-## MVP Definition
+---
 
-### Launch With (v1)
+## MVP Definition (v2.0)
 
-Minimum viable product — what's needed to validate the concept.
+### Launch With (v2.0 core)
 
-- [ ] Project type auto-detection (pyproject.toml, Cargo.toml, package.json, go.mod) — all other features depend on this
-- [ ] Auto-format hook (PostToolUse, Write/Edit matcher) — highest-frequency value delivery; fires on every edit
-- [ ] Auto-lint hook (PostToolUse, Write/Edit matcher) — paired with format; completes the "every edit is clean" promise
-- [ ] Sensitive file guard (PreToolUse, blocking) — security expectation; absence is a trust issue
-- [ ] `/allclear` quality gate skill — the primary user-facing interface; validates the "one command" promise
-- [ ] Cross-repo sibling repo discovery — required for impact and drift; build the foundation even if /impact and /drift are v1.x
-- [ ] `/allclear impact` skill — the primary differentiator; validates the unique cross-repo value proposition
-- [ ] `npx @allclear/cli init` installer — reduces friction for first install; required for plugin registry distribution
+Minimum viable product — validates the service dependency intelligence concept.
 
-### Add After Validation (v1.x)
+- [ ] Worker process (Node.js) with HTTP server — all other v2.0 features are unreachable without this
+- [ ] SQLite schema (repos, services, connections, schemas, fields, map_versions, repo_state) — stable data model before any scanning
+- [ ] Agent-based scanning via `/allclear:map` — the primary user-facing build flow
+- [ ] User confirmation flow — hard gate before any SQLite write
+- [ ] Incremental scanning (git diff since last_scanned_commit) — required for daily usability; full rescan is too slow
+- [ ] `/allclear:cross-impact` redesign using graph queries — replaces grep scan when map data exists; keeps grep fallback
+- [ ] Transitive impact traversal — blast radius is the core value; direct-only impact is insufficient
+- [ ] Breaking change classification (CRITICAL/WARN/INFO) — differentiates removed endpoints from additive changes
+- [ ] D3 web UI (basic force-directed graph) — required for users to validate the map and understand the dependency structure
+- [ ] MCP server with `impact_query` and `impact_changed` tools — enables agents to check impact autonomously before making changes
 
-Features to add once core is working.
+### Add After Validation (v2.x)
 
-- [ ] `/allclear drift` — add when impact scanning is validated and users ask for config consistency checking
-- [ ] SessionStart context injection — add when the known new-session bug is resolved upstream, or implement UserPromptSubmit fallback
-- [ ] Bats test suite expansion — add coverage for edge cases discovered after real-world usage
-- [ ] allclear.config.json override layer — add when users with non-flat repo layouts request it
+Features to add once core graph intelligence is working and validated by real usage.
 
-### Future Consideration (v2+)
+- [ ] `impact_graph` MCP tool (subgraph for a service) — add when users ask for service-scoped views
+- [ ] `impact_search` MCP tool + ChromaDB sync — add when users need semantic search across the map
+- [ ] Map snapshot diffing (graph changes since last week) — add when users ask "what changed in our dependencies?"
+- [ ] D3 UI enhancements: node filtering by protocol, zoom, service detail pane — add after basic visualization is validated
+- [ ] `impact_scan` MCP tool (trigger scan from agent) — add when agents need to self-trigger rescans
 
-Features to defer until product-market fit is established.
+### Future Consideration (v2.x+)
 
-- [ ] `/allclear pulse` — add when k8s users represent a meaningful share of adoption; adds kubectl dependency complexity
-- [ ] `/allclear deploy` — same gate as pulse; both are advanced/optional features that need a validated user base first
-- [ ] LSP server bundling — adds real-time diagnostics beyond PostToolUse hooks; high complexity, defer until hooks prove insufficient
+Features to defer until v2.0 core proves the value proposition.
+
+- [ ] Graph export (JSON, dot format for Graphviz) — defer until users ask for external tooling integration
+- [ ] Snapshot comparison UI (visual graph diff) — defer; SQLite file diff is sufficient for MVP
+- [ ] ChromaDB cloud mode (remote host) — defer; local ChromaDB covers the semantic search use case; cloud mode adds config complexity
+
+---
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Project type auto-detection | HIGH | MEDIUM | P1 |
-| Auto-format hook | HIGH | LOW | P1 |
-| Auto-lint hook | HIGH | LOW | P1 |
-| Sensitive file guard | HIGH | LOW | P1 |
-| `/allclear` quality gate | HIGH | MEDIUM | P1 |
-| `/allclear impact` (cross-repo) | HIGH | HIGH | P1 — primary differentiator |
-| npx installer | MEDIUM | LOW | P1 — distribution prerequisite |
-| Cross-repo sibling discovery | HIGH | MEDIUM | P1 — foundation for impact/drift |
-| `/allclear drift` | HIGH | HIGH | P2 |
-| Session start context injection | MEDIUM | MEDIUM | P2 — blocked by upstream bug |
-| allclear.config.json override | MEDIUM | LOW | P2 |
-| Bats test suite | MEDIUM | MEDIUM | P2 |
-| `/allclear pulse` | MEDIUM | MEDIUM | P3 |
-| `/allclear deploy` | MEDIUM | MEDIUM | P3 |
+| Worker process + HTTP API | HIGH | MEDIUM | P1 — foundation |
+| SQLite schema | HIGH | MEDIUM | P1 — foundation |
+| Agent-based scanning + `/allclear:map` | HIGH | HIGH | P1 — primary user interface |
+| User confirmation flow | HIGH | MEDIUM | P1 — trust requirement |
+| Incremental scanning | HIGH | MEDIUM | P1 — daily usability |
+| Transitive impact traversal | HIGH | HIGH | P1 — blast radius is the core value |
+| Breaking change classification | HIGH | MEDIUM | P1 — CRITICAL/WARN/INFO report |
+| `/allclear:cross-impact` redesign | HIGH | MEDIUM | P1 — existing command gets new backend |
+| D3 web UI (basic) | HIGH | HIGH | P1 — required for map validation |
+| MCP server (impact_query, impact_changed) | HIGH | MEDIUM | P1 — agent autonomy |
+| Map versioning / snapshots | MEDIUM | LOW | P2 |
+| ChromaDB sync + impact_search | MEDIUM | HIGH | P2 |
+| D3 UI enhancements (filter, zoom, detail) | MEDIUM | MEDIUM | P2 |
+| impact_scan MCP tool | MEDIUM | LOW | P2 |
+| impact_graph MCP tool | MEDIUM | MEDIUM | P2 |
+| Graph export (JSON/dot) | LOW | LOW | P3 |
+| Snapshot comparison UI | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
+- P1: Must have for v2.0 launch
+- P2: Should have, add when P1 is validated
 - P3: Nice to have, future consideration
+
+---
 
 ## Competitor Feature Analysis
 
-| Feature | Plankton (closest competitor) | Safety Net / sensitive-canary | AllClear |
-|---------|-------------------------------|-------------------------------|----------|
-| Auto-format on write | Yes (Python, TS, Shell, YAML, JSON, TOML, Markdown, Dockerfile) | No | Yes (Python, Rust, TypeScript, Go) |
-| Auto-lint on write | Yes (20+ linters, three-phase architecture) | No | Yes (per-language best-of-breed tools) |
-| Go support | **No — explicitly omitted** | No | **Yes — differentiator** |
-| Sensitive file guard | Config-based protected files list | Yes — dedicated tool | Yes — built-in hook |
-| Destructive command guard | No | Yes | No (out of scope — Safety Net covers this) |
-| Cross-repo impact scanning | **No** | **No** | **Yes — primary differentiator** |
-| Cross-repo drift detection | **No** | **No** | **Yes** |
-| Session start context injection | No | No | Yes (with upstream bug caveat) |
-| Service health check | No | No | Yes (/allclear pulse, optional kubectl) |
-| Deploy verification | No | No | Yes (/allclear deploy, optional kubectl) |
-| Zero-config auto-detect | Partial (config.json required for tuning) | N/A | Yes — primary design principle |
-| Single quality gate command | No | No | Yes (/allclear) |
-| Plugin registry distribution | No (hooks-only, no plugin manifest) | No | Yes |
-| npx installer | No | No | Yes |
-| Test suite (bats) | No | No | Yes |
-| External service dependencies | None | None | None — matching constraint |
+Tools in the service dependency intelligence space, verified via research.
+
+| Feature | CodeLogic MCP server | Augment Code microservices analysis | Grafana Service Dependency Graph | AllClear v2.0 |
+|---------|---------------------|--------------------------------------|----------------------------------|---------------|
+| MCP tool interface | Yes (codelogic-method-impact, codelogic-database-impact) | No | No | Yes (5 tools) |
+| Agent-based scanning | No (requires CodeLogic server, commercial) | No (static analysis) | No (telemetry-based) | **Yes — Claude agents, no external deps** |
+| No external service dependency | No — requires CodeLogic cloud | No — requires Augment Code platform | No — requires Grafana stack | **Yes — SQLite local only** |
+| Protocol-aware connections | No (code-only, no event bus) | Partial (HTTP only) | Yes (telemetry-based) | **Yes — REST/gRPC/events/internal** |
+| Field-level schema tracking | Partial (database column level) | No | No | **Yes — `fields` table with required flag** |
+| Breaking vs additive classification | No | Partial | No | **Yes — CRITICAL/WARN/INFO** |
+| Transitive impact | Yes | Yes | Yes | Yes |
+| Incremental scanning | N/A (static at scan time) | No | N/A (real-time telemetry) | **Yes — git diff driven** |
+| Map versioning / history | No | No | Limited (Grafana state) | **Yes — SQLite snapshots** |
+| Graph visualization | No (IDE only) | No | Yes (Grafana panel) | **Yes — D3.js localhost** |
+| User confirmation flow | No | No | No | **Yes — hard gate before persistence** |
+| Works without network access | No | No | No | **Yes — all local** |
+| Open source | No | No | Yes (plugin) | Yes (Apache 2.0) |
+
+---
 
 ## Sources
 
-- [Claude Code Plugins Reference (official)](https://code.claude.com/docs/en/plugins-reference) — HIGH confidence
-- [Claude Code Hooks Reference (official)](https://code.claude.com/docs/en/hooks) — HIGH confidence
-- [Plankton GitHub (alexfazio/plankton)](https://github.com/alexfazio/plankton) — HIGH confidence (direct source)
-- [Awesome Claude Code (hesreallyhim)](https://github.com/hesreallyhim/awesome-claude-code) — HIGH confidence
-- [Claude Code Hooks Tutorial (blakecrosley.com)](https://blakecrosley.com/blog/claude-code-hooks-tutorial) — MEDIUM confidence (third-party, matches official docs)
-- [Sensitive-canary tool (DEV Community)](https://dev.to/chataclaw/stop-claude-code-from-leaking-your-secrets-introducing-sensitive-canary-826) — MEDIUM confidence
-- [Safety Net GitHub (kenryu42)](https://github.com/kenryu42/claude-code-safety-net) — MEDIUM confidence
-- [Top 10 Claude Code Plugins 2026 (Composio)](https://composio.dev/content/top-claude-code-plugins) — MEDIUM confidence (curated list, not official)
-- [SessionStart hook bug report (anthropics/claude-code #10373)](https://github.com/anthropics/claude-code/issues/10373) — HIGH confidence (official repo issue)
-- [6 things developer tools must have in 2026 (Evil Martians)](https://evilmartians.com/chronicles/six-things-developer-tools-must-have-to-earn-trust-and-adoption) — MEDIUM confidence
+- [cross-impact-v2.md design document](../../.planning/designs/cross-impact-v2.md) — HIGH confidence (primary source)
+- [Designing MCP tools for agents — Datadog Engineering](https://www.datadoghq.com/blog/engineering/mcp-server-agent-tools/) — HIGH confidence (first-hand implementation lessons)
+- [CodeLogic MCP server — GitHub](https://github.com/CodeLogicIncEngineering/codelogic-mcp-server) — HIGH confidence (direct inspection)
+- [MCP Apps — modelcontextprotocol.io blog](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) — HIGH confidence (official MCP blog)
+- [Augment Code microservices impact analysis](https://www.augmentcode.com/tools/microservices-impact-analysis) — MEDIUM confidence (vendor marketing)
+- [Breaking change detection — Buf Docs](https://buf.build/docs/breaking/) — HIGH confidence (official Buf documentation)
+- [oasdiff breaking changes — Nordic APIs](https://nordicapis.com/using-oasdiff-to-detect-breaking-changes-in-apis/) — MEDIUM confidence
+- [Incremental analysis — SD Times](https://sdtimes.com/devops/demystifying-differential-and-incremental-analysis-for-static-code-analysis-within-devops/) — MEDIUM confidence
+- [Blast Radius impact analysis tool](https://blast-radius.dev/) — MEDIUM confidence (pattern reference)
+- [Axon graph-powered code intelligence — GitHub](https://github.com/harshkedia177/axon) — MEDIUM confidence (pattern reference for blast radius)
+- [Grafana Service Dependency Graph plugin](https://grafana.com/grafana/plugins/novatec-sdg-panel/) — MEDIUM confidence
+- [Human-in-the-loop AI agents 2025 — Fast.io](https://fast.io/resources/ai-agent-human-in-the-loop/) — MEDIUM confidence (confirmation flow patterns)
 
 ---
-*Feature research for: AllClear — Claude Code quality gate plugin for multi-repo polyglot teams*
+*Feature research for: AllClear v2.0 — Service Dependency Intelligence milestone*
 *Researched: 2026-03-15*
