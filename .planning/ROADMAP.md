@@ -42,7 +42,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. All internal path references use `${CLAUDE_PLUGIN_ROOT}` so the plugin works from any installation location
 **Plans:** 1 plan
 Plans:
-- [ ] 02-01-PLAN.md — Create lib/detect.sh and lib/siblings.sh shared libraries
+- [ ] 01-01-PLAN.md — Plugin directory scaffold, bats test infrastructure, and install verification
 
 ### Phase 2: Shared Libraries
 **Goal**: Shell library functions for project type detection and sibling repo discovery are available for all hooks and skills to source
@@ -220,7 +220,7 @@ All phases are independent and can execute in parallel. No ordering constraints.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Skeleton | 0/TBD | Not started | - |
+| 1. Plugin Skeleton | 0/1 | Planning complete | - |
 | 2. Shared Libraries | 0/1 | Planned | - |
 | 3. Format Hook | 0/1 | Planned | - |
 | 4. Lint Hook | 0/1 | Planned | - |
