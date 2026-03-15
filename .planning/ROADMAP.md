@@ -135,7 +135,10 @@ Plans:
   3. The impact report classifies affected services as CRITICAL (endpoint removed), WARN (field type changed), or INFO (additive change), and walks the graph transitively to show full blast radius
   4. When no impact map exists, `/allclear:cross-impact` falls back to grep-based symbol scanning and suggests running `/allclear:map`; when a map exists but may be stale after code changes, it offers a re-scan
   5. First successful map build prints MCP server registration instructions to help users enable impact checking in all their Claude Code agents
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 20-01-PLAN.md — Create commands/map.md: full /allclear:map orchestration flow
+- [ ] 20-02-PLAN.md — Rewrite commands/cross-impact.md: worker-aware graph queries with legacy grep fallback
 
 ### Phase 21: Integration & Config
 **Goal**: The worker auto-starts transparently at session open when a map exists, ChromaDB enhances search without blocking any core path, and the full scan-to-query flow is covered by integration tests
@@ -160,5 +163,5 @@ Plans:
 | 17. HTTP Server & Web UI | v2.0 | 0/? | Not started | - |
 | 18. Agent Scanning | v2.0 | 0/? | Not started | - |
 | 19. Repo Discovery & User Confirmation | v2.0 | 0/2 | Not started | - |
-| 20. Command Layer | v2.0 | 0/? | Not started | - |
+| 20. Command Layer | v2.0 | 0/2 | Planned | - |
 | 21. Integration & Config | v2.0 | 0/? | Not started | - |
