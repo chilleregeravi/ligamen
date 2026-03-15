@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 10: Drift Skill** - `/allclear drift` version and type consistency checking across repos
 - [x] **Phase 11: Pulse Skill** - `/allclear pulse` live service health checking via kubectl (completed 2026-03-15)
 - [x] **Phase 12: Deploy Skill** - `/allclear deploy` expected-vs-actual cluster state verification (completed 2026-03-15)
-- [ ] **Phase 13: Tests** - Bats test suite for all hooks, exit codes, and library functions
+- [x] **Phase 13: Tests** - Bats test suite for all hooks, exit codes, and library functions (completed 2026-03-15)
 
 ## Phase Details
 
@@ -207,7 +207,7 @@ Plans:
   3. Lint hook tests verify lint output appears in the conversation and the hook always exits 0
   4. Guard hook tests verify that writes to `.env`, lock files, and generated directories produce exit 2 with correct `permissionDecision: "deny"` JSON, and that migration/generated-code writes produce warnings with exit 0
   5. Library tests verify correct project type detection for each manifest type and mixed-language repos, and correct sibling repo discovery from a parent directory
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [ ] 13-01-PLAN.md — Bats test infrastructure setup + library tests (detect.bats, siblings.bats)
 - [ ] 13-02-PLAN.md — Format and lint hook tests (format.bats, lint.bats)
@@ -232,4 +232,4 @@ All phases are independent and can execute in parallel. No ordering constraints.
 | 10. Drift Skill | 1/2 | In Progress|  |
 | 11. Pulse Skill | 1/1 | Complete   | 2026-03-15 |
 | 12. Deploy Skill | 1/1 | Complete   | 2026-03-15 |
-| 13. Tests | 2/3 | In Progress|  |
+| 13. Tests | 3/3 | Complete   | 2026-03-15 |
