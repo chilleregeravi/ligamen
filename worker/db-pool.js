@@ -11,6 +11,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import Database from "better-sqlite3";
+import { openDb } from "./db.js";
 import { QueryEngine } from "./query-engine.js";
 
 const dataDir =
@@ -55,10 +56,8 @@ export function getQueryEngine(projectRoot) {
   }
 
   try {
-    const db = new Database(dbPath);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-    db.pragma("busy_timeout = 5000");
+    // Use openDb() to ensure migrations run (e.g., adding 'type' column)
+    const db = openDb(projectRoot);
     const qe = new QueryEngine(db);
     pool.set(projectRoot, qe);
     return qe;
@@ -168,12 +167,28 @@ export function getQueryEngineByHash(hash) {
   }
 
   try {
+    // Open with migrations via a temporary openDb call
+    // openDb uses projectRoot for hashing, but we already have the DB path.
+    // Open directly but run migrations manually.
     const db = new Database(dbPath);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
     db.pragma("busy_timeout = 5000");
+    // Run migrations if schema_versions table exists
+    try {
+      const currentVer =
+        db.prepare("SELECT MAX(version) FROM schema_versions").pluck().get() ??
+        0;
+      if (currentVer < 2) {
+        db.exec(
+          "ALTER TABLE services ADD COLUMN type TEXT NOT NULL DEFAULT 'service'",
+        );
+        db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(2);
+      }
+    } catch {
+      /* column may already exist */
+    }
     const qe = new QueryEngine(db);
-    // Cache with hash as key since we don't know the project root
     pool.set(`__hash__${hash}`, qe);
     return qe;
   } catch (err) {
