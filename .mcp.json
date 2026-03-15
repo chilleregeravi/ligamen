@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "allclear-impact": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/worker/mcp-server.js"],
+      "env": {
+        "ALLCLEAR_DB_PATH": ".allclear/impact-map.db"
+      }
+    }
+  }
+}
