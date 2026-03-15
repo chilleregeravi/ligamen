@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Service Dependency Intelligence
 status: planning
-stopped_at: Completed 18-01-PLAN.md — agent prompt template and findings schema validator
-last_updated: "2026-03-15T19:19:43.372Z"
+stopped_at: Completed 18-02-PLAN.md — scan-manager with incremental/full scan and repo_state integration
+last_updated: "2026-03-15T19:25:59.845Z"
 last_activity: 2026-03-15 — Roadmap created, 8 phases defined (14-21)
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 19
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-repo-discovery-user-confirmation P02 | 110s | 2 tasks | 2 files |
 | Phase 19-repo-discovery-user-confirmation P01 | 2min | 2 tasks | 2 files |
 | Phase 18-agent-scanning P01 | 3min | 2 tasks | 3 files |
+| Phase 18-agent-scanning P02 | 3.5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 19-repo-discovery-user-confirmation]: discoverNew scans 5 manifest types: package.json, pyproject.toml, go.mod, Cargo.toml, pom.xml
 - [Phase 18-agent-scanning]: Validation order: connections checked first so validateFindings({}) yields 'missing required field: connections' per spec
 - [Phase 18-agent-scanning]: agent-prompt.md prohibits inference: literal string required for every reported connection
+- [Phase 18-agent-scanning]: getChangedFiles uses git ls-files (not diff) for sinceCommit=null — returns all tracked files for full scan
+- [Phase 18-agent-scanning]: agentRunner injection pattern: setAgentRunner(fn) decouples scan-manager.js from Claude Task tool — MCP server injects real invoker, tests inject mock
+- [Phase 18-agent-scanning]: Rename detection: baseCommit must be after file-to-rename is committed — diff from before add shows A new.txt not R old.txt->new.txt
 
 ### Pending Todos
 
@@ -113,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T19:19:43.369Z
-Stopped at: Completed 18-01-PLAN.md — agent prompt template and findings schema validator
+Last session: 2026-03-15T19:25:51.335Z
+Stopped at: Completed 18-02-PLAN.md — scan-manager with incremental/full scan and repo_state integration
 Resume file: None
