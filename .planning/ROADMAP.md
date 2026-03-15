@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Plugin Skeleton** - Directory structure, plugin.json manifest, and git-clone installation
 - [ ] **Phase 2: Shared Libraries** - Project type detection (detect.sh) and sibling repo discovery (siblings.sh)
-- [ ] **Phase 3: Format Hook** - Auto-format on every Claude edit for Python, Rust, TypeScript, Go, JSON, YAML
+- [x] **Phase 3: Format Hook** - Auto-format on every Claude edit for Python, Rust, TypeScript, Go, JSON, YAML (completed 2026-03-15)
 - [ ] **Phase 4: Lint Hook** - Auto-lint on every Claude edit with per-language linter invocation
 - [ ] **Phase 5: Guard Hook** - Hard-block and soft-warn PreToolUse hook for sensitive and generated files
 - [ ] **Phase 6: Session Hook** - Session-start context injection with project type and available commands
@@ -68,7 +68,7 @@ Plans:
   3. With no formatter installed for the file's language, the hook silently skips with no error or nag message
   4. Files inside `node_modules/`, `.venv/`, `target/`, or other generated directories are never formatted
   5. A formatter crash or non-zero exit never blocks the edit — the hook exits 0 in all cases
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 03-01-PLAN.md — hooks.json wiring + format.sh auto-format dispatch script
 
@@ -222,7 +222,7 @@ All phases are independent and can execute in parallel. No ordering constraints.
 |-------|----------------|--------|-----------|
 | 1. Plugin Skeleton | 0/1 | Planning complete | - |
 | 2. Shared Libraries | 0/1 | Planned | - |
-| 3. Format Hook | 0/1 | Planned | - |
+| 3. Format Hook | 1/1 | Complete   | 2026-03-15 |
 | 4. Lint Hook | 0/1 | Planned | - |
 | 5. Guard Hook | 0/1 | Planned | - |
 | 6. Session Hook | 0/2 | Planning complete | - |

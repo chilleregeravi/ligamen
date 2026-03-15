@@ -18,27 +18,27 @@
 
 ### Auto-Format Hook
 
-- [ ] **FMTH-01**: Auto-format hook fires on PostToolUse for Edit and Write tool events
-- [ ] **FMTH-02**: Hook formats Python files with ruff format (fallback: black)
-- [ ] **FMTH-03**: Hook formats Rust files with rustfmt
-- [ ] **FMTH-04**: Hook formats TypeScript/JavaScript files with prettier (fallback: eslint --fix)
-- [ ] **FMTH-05**: Hook formats Go files with gofmt
-- [ ] **FMTH-06**: Hook formats JSON/YAML files with prettier
-- [ ] **FMTH-07**: Hook is silent on success (no output cluttering conversation)
-- [ ] **FMTH-08**: Hook skips formatting if formatter is not installed (no nag)
-- [ ] **FMTH-09**: Hook skips files in virtual envs, node_modules, and generated directories
-- [ ] **FMTH-10**: Hook never blocks edits on formatter failure — exits 0 always
+- [x] **FMTH-01**: Auto-format hook fires on PostToolUse for Edit and Write tool events
+- [x] **FMTH-02**: Hook formats Python files with ruff format (fallback: black)
+- [x] **FMTH-03**: Hook formats Rust files with rustfmt
+- [x] **FMTH-04**: Hook formats TypeScript/JavaScript files with prettier (fallback: eslint --fix)
+- [x] **FMTH-05**: Hook formats Go files with gofmt
+- [x] **FMTH-06**: Hook formats JSON/YAML files with prettier
+- [x] **FMTH-07**: Hook is silent on success (no output cluttering conversation)
+- [x] **FMTH-08**: Hook skips formatting if formatter is not installed (no nag)
+- [x] **FMTH-09**: Hook skips files in virtual envs, node_modules, and generated directories
+- [x] **FMTH-10**: Hook never blocks edits on formatter failure — exits 0 always
 
 ### Auto-Lint Hook
 
-- [ ] **LNTH-01**: Auto-lint hook fires on PostToolUse for Edit and Write tool events
-- [ ] **LNTH-02**: Hook lints Python files with ruff check
-- [ ] **LNTH-03**: Hook lints Rust files with cargo clippy (throttled to max once per 30 seconds)
-- [ ] **LNTH-04**: Hook lints TypeScript/JavaScript files with eslint
-- [ ] **LNTH-05**: Hook lints Go files with golangci-lint
-- [ ] **LNTH-06**: Hook outputs lint warnings to conversation so Claude can see and address them
-- [ ] **LNTH-07**: Hook never blocks edits — informational only, exits 0 always
-- [ ] **LNTH-08**: Hook skips if linter is not installed
+- [x] **LNTH-01**: Auto-lint hook fires on PostToolUse for Edit and Write tool events
+- [x] **LNTH-02**: Hook lints Python files with ruff check
+- [x] **LNTH-03**: Hook lints Rust files with cargo clippy (throttled to max once per 30 seconds)
+- [x] **LNTH-04**: Hook lints TypeScript/JavaScript files with eslint
+- [x] **LNTH-05**: Hook lints Go files with golangci-lint
+- [x] **LNTH-06**: Hook outputs lint warnings to conversation so Claude can see and address them
+- [x] **LNTH-07**: Hook never blocks edits — informational only, exits 0 always
+- [x] **LNTH-08**: Hook skips if linter is not installed
 
 ### Sensitive File Guard Hook
 
@@ -157,24 +157,24 @@
 | PLGN-05 | Phase 2 | Pending |
 | PLGN-07 | Phase 2 | Pending |
 | PLGN-08 | Phase 2 | Pending |
-| FMTH-01 | Phase 3 | Pending |
-| FMTH-02 | Phase 3 | Pending |
-| FMTH-03 | Phase 3 | Pending |
-| FMTH-04 | Phase 3 | Pending |
-| FMTH-05 | Phase 3 | Pending |
-| FMTH-06 | Phase 3 | Pending |
-| FMTH-07 | Phase 3 | Pending |
-| FMTH-08 | Phase 3 | Pending |
-| FMTH-09 | Phase 3 | Pending |
-| FMTH-10 | Phase 3 | Pending |
-| LNTH-01 | Phase 4 | Pending |
-| LNTH-02 | Phase 4 | Pending |
-| LNTH-03 | Phase 4 | Pending |
-| LNTH-04 | Phase 4 | Pending |
-| LNTH-05 | Phase 4 | Pending |
-| LNTH-06 | Phase 4 | Pending |
-| LNTH-07 | Phase 4 | Pending |
-| LNTH-08 | Phase 4 | Pending |
+| FMTH-01 | Phase 3 | Complete |
+| FMTH-02 | Phase 3 | Complete |
+| FMTH-03 | Phase 3 | Complete |
+| FMTH-04 | Phase 3 | Complete |
+| FMTH-05 | Phase 3 | Complete |
+| FMTH-06 | Phase 3 | Complete |
+| FMTH-07 | Phase 3 | Complete |
+| FMTH-08 | Phase 3 | Complete |
+| FMTH-09 | Phase 3 | Complete |
+| FMTH-10 | Phase 3 | Complete |
+| LNTH-01 | Phase 4 | Complete |
+| LNTH-02 | Phase 4 | Complete |
+| LNTH-03 | Phase 4 | Complete |
+| LNTH-04 | Phase 4 | Complete |
+| LNTH-05 | Phase 4 | Complete |
+| LNTH-06 | Phase 4 | Complete |
+| LNTH-07 | Phase 4 | Complete |
+| LNTH-08 | Phase 4 | Complete |
 | GRDH-01 | Phase 5 | Pending |
 | GRDH-02 | Phase 5 | Pending |
 | GRDH-03 | Phase 5 | Pending |

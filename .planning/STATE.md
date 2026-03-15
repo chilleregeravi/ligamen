@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: "Completed 01-01-PLAN.md (Task 3 checkpoint:human-verify pending)"
-last_updated: "2026-03-15T10:11:08.421Z"
+stopped_at: Completed 02-shared-libraries/02-01-PLAN.md
+last_updated: "2026-03-15T10:11:23.903Z"
 last_activity: 2026-03-15 — Roadmap revised to parallel structure, 7 sequential phases replaced with 13 independent phases
 progress:
   total_phases: 13
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 17
-  completed_plans: 9
+  completed_plans: 10
   percent: 29
 ---
 
@@ -56,6 +56,9 @@ Progress: [███░░░░░░░] 29%
 | Phase 01-plugin-skeleton P01 | 8 | 2 tasks | 17 files |
 | Phase 03-format-hook P01 | 2 | 2 tasks | 2 files |
 | Phase 04-lint-hook P01 | 2min | 2 tasks | 2 files |
+| Phase 02-shared-libraries P01 | 2 | 2 tasks | 2 files |
+| Phase 08-config-layer P01 | 2 | 2 tasks | 7 files |
+| Phase 13-tests P02 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -81,6 +84,15 @@ Recent decisions affecting current work:
 - [Phase 03-format-hook]: Added ALLCLEAR_DISABLE_FORMAT toggle for Phase 8 CONF-02 forward compat — one-liner cost, zero rework benefit
 - [Phase 03-format-hook]: Path exclusion checks /env/ and /.tox/ beyond base patterns to cover all Python virtualenv naming conventions
 - [Phase 03-format-hook]: Redirect both stdout and stderr (>/dev/null 2>&1) to silence all formatter output; redirecting only stderr leaves stdout polluted
+- [Phase 04-lint-hook]: Used cksum instead of md5sum for clippy throttle key — POSIX standard, present on macOS without coreutils
+- [Phase 04-lint-hook]: Clippy throttle timestamp written BEFORE run to handle concurrent PostToolUse events on same Cargo project
+- [Phase 04-lint-hook]: Inline language fallback in lint.sh ensures Phase 4 hook works before lib/detect.sh (Phase 2) is deployed
+- [Phase 02-shared-libraries]: Use $(cd dir && pwd) instead of realpath for POSIX-safe path resolution — realpath not guaranteed on macOS without Homebrew
+- [Phase 02-shared-libraries]: detect_all_project_types returns empty string (not 'unknown') when no manifests found
+- [Phase 02-shared-libraries]: No set -e in library files — sourcing context owns error handling to prevent strict-mode leakage
+- [Phase 08-config-layer]: Used while-read loop instead of mapfile for bash 3.2 compatibility on macOS
+- [Phase 08-config-layer]: lib/config.sh is a leaf node (sources nothing else) to prevent circular source risks
+- [Phase 08-config-layer]: ALLCLEAR_CONFIG_SIBLINGS is NOT exported — bash arrays cannot be exported across subshells
 
 ### Pending Todos
 
@@ -94,6 +106,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T10:10:58.815Z
-Stopped at: Completed 01-01-PLAN.md (Task 3 checkpoint:human-verify pending)
+Last session: 2026-03-15T10:11:21.654Z
+Stopped at: Completed 02-shared-libraries/02-01-PLAN.md
 Resume file: None
