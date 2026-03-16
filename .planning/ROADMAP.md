@@ -66,7 +66,11 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   2. Every log line in worker.log includes a `component` field with one of: worker, http, mcp, scan
   3. MCP server, HTTP server, scan manager, and worker index all use the shared logger
   4. No console.log or console.error calls remain in production worker code (test files excluded)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 23-01-PLAN.md — Create worker/lib/logger.js shared logger factory with createLogger and component field
+- [ ] 23-02-PLAN.md — Wire logger into worker/index.js, worker/server/http.js, worker/server/chroma.js
+- [ ] 23-03-PLAN.md — Wire logger into worker/mcp/server.js, worker/scan/manager.js, worker/db/database.js
 
 ### Phase 24: Log Terminal API
 **Goal**: The worker HTTP server exposes a queryable log endpoint that the UI can poll to retrieve filtered log lines
@@ -110,7 +114,7 @@ Plans:
 | 1-13 | v1.0 | 17/17 | Complete | 2026-03-15 |
 | 14-21 | v2.0 | 19/19 | Complete | 2026-03-15 |
 | 22. Canvas & Zoom | v2.1 | 0/TBD | Not started | - |
-| 23. Logging Instrumentation | v2.1 | 0/TBD | Not started | - |
+| 23. Logging Instrumentation | v2.1 | 0/3 | Not started | - |
 | 24. Log Terminal API | v2.1 | 0/1 | Not started | - |
 | 25. Log Terminal UI | v2.1 | 0/TBD | Not started | - |
 | 26. Project Switcher | v2.1 | 0/TBD | Not started | - |
