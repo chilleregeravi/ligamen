@@ -77,7 +77,9 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   2. The ?component= query param filters results to only lines matching that component label
   3. The ?since= query param returns only lines newer than the given timestamp
   4. Closing the browser tab or connection does not leave a zombie connection in the worker process
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 24-01-PLAN.md — Add GET /api/logs route to Fastify server with component/since filtering, 500-line cap, and dataDir option wiring
 
 ### Phase 25: Log Terminal UI
 **Goal**: Users can observe real-time worker activity from within the graph UI, filtering and searching logs without leaving the browser
@@ -109,6 +111,6 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 | 14-21 | v2.0 | 19/19 | Complete | 2026-03-15 |
 | 22. Canvas & Zoom | v2.1 | 0/TBD | Not started | - |
 | 23. Logging Instrumentation | v2.1 | 0/TBD | Not started | - |
-| 24. Log Terminal API | v2.1 | 0/TBD | Not started | - |
+| 24. Log Terminal API | v2.1 | 0/1 | Not started | - |
 | 25. Log Terminal UI | v2.1 | 0/TBD | Not started | - |
 | 26. Project Switcher | v2.1 | 0/TBD | Not started | - |
