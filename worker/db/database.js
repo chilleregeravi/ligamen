@@ -58,7 +58,7 @@ async function loadMigrationsAsync() {
         migrations.push({ version: migration.version, up: migration.up });
       }
     } catch (err) {
-      console.error(`Failed to load migration ${file}:`, err.message);
+      process.stderr.write(`[db] Failed to load migration ${file}: ${err.message}\n`);
     }
   }
 
