@@ -197,9 +197,9 @@ Your JSON object must match this exact structure:
       "root_path": "string — relative path to service root within repo",
       "language": "string — primary language (typescript, python, go, rust, java, etc.)",
       "type": "service | library | sdk — 'service' for deployable units, 'library'/'sdk' for shared code",
-      "boundary_entry": "string | null — file that external callers hit (e.g. 'src/main.py', 'src/routes/index.ts')",
+      "boundary_entry": "string | null — file that external callers hit (e.g. 'src/main.py', 'src/routes/index.ts', 'src/index.ts' for libs)",
       "exposes": [
-        "string — each entry formatted as 'METHOD /path' for REST (e.g. 'GET /users', 'POST /auth/token'), 'topic-name' for events, or 'functionName' for SDK exports. MUST list every endpoint this service handles."
+        "string — format depends on type (see Exposes Format Rules below)"
       ],
       "confidence": "high | low"
     }
@@ -211,7 +211,7 @@ Your JSON object must match this exact structure:
       "protocol": "rest | grpc | kafka | rabbitmq | internal | sdk",
       "crossing": "external | sdk | internal — 'external' for network calls, 'sdk' for library imports, 'internal' for same-service module calls",
       "method": "string — HTTP method (GET/POST/etc), 'produce', 'consume', 'import', or 'call'",
-      "path": "string — endpoint path, topic name, or imported module. Use template paths (e.g. /users/{id}), NOT interpolated instances",
+      "path": "string — format depends on protocol (see Connection Path Rules below)",
       "source_file": "string | null — file:function in caller that makes the call",
       "target_file": "string | null — file:function in callee that handles the call (null if unknown)",
       "confidence": "high | low",
@@ -235,19 +235,46 @@ Your JSON object must match this exact structure:
 }
 ```
 
-**Notes on the schema:**
+**Exposes Format Rules (type-conditional):**
+
+The `exposes` array format depends on the service `type`:
+
+| Type | Format | Examples |
+|------|--------|---------|
+| `service` | `"METHOD /path"` for REST, `"topic-name"` for events | `"GET /users"`, `"POST /auth/token"`, `"order.created"` |
+| `library` or `sdk` | `"functionName(param: Type): ReturnType"` — exported function signatures | `"createClient(config: Config): Client"`, `"parseEvent(raw: Buffer): Event"` |
+
+For **services**: list every HTTP endpoint, gRPC method, or event topic the service handles. This is used to detect API mismatches.
+
+For **libraries/SDKs**: list the **public exported functions** that other services import and call. Include parameter types and return types when visible from the source. At minimum, list `"functionName"`. This is used to determine whether a lib change affects a specific caller.
+
+**Connection Path Rules (protocol-conditional):**
+
+The `path` field format depends on the connection type:
+
+| Protocol | Path format | Examples |
+|----------|-------------|---------|
+| `rest` | Template endpoint path | `"/users/{id}"`, `"/auth/validate"` |
+| `grpc` | Service/method | `"UserService/GetUser"` |
+| `kafka`, `rabbitmq` | Topic name | `"order.created"` |
+| `sdk` | **Specific function name(s) called** — NOT the module path | `"createClient"`, `"parseEvent,sendCommand"` |
+| `internal` | Module path or function | `"utils/auth:validateToken"` |
+
+For `sdk` connections: the `path` must be the **specific exported function(s)** the caller uses, not just the import path. This enables precise impact analysis — "lib X changed function Y; service A calls Y but service B only calls Z."
+
+**General notes:**
 
 - `connections` is required (may be an empty array if no connections found)
 - `schemas` is required (may be an empty array)
 - `services` is required (must include at least the primary service)
-- `path` in connections: report **template paths** like `/users/{id}` not interpolated values like `/users/123`
 - `target_file` is optional — set to `null` if the target handler file is not visible in this repo
 - `fields[].required` must be a boolean (`true` or `false`), not a string
-- `exposes` is **critical** — it's used to detect API mismatches. List every endpoint/topic this service handles. Format: `"METHOD /path"` for REST, `"topic-name"` for events
 
 ---
 
 ## Example Output
+
+### Example 1: A service that calls another service and uses a shared library
 
 ```json
 {
@@ -284,14 +311,15 @@ Your JSON object must match this exact structure:
     },
     {
       "source": "user-api",
-      "target": "notification-service",
-      "protocol": "kafka",
-      "method": "produce",
-      "path": "user.created",
+      "target": "shared-sdk",
+      "protocol": "sdk",
+      "crossing": "sdk",
+      "method": "import",
+      "path": "createEventClient,publishEvent",
       "source_file": "src/handlers/user.ts:createUser",
       "target_file": null,
       "confidence": "high",
-      "evidence": "await producer.send({ topic: 'user.created', messages: [{ value: JSON.stringify(payload) }] })"
+      "evidence": "import { createEventClient, publishEvent } from '@acme/shared-sdk'"
     }
   ],
   "schemas": [
@@ -306,6 +334,34 @@ Your JSON object must match this exact structure:
       ]
     }
   ]
+}
+```
+
+### Example 2: A shared library (scanned from its own repo)
+
+```json
+{
+  "service_name": "shared-sdk",
+  "confidence": "high",
+  "services": [
+    {
+      "name": "shared-sdk",
+      "root_path": ".",
+      "language": "typescript",
+      "type": "library",
+      "boundary_entry": "src/index.ts",
+      "exposes": [
+        "createEventClient(config: EventConfig): EventClient",
+        "publishEvent(client: EventClient, topic: string, payload: object): Promise<void>",
+        "parseEvent(raw: Buffer): ParsedEvent",
+        "EventConfig",
+        "EventClient"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "connections": [],
+  "schemas": []
 }
 ```
 
