@@ -1,0 +1,74 @@
+# Requirements: AllClear v2.1
+
+**Defined:** 2026-03-16
+**Core Value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
+
+## v2.1 Requirements
+
+Requirements for UI polish and observability release. Each maps to roadmap phases.
+
+### Canvas Rendering
+
+- [ ] **CANVAS-01**: Graph renders at native resolution on HiDPI/Retina displays (devicePixelRatio scaling)
+- [ ] **CANVAS-02**: Node labels, tooltips, and detail panel text use larger, readable font sizes
+
+### Zoom & Pan
+
+- [ ] **ZOOM-01**: Zoom sensitivity is reduced for smooth, controllable zoom on mouse wheel and trackpad
+- [ ] **ZOOM-02**: Pinch gesture zooms while two-finger scroll pans (ctrlKey detection)
+- [ ] **ZOOM-03**: User can click a fit-to-screen button to reset view to show all nodes centered
+
+### Project Switcher
+
+- [ ] **PROJ-01**: User can switch between projects via a persistent dropdown without page reload
+
+### Log Terminal
+
+- [ ] **LOG-01**: User can open a collapsible bottom panel showing real-time worker logs (collapsed by default)
+- [ ] **LOG-02**: User can filter logs by component (scan, MCP, worker, HTTP)
+- [ ] **LOG-03**: User can search logs by keyword
+- [ ] **LOG-04**: Log panel auto-scrolls to latest entry and pauses when user scrolls up manually
+
+## Future Requirements
+
+### Project Switcher Enhancements
+
+- **PROJ-02**: Remember last-selected project in localStorage across sessions
+
+### Log Terminal Enhancements
+
+- **LOG-05**: Log rotation support for long-running worker instances
+- **LOG-06**: Export visible logs to file
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| xterm.js interactive terminal | This is a log viewer, not a shell — styled div is sufficient and avoids 300KB dep |
+| Log persistence across worker restarts | Worker already writes to file; UI streams from file, no additional persistence needed |
+| Multi-project log aggregation | v2.1 shows logs for the single running worker instance |
+| Graph layout algorithms beyond D3 force | D3 force is working; layout improvements are a separate milestone |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CANVAS-01 | — | Pending |
+| CANVAS-02 | — | Pending |
+| ZOOM-01 | — | Pending |
+| ZOOM-02 | — | Pending |
+| ZOOM-03 | — | Pending |
+| PROJ-01 | — | Pending |
+| LOG-01 | — | Pending |
+| LOG-02 | — | Pending |
+| LOG-03 | — | Pending |
+| LOG-04 | — | Pending |
+
+**Coverage:**
+- v2.1 requirements: 10 total
+- Mapped to phases: 0
+- Unmapped: 10 ⚠️
+
+---
+*Requirements defined: 2026-03-16*
+*Last updated: 2026-03-16 after initial definition*
