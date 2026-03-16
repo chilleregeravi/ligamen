@@ -33,6 +33,38 @@ async function init() {
   watchDPR();
   resize();
 
+  function fitToScreen() {
+    const positions = Object.values(state.positions);
+    if (positions.length === 0) return;
+
+    // Compute bounding box of all node positions (CSS pixel space)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const { x, y } of positions) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+
+    const PADDING = 60; // px — breathing room around the graph
+    const cssW = container.clientWidth;
+    const cssH = container.clientHeight;
+    const graphW = maxX - minX || 1;
+    const graphH = maxY - minY || 1;
+
+    const scaleX = (cssW - PADDING * 2) / graphW;
+    const scaleY = (cssH - PADDING * 2) / graphH;
+    const scale = Math.min(Math.min(scaleX, scaleY), 5);
+    const clampedScale = Math.max(0.15, scale);
+
+    // Center the bounding box in the canvas
+    state.transform.scale = clampedScale;
+    state.transform.x = cssW / 2 - (minX + graphW / 2) * clampedScale;
+    state.transform.y = cssH / 2 - (minY + graphH / 2) * clampedScale;
+
+    render();
+  }
+
   // Resolve project from URL or show picker
   const urlParams = new URLSearchParams(window.location.search);
   let project = urlParams.get("project");
@@ -146,6 +178,7 @@ async function init() {
 
   setupInteractions(canvas);
   setupControls();
+  document.getElementById("fit-btn").addEventListener("click", fitToScreen);
 
   document.getElementById("detail-close").addEventListener("click", () => {
     hideDetailPanel();
