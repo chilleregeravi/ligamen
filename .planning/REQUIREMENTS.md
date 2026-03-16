@@ -22,7 +22,7 @@ Requirements for scan data integrity and cross-repo MCP queries.
 
 ### Cross-Repo MCP Queries
 
-- [ ] **SCAN-05**: MCP tools accept a `repository` parameter (name or path) and resolve to the correct project DB by searching all project DBs under ~/.allclear/projects/ for a matching repo entry
+- [x] **SCAN-05**: MCP tools accept a `repository` parameter (name or path) and resolve to the correct project DB by searching all project DBs under ~/.allclear/projects/ for a matching repo entry
 
 ## Future Requirements
 
@@ -52,7 +52,7 @@ Requirements for scan data integrity and cross-repo MCP queries.
 | SCAN-02 | Phase 27 | Complete |
 | SCAN-03 | Phase 28 | Complete |
 | SCAN-04 | Phase 27 | Complete |
-| SCAN-05 | Phase 29 | Pending |
+| SCAN-05 | Phase 29 | Complete |
 
 **Coverage:**
 - v2.2 requirements: 5 total

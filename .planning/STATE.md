@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Scan Data Integrity
 status: planning
-stopped_at: Completed 28-01-PLAN.md — scan version bracket schema and QueryEngine methods complete
-last_updated: "2026-03-16T15:09:19.522Z"
+stopped_at: Completed 29-01-PLAN.md — cross-project MCP queries with resolveDb per-call resolution
+last_updated: "2026-03-16T15:23:02.551Z"
 last_activity: 2026-03-16 — v2.2 roadmap created
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -53,6 +53,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 27-01]: Migration 004 + ON CONFLICT DO UPDATE shipped atomically — UNIQUE constraint alone with INSERT OR REPLACE causes cascade-delete of child rows
 - [Phase 28]: Migration 005 uses ALTER TABLE ADD COLUMN without DEFAULT — nullable FK, existing rows get NULL
 - [Phase 28]: endScan deletes connections before services (no CASCADE on FK in migration 001 services table)
+- [Phase 29-cross-project-mcp-queries]: resolveDb routing: absolute path → getQueryEngine; 12-char hex → getQueryEngineByHash; other string → getQueryEngineByRepo; undefined → ALLCLEAR_PROJECT_ROOT / cwd
+- [Phase 29-cross-project-mcp-queries]: Pool-owned connections: MCP tool handlers never call db.close() — pool.js owns connection lifetime via QueryEngine cache
 
 ### Pending Todos
 
@@ -67,6 +69,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-16T15:09:19.520Z
-Stopped at: Completed 28-01-PLAN.md — scan version bracket schema and QueryEngine methods complete
+Last session: 2026-03-16T15:23:02.548Z
+Stopped at: Completed 29-01-PLAN.md — cross-project MCP queries with resolveDb per-call resolution
 Resume file: None

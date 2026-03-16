@@ -53,7 +53,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 - [x] **Phase 27: Schema Foundation + Upsert Repair** — Migration 004 adds UNIQUE constraint, deduplicates existing data, rebuilds FTS5; upsert rewrite ships atomically; agent naming convention enforced (completed 2026-03-16)
 - [ ] **Phase 28: Scan Version Bracket** — Migration 005 adds scan_versions table; beginScan/endScan bracket makes re-scan atomic; stale rows cleaned up after successful persist
-- [ ] **Phase 29: Cross-Project MCP Queries** — MCP tools accept optional `project` parameter; per-call DB resolution via pool.js; agents in any repo can query any project graph
+- [x] **Phase 29: Cross-Project MCP Queries** — MCP tools accept optional `project` parameter; per-call DB resolution via pool.js; agents in any repo can query any project graph (completed 2026-03-16)
 
 ## Phase Details
 
@@ -108,4 +108,4 @@ Plans:
 | 22-26 | v2.1 | 11/11 | Complete | 2026-03-16 |
 | 27. Schema Foundation + Upsert Repair | 2/2 | Complete   | 2026-03-16 | - |
 | 28. Scan Version Bracket | 1/2 | In Progress|  | - |
-| 29. Cross-Project MCP Queries | v2.2 | 0/1 | Not started | - |
+| 29. Cross-Project MCP Queries | 1/1 | Complete   | 2026-03-16 | - |
