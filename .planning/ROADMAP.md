@@ -81,7 +81,11 @@ Plans:
   1. After re-scanning a repo where a service was removed, that service no longer appears in the graph
   2. If a scan fails mid-run, the previous scan's data remains intact and queryable — no partial or corrupt graph state
   3. Each completed scan is recorded as a version entry; the graph always reflects the latest completed scan
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — Migration 005 (scan_versions table + scan_version_id FK columns) + QueryEngine beginScan/endScan + persistFindings with scanVersionId
+- [ ] 28-02-PLAN.md — Wire beginScan/endScan bracket in scanRepos + human verify
 
 ### Phase 29: Cross-Project MCP Queries
 **Goal**: MCP tools resolve the correct project database from any working directory, enabling agents to query any repo's graph
@@ -103,5 +107,5 @@ Plans:
 | 14-21 | v2.0 | 19/19 | Complete | 2026-03-15 |
 | 22-26 | v2.1 | 11/11 | Complete | 2026-03-16 |
 | 27. Schema Foundation + Upsert Repair | v2.2 | 0/2 | Not started | - |
-| 28. Scan Version Bracket | v2.2 | 0/TBD | Not started | - |
+| 28. Scan Version Bracket | v2.2 | 0/2 | Not started | - |
 | 29. Cross-Project MCP Queries | v2.2 | 0/1 | Not started | - |
