@@ -4,7 +4,7 @@ milestone: v2.1
 milestone_name: UI Polish & Observability
 status: planning
 stopped_at: Completed 26-02-PLAN.md (project-switcher.js full implementation + human verify)
-last_updated: "2026-03-16T13:21:16.712Z"
+last_updated: "2026-03-16T13:29:44.376Z"
 last_activity: 2026-03-16 — v2.1 roadmap created; phases 22-25 defined
 progress:
   total_phases: 5
