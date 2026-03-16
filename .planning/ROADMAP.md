@@ -87,7 +87,9 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
   1. An agent working in repo-B can call an MCP impact tool with `project: "repo-A"` and receive correct results from repo-A's graph
   2. MCP tools with no `project` parameter continue to work as before — no breaking change for single-project users
   3. Passing an unknown project name or path returns a structured error with a hint to run `/allclear:map` first — never silent empty results
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 29-01-PLAN.md — pool.js getQueryEngineByRepo + mcp/server.js per-call resolveDb with optional project param on all 5 tools
 
 ## Progress
 
@@ -98,4 +100,4 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 | 22-26 | v2.1 | 11/11 | Complete | 2026-03-16 |
 | 27. Schema Foundation + Upsert Repair | v2.2 | 0/TBD | Not started | - |
 | 28. Scan Version Bracket | v2.2 | 0/TBD | Not started | - |
-| 29. Cross-Project MCP Queries | v2.2 | 0/TBD | Not started | - |
+| 29. Cross-Project MCP Queries | v2.2 | 0/1 | Not started | - |
