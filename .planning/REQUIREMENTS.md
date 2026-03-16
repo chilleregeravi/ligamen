@@ -30,10 +30,10 @@ Requirements for UI polish and observability release. Each maps to roadmap phase
 
 ### Log Terminal
 
-- [ ] **LOG-01**: User can open a collapsible bottom panel showing real-time worker logs (collapsed by default)
-- [ ] **LOG-02**: User can filter logs by component (scan, MCP, worker, HTTP)
-- [ ] **LOG-03**: User can search logs by keyword
-- [ ] **LOG-04**: Log panel auto-scrolls to latest entry and pauses when user scrolls up manually
+- [x] **LOG-01**: User can open a collapsible bottom panel showing real-time worker logs (collapsed by default)
+- [x] **LOG-02**: User can filter logs by component (scan, MCP, worker, HTTP)
+- [x] **LOG-03**: User can search logs by keyword
+- [x] **LOG-04**: Log panel auto-scrolls to latest entry and pauses when user scrolls up manually
 
 ## Future Requirements
 
@@ -74,10 +74,10 @@ Requirements for UI polish and observability release. Each maps to roadmap phase
 | LOG-INFRA-01 | Phase 23 | Complete |
 | LOG-INFRA-02 | Phase 23 | Complete |
 | LOG-INFRA-03 | Phase 23 | Complete |
-| LOG-01 | Phase 25 | Pending |
-| LOG-02 | Phase 25 | Pending |
-| LOG-03 | Phase 25 | Pending |
-| LOG-04 | Phase 25 | Pending |
+| LOG-01 | Phase 25 | Complete |
+| LOG-02 | Phase 25 | Complete |
+| LOG-03 | Phase 25 | Complete |
+| LOG-04 | Phase 25 | Complete |
 | PROJ-01 | Phase 26 | Complete |
 
 **Coverage:**
