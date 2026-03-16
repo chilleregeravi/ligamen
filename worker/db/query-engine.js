@@ -262,18 +262,37 @@ export class QueryEngine {
     `);
 
     this._stmtUpsertService = db.prepare(`
-      INSERT INTO services (repo_id, name, root_path, language, type)
-      VALUES (@repo_id, @name, @root_path, @language, @type)
+      INSERT INTO services (repo_id, name, root_path, language, type, scan_version_id)
+      VALUES (@repo_id, @name, @root_path, @language, @type, @scan_version_id)
       ON CONFLICT(repo_id, name) DO UPDATE SET
         root_path = excluded.root_path,
         language = excluded.language,
-        type = excluded.type
+        type = excluded.type,
+        scan_version_id = excluded.scan_version_id
     `);
 
     this._stmtUpsertConnection = db.prepare(`
-      INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file)
-      VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file)
+      INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id)
+      VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id)
     `);
+
+    this._stmtBeginScan = db.prepare(
+      "INSERT INTO scan_versions (repo_id, started_at) VALUES (?, ?)"
+    );
+    this._stmtEndScan = db.prepare(
+      "UPDATE scan_versions SET completed_at = ? WHERE id = ?"
+    );
+    this._stmtDeleteStaleConnections = db.prepare(`
+      DELETE FROM connections
+      WHERE source_service_id IN (
+        SELECT id FROM services WHERE repo_id = ? AND scan_version_id != ? AND scan_version_id IS NOT NULL
+      ) OR target_service_id IN (
+        SELECT id FROM services WHERE repo_id = ? AND scan_version_id != ? AND scan_version_id IS NOT NULL
+      )
+    `);
+    this._stmtDeleteStaleServices = db.prepare(
+      "DELETE FROM services WHERE repo_id = ? AND scan_version_id != ? AND scan_version_id IS NOT NULL"
+    );
 
     this._stmtUpsertSchema = db.prepare(`
       INSERT OR REPLACE INTO schemas (connection_id, role, name, file)
@@ -451,6 +470,7 @@ export class QueryEngine {
   upsertService(serviceData) {
     const result = this._stmtUpsertService.run({
       type: "service",
+      scan_version_id: null,
       ...serviceData,
     });
     return result.lastInsertRowid;
@@ -467,6 +487,7 @@ export class QueryEngine {
       path: null,
       source_file: null,
       target_file: null,
+      scan_version_id: null,
       ...connData,
     });
     return result.lastInsertRowid;
@@ -527,6 +548,41 @@ export class QueryEngine {
    */
   setRepoState(repoId, commit) {
     this.updateRepoState(repoId, commit);
+  }
+
+  /**
+   * Opens a new scan bracket for the given repo.
+   * Inserts a scan_versions row with the current ISO timestamp and returns
+   * its integer ID. Pass this ID to persistFindings and endScan.
+   *
+   * @param {number} repoId
+   * @returns {number} The new scan_versions row ID
+   */
+  beginScan(repoId) {
+    const result = this._stmtBeginScan.run(repoId, new Date().toISOString());
+    return result.lastInsertRowid;
+  }
+
+  /**
+   * Closes a scan bracket. Does three things in order:
+   *   1. UPDATE scan_versions SET completed_at = now WHERE id = scanVersionId
+   *   2. DELETE stale connections (referencing stale service rows)
+   *   3. DELETE stale services (scan_version_id != scanVersionId AND NOT NULL)
+   *
+   * Rows with scan_version_id IS NULL are NOT deleted — they are legacy
+   * pre-bracket rows that survive until a subsequent scan replaces them.
+   *
+   * The connections DELETE runs first (no CASCADE on FK — connections reference
+   * services by FK, so services cannot be deleted while connections exist).
+   *
+   * @param {number} repoId
+   * @param {number} scanVersionId - The ID returned by beginScan
+   */
+  endScan(repoId, scanVersionId) {
+    this._stmtEndScan.run(new Date().toISOString(), scanVersionId);
+    // Delete stale connections before stale services — no CASCADE on FK
+    this._stmtDeleteStaleConnections.run(repoId, scanVersionId, repoId, scanVersionId);
+    this._stmtDeleteStaleServices.run(repoId, scanVersionId);
   }
 
   /**
@@ -672,8 +728,10 @@ export class QueryEngine {
    * @param {number} repoId - The repo row ID
    * @param {object} findings - Agent scan findings (services, connections, schemas arrays)
    * @param {string} [commit] - Git commit hash to record in repo_state
+   * @param {number} [scanVersionId] - Optional scan version ID from beginScan(). When
+   *   provided, every upserted service and connection row is stamped with this ID.
    */
-  persistFindings(repoId, findings, commit) {
+  persistFindings(repoId, findings, commit, scanVersionId) {
     const serviceIdMap = new Map(); // name → id
 
     // 1. Upsert services
@@ -684,6 +742,7 @@ export class QueryEngine {
         root_path: svc.root_path || ".",
         language: svc.language || "unknown",
         type: svc.type || "service",
+        scan_version_id: scanVersionId ?? null,
       });
       serviceIdMap.set(svc.name, id);
     }
@@ -704,6 +763,7 @@ export class QueryEngine {
         path: conn.path || null,
         source_file: conn.source_file || null,
         target_file: conn.target_file || null,
+        scan_version_id: scanVersionId ?? null,
       });
 
       // 3. Upsert schemas for this connection

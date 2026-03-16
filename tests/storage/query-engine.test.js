@@ -21,6 +21,9 @@ import { QueryEngine } from "../../worker/db/query-engine.js";
 // Migration runner — reuse db.js's runMigrations logic by importing migration directly
 import * as migration001 from "../../worker/db/migrations/001_initial_schema.js";
 import * as migration002 from "../../worker/db/migrations/002_service_type.js";
+import * as migration003 from "../../worker/db/migrations/003_exposed_endpoints.js";
+import * as migration004 from "../../worker/db/migrations/004_dedup_constraints.js";
+import * as migration005 from "../../worker/db/migrations/005_scan_versions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +31,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * Create a fresh isolated in-memory-backed on-disk DB for each test.
  * Uses better-sqlite3 directly (not the openDb singleton) so each test
  * gets a truly independent connection that can be safely closed.
+ *
+ * Runs all migrations in version order so the QueryEngine constructor can
+ * prepare statements against the full schema (including scan_version_id
+ * columns added by migration 005).
  */
 function makeQE() {
   const dir = path.join(os.tmpdir(), "allclear-test-" + crypto.randomUUID());
@@ -38,23 +45,19 @@ function makeQE() {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
-  // Bootstrap schema_versions and run migration 001
+  // Bootstrap schema_versions and run all migrations in order
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_versions (
       version    INTEGER PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-  db.transaction(() => {
-    migration001.up(db);
-    db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(
-      migration001.version,
-    );
-    migration002.up(db);
-    db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(
-      migration002.version,
-    );
-  })();
+  for (const m of [migration001, migration002, migration003, migration004, migration005]) {
+    db.transaction(() => {
+      m.up(db);
+      db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(m.version);
+    })();
+  }
 
   const qe = new QueryEngine(db);
   return { db, qe };
