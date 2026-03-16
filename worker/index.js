@@ -4,6 +4,7 @@ import os from "node:os";
 import { createHttpServer } from "./server/http.js";
 import { getQueryEngine } from "./db/pool.js";
 import { initChromaSync } from "./server/chroma.js";
+import { createLogger } from "./lib/logger.js";
 
 // ---------------------------------------------------------------------------
 // 1. Parse CLI args
@@ -49,29 +50,14 @@ fs.writeFileSync(PID_FILE, String(process.pid));
 // ---------------------------------------------------------------------------
 // 5. Structured logger
 // ---------------------------------------------------------------------------
-const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
-
-function log(level, msg, extra = {}) {
-  if (LEVELS[level] < LEVELS[logLevel]) return;
-  const line = JSON.stringify({
-    ts: new Date().toISOString(),
-    level,
-    msg,
-    pid: process.pid,
-    port,
-    ...extra,
-  });
-  const logFile = path.join(dataDir, "logs", "worker.log");
-  fs.appendFileSync(logFile, line + "\n");
-  process.stderr.write(line + "\n");
-}
+const logger = createLogger({ dataDir, port, logLevel, component: 'worker' });
 
 // ---------------------------------------------------------------------------
 // 6. Initialize ChromaDB (optional — non-blocking)
 // ---------------------------------------------------------------------------
 if (allSettings.ALLCLEAR_CHROMA_MODE) {
-  initChromaSync(allSettings).then((ok) => {
-    log(
+  initChromaSync(allSettings, null, logger).then((ok) => {
+    logger.log(
       "INFO",
       ok ? "ChromaDB connected" : "ChromaDB unavailable — using FTS5 fallback",
     );
@@ -86,15 +72,16 @@ if (allSettings.ALLCLEAR_CHROMA_MODE) {
 const app = await createHttpServer(null, {
   port,
   resolveQueryEngine: getQueryEngine,
+  logger,
 });
 fs.writeFileSync(PORT_FILE, String(port));
-log("INFO", "worker started", { port });
+logger.log("INFO", "worker started", { port });
 
 // ---------------------------------------------------------------------------
 // 7. Graceful shutdown
 // ---------------------------------------------------------------------------
 function shutdown(signal) {
-  log("INFO", `received ${signal}, shutting down`);
+  logger.log("INFO", `received ${signal}, shutting down`);
   app.close(() => {
     try {
       fs.rmSync(PID_FILE, { force: true });
@@ -102,7 +89,7 @@ function shutdown(signal) {
     try {
       fs.rmSync(PORT_FILE, { force: true });
     } catch {}
-    log("INFO", "worker stopped");
+    logger.log("INFO", "worker stopped");
     process.exit(0);
   });
 }
