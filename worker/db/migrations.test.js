@@ -17,7 +17,7 @@ const testRoot = path.join(os.tmpdir(), "allclear-schema-test-" + Date.now());
 fs.mkdirSync(testRoot, { recursive: true });
 
 // Import openDb (requires migration 001 to exist for meaningful assertions)
-const { openDb } = await import("./db.js");
+const { openDb } = await import("./database.js");
 const db = openDb(testRoot);
 
 // All 7 domain tables must exist
@@ -42,7 +42,7 @@ const ver = db
   .prepare("SELECT MAX(version) FROM schema_versions")
   .pluck()
   .get();
-assert.strictEqual(ver, 1, "schema version is 1");
+assert.ok(ver >= 1, `schema version is at least 1 (got ${ver})`);
 
 // FTS5 virtual tables must exist
 const allObjs = db.prepare("SELECT name FROM sqlite_master").pluck().all();

@@ -182,7 +182,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
   }
 
   // Load the agent prompt template once
-  const promptTemplatePath = join(__dirname, "agent-prompt.md");
+  const promptTemplatePath = join(__dirname, "agent-prompt-deep.md");
   const promptTemplate = readFileSync(promptTemplatePath, "utf8");
 
   /** @type {ScanResult[]} */

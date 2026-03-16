@@ -52,7 +52,7 @@ test("GET /graph returns 503 when queryEngine is null", async () => {
   const res = await server.inject({ method: "GET", url: "/graph" });
   assert.equal(res.statusCode, 503);
   const body = JSON.parse(res.payload);
-  assert.equal(body.error, "No map data yet");
+  assert.equal(body.error, "No map data yet. Pass ?project=/path/to/repo or run /allclear:map first.");
   await server.close();
 });
 
@@ -113,13 +113,33 @@ test("GET /service/:name returns 503 when queryEngine is null", async () => {
   await server.close();
 });
 
-test("POST /scan returns 202 with status started", async () => {
-  const server = await makeServer();
-  const res = await server.inject({ method: "POST", url: "/scan" });
-  assert.equal(res.statusCode, 202);
+test("POST /scan persists findings and returns 200", async () => {
+  const persisted = [];
+  const server = await makeServer({
+    ...mockQE,
+    upsertRepo: () => 1,
+    persistFindings: (repoId, findings, commit) => persisted.push({ repoId, findings, commit }),
+  });
+  const res = await server.inject({
+    method: "POST",
+    url: "/scan",
+    payload: {
+      repo_path: "/tmp/test-repo",
+      repo_name: "test-repo",
+      findings: { services: [], connections: [], schemas: [] },
+    },
+  });
+  assert.equal(res.statusCode, 200);
   const body = JSON.parse(res.payload);
-  assert.equal(body.status, "started");
-  assert.equal(body.message, "Scan triggered");
+  assert.equal(body.status, "persisted");
+  assert.equal(persisted.length, 1);
+  await server.close();
+});
+
+test("POST /scan returns 400 when repo_path missing", async () => {
+  const server = await makeServer();
+  const res = await server.inject({ method: "POST", url: "/scan", payload: {} });
+  assert.equal(res.statusCode, 400);
   await server.close();
 });
 

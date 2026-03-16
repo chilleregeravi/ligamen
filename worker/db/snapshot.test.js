@@ -32,7 +32,7 @@ describe("isFirstScan()", () => {
     testRoot = path.join(os.tmpdir(), "allclear-snap-test-" + Date.now());
     fs.mkdirSync(testRoot, { recursive: true });
     // Import db.js fresh — ESM caches, so we rely on isFirstScan checking map_versions
-    importedDb = await import("./db.js");
+    importedDb = await import("./database.js");
     // Open the DB for testRoot
     importedDb.openDb(testRoot);
   });
@@ -64,7 +64,7 @@ describe("createSnapshot()", () => {
     testRoot2 = path.join(os.tmpdir(), "allclear-snap-test2-" + Date.now());
     fs.mkdirSync(testRoot2, { recursive: true });
     // Import module (already cached from previous describe)
-    importedDb2 = await import("./db.js");
+    importedDb2 = await import("./database.js");
   });
 
   it("exports createSnapshot function", () => {
@@ -132,7 +132,7 @@ describe("createSnapshot() retention cleanup", () => {
   before(async () => {
     testRoot3 = path.join(os.tmpdir(), "allclear-retention-test-" + Date.now());
     fs.mkdirSync(testRoot3, { recursive: true });
-    importedDb3 = await import("./db.js");
+    importedDb3 = await import("./database.js");
   });
 
   it("retains at most 10 snapshots by default when creating 12 snapshots", async () => {

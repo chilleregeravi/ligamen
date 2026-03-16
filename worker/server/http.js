@@ -47,7 +47,7 @@ async function createHttpServer(queryEngine, options = {}) {
 
   // Register static file serving from worker/ui/
   await fastify.register(fastifyStatic, {
-    root: path.join(__dirname, "ui"),
+    root: path.join(__dirname, "..", "ui"),
     prefix: "/",
     decorateReply: false,
   });

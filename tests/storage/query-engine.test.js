@@ -20,6 +20,7 @@ import { QueryEngine } from "../../worker/db/query-engine.js";
 
 // Migration runner — reuse db.js's runMigrations logic by importing migration directly
 import * as migration001 from "../../worker/db/migrations/001_initial_schema.js";
+import * as migration002 from "../../worker/db/migrations/002_service_type.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -48,6 +49,10 @@ function makeQE() {
     migration001.up(db);
     db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(
       migration001.version,
+    );
+    migration002.up(db);
+    db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(
+      migration002.version,
     );
   })();
 
@@ -109,13 +114,13 @@ describe("schema", () => {
     db.close();
   });
 
-  it("schema_version is 1", () => {
+  it("schema_version is at least 2", () => {
     const { db } = makeQE();
     const ver = db
       .prepare("SELECT MAX(version) FROM schema_versions")
       .pluck()
       .get();
-    assert.strictEqual(ver, 1);
+    assert.ok(ver >= 2, `expected version >= 2, got ${ver}`);
     db.close();
   });
 
