@@ -74,30 +74,52 @@ Example evidence strings:
 
 ---
 
-## What IS a Service
+## Type Classification
 
-A service is a **deployable unit** that runs as a process and communicates over a network, message bus, or system interface. Examples:
+Every entry in the `services` array must have one of these types:
 
-- An HTTP/REST API server (Express, FastAPI, Gin, Actix, Spring Boot)
-- A gRPC server
-- A message queue consumer/producer (Kafka, RabbitMQ, SQS)
-- A WebSocket server
-- A background worker that processes jobs from a queue
-- A systemd/init.d service or daemon
-- A cron job or scheduled task that calls other services
-- A Docker container that runs as a long-lived process
-- A serverless function (Lambda, Cloud Function) that handles requests
-- A database migration runner that modifies shared state
+### `type: "service"` — Deployable units
 
-**NOT services:**
+A process that runs and communicates over a network, message bus, or system interface:
 
-- Shared libraries (`lib/`, `utils/`, `helpers/`, `common/`)
+- HTTP/REST API server (Express, FastAPI, Gin, Actix, Spring Boot)
+- gRPC server
+- Message queue consumer/producer (Kafka, RabbitMQ, SQS)
+- WebSocket server
+- Background worker that processes jobs from a queue
+- Daemon, systemd service, cron job
+- Docker container running as a long-lived process
+- Serverless function (Lambda, Cloud Function)
+
+### `type: "library"` or `"sdk"` — Shared code
+
+Packages imported by services, not deployable on their own:
+
+- Shared client libraries (`@acme/sdk`, `edgeworks-sdk`)
+- Internal packages (`lib/`, `packages/common`)
+- SDKs that abstract calls to another service
+
+### `type: "infra"` — Infrastructure-as-code
+
+Repos that define deployment, configuration, or infrastructure for services:
+
+- Kubernetes manifests (kustomize overlays, Helm charts, raw YAML)
+- Terraform/OpenTofu configurations
+- Docker Compose files
+- CI/CD pipeline definitions that deploy services
+- ArgoCD/Flux GitOps configurations
+
+**How to detect:** Repo contains `kustomization.yaml`, `Chart.yaml`, `*.tf`, `docker-compose.yml`, `helmfile.yaml`, or directories like `overlays/`, `charts/`, `terraform/`.
+
+### NOT any of the above
+
+Do not report these as services, libraries, or infra:
+
 - CLI tools and scripts (`scripts/`, `bin/`)
 - Test files and fixtures (`tests/`, `__tests__/`, `spec/`)
-- Configuration files
 - Build tools, linters, formatters
 - Shell scripts that are sourced (not executed as servers)
-- Plugin/extension code that extends another tool (hooks, skills, commands)
+- Plugin/extension code that extends another tool
 
 ## What NOT to Report
 
@@ -196,7 +218,7 @@ Your JSON object must match this exact structure:
       "name": "string — service identifier, MUST be lowercase-hyphenated, derived from package manifest name field (package.json 'name', pyproject.toml [project] name, go.mod module last segment, Cargo.toml [package] name). See Service Naming Convention section.",
       "root_path": "string — relative path to service root within repo",
       "language": "string — primary language (typescript, python, go, rust, java, etc.)",
-      "type": "service | library | sdk — 'service' for deployable units, 'library'/'sdk' for shared code",
+      "type": "service | library | sdk | infra — 'service' for deployable units, 'library'/'sdk' for shared code, 'infra' for IaC repos",
       "boundary_entry": "string | null — file that external callers hit (e.g. 'src/main.py', 'src/routes/index.ts', 'src/index.ts' for libs)",
       "exposes": [
         "string — format depends on type (see Exposes Format Rules below)"
@@ -208,9 +230,9 @@ Your JSON object must match this exact structure:
     {
       "source": "string — name of the calling service or library",
       "target": "string — name of the called service or library",
-      "protocol": "rest | grpc | kafka | rabbitmq | internal | sdk",
+      "protocol": "rest | grpc | kafka | rabbitmq | internal | sdk | k8s | tf | helm",
       "crossing": "external | sdk | internal — 'external' for network calls, 'sdk' for library imports, 'internal' for same-service module calls",
-      "method": "string — HTTP method (GET/POST/etc), 'produce', 'consume', 'import', or 'call'",
+      "method": "string — HTTP method (GET/POST/etc), 'produce', 'consume', 'import', 'call', 'deploy', or 'configure'",
       "path": "string — format depends on protocol (see Connection Path Rules below)",
       "source_file": "string | null — file:function in caller that makes the call",
       "target_file": "string | null — file:function in callee that handles the call (null if unknown)",
@@ -243,10 +265,20 @@ The `exposes` array format depends on the service `type`:
 |------|--------|---------|
 | `service` | `"METHOD /path"` for REST, `"topic-name"` for events | `"GET /users"`, `"POST /auth/token"`, `"order.created"` |
 | `library` or `sdk` | `"functionName(param: Type): ReturnType"` — exported function signatures | `"createClient(config: Config): Client"`, `"parseEvent(raw: Buffer): Event"` |
+| `infra` | `"prefix:resource-type/name"` or `"prefix:resource-type/name → target"` | See infra examples below |
 
 For **services**: list every HTTP endpoint, gRPC method, or event topic the service handles. This is used to detect API mismatches.
 
 For **libraries/SDKs**: list the **public exported functions** that other services import and call. Include parameter types and return types when visible from the source. At minimum, list `"functionName"`. This is used to determine whether a lib change affects a specific caller.
+
+For **infra**: list the Kubernetes resources, Terraform outputs, or other infrastructure objects this repo manages. Use these prefixes:
+
+| Prefix | Meaning | Examples |
+|--------|---------|---------|
+| `k8s:` | Kubernetes resource | `"k8s:deployment/payment-service"`, `"k8s:ingress/payment → payment.example.com"`, `"k8s:configmap/payment-env"` |
+| `tf:` | Terraform resource/output | `"tf:resource/aws_rds_instance.payments"`, `"tf:output/db_connection_string"` |
+| `helm:` | Helm chart release | `"helm:release/payment-service"`, `"helm:values/payment-service"` |
+| `compose:` | Docker Compose service | `"compose:service/payment-db"` |
 
 **Connection Path Rules (protocol-conditional):**
 
@@ -259,8 +291,13 @@ The `path` field format depends on the connection type:
 | `kafka`, `rabbitmq` | Topic name | `"order.created"` |
 | `sdk` | **Specific function name(s) called** — NOT the module path | `"createClient"`, `"parseEvent,sendCommand"` |
 | `internal` | Module path or function | `"utils/auth:validateToken"` |
+| `k8s` | `"k8s:resource-type/name → key"` — the specific resource and key that wires infra to service | `"k8s:configmap/payment-env → PAYMENT_DB_URL"`, `"k8s:secret/payment-creds → DB_PASSWORD"` |
+| `tf` | `"tf:output/name"` or `"tf:resource/type.name"` | `"tf:output/db_connection_string"` |
+| `helm` | `"helm:values/key-path"` | `"helm:values/image.tag"`, `"helm:values/env.DATABASE_URL"` |
 
 For `sdk` connections: the `path` must be the **specific exported function(s)** the caller uses, not just the import path. This enables precise impact analysis — "lib X changed function Y; service A calls Y but service B only calls Z."
+
+For `k8s`/`tf`/`helm` connections: these represent infra-to-service wiring. The `source` is the infra repo, the `target` is the service being deployed/configured. The `path` identifies **what specific configuration** connects them — which configmap key, which secret, which Helm value. This enables: "you changed values.yaml for payment-service, here are the 3 services whose env vars are affected."
 
 **General notes:**
 
@@ -361,6 +398,72 @@ For `sdk` connections: the `path` must be the **specific exported function(s)** 
     }
   ],
   "connections": [],
+  "schemas": []
+}
+```
+
+### Example 3: An infrastructure repo (Kubernetes + Helm)
+
+```json
+{
+  "service_name": "infra-core",
+  "confidence": "high",
+  "services": [
+    {
+      "name": "infra-core",
+      "root_path": ".",
+      "language": "yaml",
+      "type": "infra",
+      "boundary_entry": "kustomization.yaml",
+      "exposes": [
+        "k8s:deployment/payment-service",
+        "k8s:deployment/auth-service",
+        "k8s:configmap/payment-env",
+        "k8s:secret/payment-creds",
+        "k8s:ingress/payment → payment.example.com",
+        "helm:release/monitoring-stack"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "connections": [
+    {
+      "source": "infra-core",
+      "target": "payment-service",
+      "protocol": "k8s",
+      "crossing": "external",
+      "method": "configure",
+      "path": "k8s:configmap/payment-env → PAYMENT_DB_URL",
+      "source_file": "overlays/prod/payment/configmap.yaml",
+      "target_file": null,
+      "confidence": "high",
+      "evidence": "env:\n  - name: PAYMENT_DB_URL\n    valueFrom:\n      configMapKeyRef:\n        name: payment-env\n        key: PAYMENT_DB_URL"
+    },
+    {
+      "source": "infra-core",
+      "target": "payment-service",
+      "protocol": "k8s",
+      "crossing": "external",
+      "method": "deploy",
+      "path": "k8s:deployment/payment-service",
+      "source_file": "overlays/prod/payment/deployment.yaml",
+      "target_file": null,
+      "confidence": "high",
+      "evidence": "image: registry.example.com/payment-service:v1.2.3"
+    },
+    {
+      "source": "infra-core",
+      "target": "auth-service",
+      "protocol": "k8s",
+      "crossing": "external",
+      "method": "configure",
+      "path": "k8s:secret/auth-creds → AUTH_JWT_SECRET",
+      "source_file": "overlays/prod/auth/secret.yaml",
+      "target_file": null,
+      "confidence": "high",
+      "evidence": "stringData:\n  AUTH_JWT_SECRET: <sealed>"
+    }
+  ],
   "schemas": []
 }
 ```

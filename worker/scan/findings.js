@@ -38,6 +38,9 @@ export const VALID_PROTOCOLS = [
   "rabbitmq",
   "internal",
   "sdk",
+  "k8s",
+  "tf",
+  "helm",
 ];
 
 /** @type {string[]} */
