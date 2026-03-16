@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: UI Polish & Observability
 status: planning
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-03-16T12:45:42.422Z"
+stopped_at: Completed 22-01-PLAN.md (HiDPI canvas fix)
+last_updated: "2026-03-16T12:47:00.775Z"
 last_activity: 2026-03-16 — v2.1 roadmap created; phases 22-25 defined
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 11
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -47,6 +47,8 @@ Progress: [░░░░░░░░░░] 0% (v2.1)
 - [Phase 22-canvas-zoom]: ctrlKey=false pans (not zooms) — mouse users use Ctrl+scroll (standard shortcut); trackpad two-finger scroll pans naturally
 - [Phase 22-canvas-zoom]: Wheel zoom uses Math.pow(2, delta) exponential formula with SENSITIVITY=0.001 (D3-style, half of D3 default for gentler feel)
 - [Phase 23-logging-instrumentation]: createLogger factory in worker/lib/logger.js — plain object, component-tagged JSON logging, port field omitted when undefined/null
+- [Phase 22-canvas-zoom]: CSS pixel space is the single coordinate truth — DPR is render-time only; no mouse event or transform values multiplied by DPR
+- [Phase 22-canvas-zoom]: watchDPR uses matchMedia re-registration (not persistent listener) for multi-monitor DPR change detection
 
 ### Pending Todos
 
@@ -59,6 +61,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T12:45:42.419Z
-Stopped at: Completed 23-01-PLAN.md
+Last session: 2026-03-16T12:47:00.772Z
+Stopped at: Completed 22-01-PLAN.md (HiDPI canvas fix)
 Resume file: None

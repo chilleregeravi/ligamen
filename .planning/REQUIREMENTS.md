@@ -9,8 +9,8 @@ Requirements for UI polish and observability release. Each maps to roadmap phase
 
 ### Canvas Rendering
 
-- [ ] **CANVAS-01**: Graph renders at native resolution on HiDPI/Retina displays (devicePixelRatio scaling)
-- [ ] **CANVAS-02**: Node labels, tooltips, and detail panel text use larger, readable font sizes
+- [x] **CANVAS-01**: Graph renders at native resolution on HiDPI/Retina displays (devicePixelRatio scaling)
+- [x] **CANVAS-02**: Node labels, tooltips, and detail panel text use larger, readable font sizes
 
 ### Zoom & Pan
 
@@ -59,8 +59,8 @@ Requirements for UI polish and observability release. Each maps to roadmap phase
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CANVAS-01 | Phase 22 | Pending |
-| CANVAS-02 | Phase 22 | Pending |
+| CANVAS-01 | Phase 22 | Complete |
+| CANVAS-02 | Phase 22 | Complete |
 | ZOOM-01 | Phase 22 | Complete |
 | ZOOM-02 | Phase 22 | Complete |
 | ZOOM-03 | Phase 22 | Pending |
