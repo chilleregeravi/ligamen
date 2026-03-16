@@ -10,6 +10,7 @@ import { render } from "./modules/renderer.js";
 import { setupInteractions, setupControls } from "./modules/interactions.js";
 import { hideDetailPanel } from "./modules/detail-panel.js";
 import { showProjectPicker } from "./modules/project-picker.js";
+import { initLogTerminal } from "./modules/log-terminal.js";
 // Stub — will be implemented in Plan 02
 import { initProjectSwitcher } from "./modules/project-switcher.js";
 
@@ -213,6 +214,7 @@ async function init() {
   const resolvedHash = hash || project;
 
   await loadProject(resolvedHash, canvas, fitToScreen);
+  initLogTerminal();
   initProjectSwitcher(resolvedHash);
 }
 
