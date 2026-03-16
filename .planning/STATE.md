@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Service Dependency Intelligence
+milestone: v2.1
+milestone_name: UI Polish & Observability
 status: planning
-stopped_at: Completed 21-04-PLAN.md — integration test suite for scan-to-query flow
-last_updated: "2026-03-15T22:26:12.806Z"
-last_activity: 2026-03-15 — Roadmap created, 8 phases defined (14-21)
+stopped_at: Defining requirements
+last_updated: "2026-03-16"
+last_activity: 2026-03-16 — Milestone v2.1 started
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 19
-  completed_plans: 19
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 0
 ---
 
@@ -18,111 +18,27 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-15)
+See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** v2.0 Service Dependency Intelligence — Phase 14: Storage Foundation (ready to plan)
+**Current focus:** v2.1 UI Polish & Observability
 
 ## Current Position
 
-Phase: 14 of 21 (Storage Foundation)
-Plan: — of — (not started)
-Status: Ready to plan
-Last activity: 2026-03-15 — Roadmap created, 8 phases defined (14-21)
-
-Progress: [░░░░░░░░░░] 0%
-
-## Performance Metrics
-
-**Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
-
-*Updated after each plan completion*
-| Phase 16-mcp-server P01 | 2 | 2 tasks | 5 files |
-| Phase 15-worker-lifecycle P01 | 84s | 3 tasks | 3 files |
-| Phase 17-http-server-web-ui P01 | 10 | 2 tasks | 4 files |
-| Phase 14-storage-foundation P01 | 7min | 2 tasks | 4 files |
-| Phase 17-http-server-web-ui P02 | 3min | 2 tasks | 3 files |
-| Phase 14-storage-foundation P02 | 5min | 2 tasks | 3 files |
-| Phase 15-worker-lifecycle P02 | 6min | 2 tasks | 3 files |
-| Phase 16-mcp-server P02 | 16min | 2 tasks | 3 files |
-| Phase 16-mcp-server P03 | 10min | 1 tasks | 2 files |
-| Phase 19-repo-discovery-user-confirmation P02 | 110s | 2 tasks | 2 files |
-| Phase 19-repo-discovery-user-confirmation P01 | 2min | 2 tasks | 2 files |
-| Phase 18-agent-scanning P01 | 3min | 2 tasks | 3 files |
-| Phase 18-agent-scanning P02 | 3.5min | 2 tasks | 3 files |
-| Phase 20-command-layer P01 | 2min | 1 tasks | 1 files |
-| Phase 20-command-layer P02 | 82s | 1 tasks | 1 files |
-| Phase 21-integration-config P03 | 2min | 2 tasks | 3 files |
-| Phase 21-integration-config P01 | 2min | 2 tasks | 3 files |
-| Phase 21-integration-config P02 | 261s | 2 tasks | 5 files |
-| Phase 21-integration-config P04 | 142s | 1 tasks | 1 files |
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-16 — Milestone v2.1 started
 
 ## Accumulated Context
 
 ### Decisions
 
-- [v2.0]: Cross-impact redesigned from symbol grep to service dependency graph
-- [v2.0]: SQLite primary, ChromaDB optional (follows claude-mem pattern)
-- [v2.0]: Agent-based scanning — no external tools (tree-sitter, stack-graphs)
-- [v2.0]: User confirms all findings before persisting (hard gate, not toggle)
-- [v2.0]: Worker auto-starts when impact-map section present in config
-- [v2.0]: Service is the unit, not repo — works for mono-repo and multi-repo
-- [v2.0]: Incremental scans by default, full re-scan on demand
-- [v2.0]: MCP server reads SQLite directly — no worker dependency for queries
-- [v2.0]: Background subagents cannot access MCP tools (issue #13254) — agent scan runs foreground only
-- [Phase 16-mcp-server]: type:module added to package.json — all worker files use ESM import syntax
-- [Phase 16-mcp-server]: openDb() exported as named export so Plan 02 tools can import without re-opening DB
-- [Phase 16-mcp-server]: Fastify and HTTP deps added in 16-01 to avoid second npm install in Phase 17
-- [Phase 15-01]: DATA_DIR for PID/port files is ~/.allclear (machine-wide), overridable via ALLCLEAR_DATA_DIR
-- [Phase 15-01]: Port resolution order: ALLCLEAR_WORKER_PORT env -> settings.json -> allclear.config.json -> 37888
-- [Phase 15-01]: PORT_FILE written before spawning so callers can read port immediately after worker-start.sh exits
-- [Phase 17-http-server-web-ui]: Server binds to 127.0.0.1 only — never 0.0.0.0 — hard-coded for security
-- [Phase 17-http-server-web-ui]: Readiness route registered first in Fastify — guarantees probe works before DB init
-- [Phase 17-http-server-web-ui]: null queryEngine returns 503 on data routes — expected transient state before DB ready, not an error
-- [Phase 14-01]: Top-level await used in db.js to preload ES module migrations before any openDb() call
-- [Phase 14-01]: FTS5 content tables with trigger-based sync (ai/ad/au per table) chosen for incremental index updates
-- [Phase 17-http-server-web-ui]: Canvas not SVG for graph UI — SVG degrades at 30+ nodes, Canvas scales to 100+
-- [Phase 17-http-server-web-ui]: Web Worker for D3 force simulation — keeps main thread free for smooth 60fps interaction
-- [Phase 14-02]: classifyImpact is a pure mapping — caller provides the delta, engine applies severity rules without DB cross-check
-- [Phase 14-02]: FTS5 queries wrapped in double-quotes to handle hyphens (svc-a parses as svc NOT a without quoting)
-- [Phase 14-02]: Tests use new Database() directly instead of openDb() singleton to avoid per-test isolation failures
-- [Phase 15-02]: /api/readiness registered before DB init — probe always returns 200 regardless of DB state
-- [Phase 15-02]: Startup order: parse args → read settings → mkdir → write PID → register routes → listen → write port → log
-- [Phase 16-mcp-server]: Pure query functions exported as named exports (queryImpact etc.) to decouple from MCP SDK — enables unit testing with in-memory SQLite
-- [Phase 16-mcp-server]: FTS5 fallback catches 'no such table: connections_fts' specifically — avoids masking real query errors
-- [Phase 16-mcp-server]: MCP console.log guard placed before step-4 file check in lint.sh so CI invocations without file args still run the check
-- [Phase 16-mcp-server]: Bats assert for DB-absent test uses unquoted 'results' substring since MCP SDK JSON-encodes tool response text
-- [Phase 19-02]: ESM used in confirmation-flow.js instead of CommonJS — project type:module requires ESM imports for consistency
-- [Phase 19-02]: confirmation-flow.js is a pure module — no I/O, no SQLite writes; Phase 20 command layer is the sole persistence gate after calling this module
-- [Phase 19-repo-discovery-user-confirmation]: ESM used instead of CommonJS in repo-discovery.js — package.json type:module, all worker files use ESM
-- [Phase 19-repo-discovery-user-confirmation]: discoverNew scans 5 manifest types: package.json, pyproject.toml, go.mod, Cargo.toml, pom.xml
-- [Phase 18-agent-scanning]: Validation order: connections checked first so validateFindings({}) yields 'missing required field: connections' per spec
-- [Phase 18-agent-scanning]: agent-prompt.md prohibits inference: literal string required for every reported connection
-- [Phase 18-agent-scanning]: getChangedFiles uses git ls-files (not diff) for sinceCommit=null — returns all tracked files for full scan
-- [Phase 18-agent-scanning]: agentRunner injection pattern: setAgentRunner(fn) decouples scan-manager.js from Claude Task tool — MCP server injects real invoker, tests inject mock
-- [Phase 18-agent-scanning]: Rename detection: baseCommit must be after file-to-rename is committed — diff from before add shows A new.txt not R old.txt->new.txt
-- [Phase 20-command-layer]: commands/map.md is a pure orchestration prompt — all heavy lifting delegated to Phase 15/17/18/19 infrastructure
-- [Phase 20-command-layer]: First-build detection: versions list empty before Step 7 persist triggers MCP instructions + impact-map section write to allclear.config.json
-- [Phase 20-02]: cross-impact is query-only — never starts the worker inline
-- [Phase 20-02]: State B (worker up, no map data) still runs legacy grep to give partial results
-- [Phase 21-integration-config]: VACUUM INTO used for snapshot atomicity — safer than cp because it excludes WAL/SHM sidecars
-- [Phase 21-integration-config]: Snapshot paths stored relative (snapshots/timestamp.db) — portable across machine/user changes
-- [Phase 21-integration-config]: worker_start_background() and worker_status_line() added to lib/worker-client.sh to fill Phase 15 implementation gap
-- [Phase 21-integration-config]: session-start.sh auto-starts worker when impact-map section present in allclear.config.json — non-blocking, exits 0 always
-- [Phase 21-02]: chromaSearch throws when unavailable so query-engine can trigger FTS5 fallback without explicit availability check at call site
-- [Phase 21-02]: initChromaSync accepts optional mockClient for hermetic tests without running ChromaDB; _resetForTest() enables per-test isolation
-- [Phase 21-02]: writeScan() in db.js is the canonical SQLite persist gate; syncFindings fire-and-forget appended after synchronous SQLite writes complete
-- [Phase 21-04]: Integration tests use inline schema DDL in each Node.js subprocess to avoid db.js singleton interference — same isolation pattern as worker/db.test.js
-- [Phase 21-04]: QueryEngine.createMapVersion used for snapshot test (INTG-E2E-05) instead of db.createSnapshot — avoids getDb() singleton dependency, exercises same VACUUM INTO path
+- [v2.0]: Canvas not SVG for graph UI — SVG degrades at 30+ nodes, Canvas scales to 100+
+- [v2.0]: Web Worker for D3 force simulation — keeps main thread free for smooth 60fps interaction
+- [v2.0]: Worker logs to ~/.allclear/logs/worker.log as structured JSON (one line per entry)
+- [v2.0]: Server binds to 127.0.0.1 only — never 0.0.0.0
+- [v2.0]: null queryEngine returns 503 on data routes — expected transient state before DB ready
 
 ### Pending Todos
 
@@ -130,12 +46,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 18]: Agent hallucination rate unknown until tested on real repos — plan for prompt iteration loop
-- [Phase 16]: MCP tool description length limits and .mcp.json registration convention should be re-verified at implementation time (MCP spec evolves)
-- [Phase 17]: D3 Canvas hit detection for node click/hover requires custom point-in-circle math — spike before full UI implementation
+None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T19:42:04.689Z
-Stopped at: Completed 21-04-PLAN.md — integration test suite for scan-to-query flow
+Last session: 2026-03-16
+Stopped at: Defining requirements for v2.1
 Resume file: None

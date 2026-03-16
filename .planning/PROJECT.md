@@ -37,7 +37,7 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ### Active
 
-(Defined per milestone — see current milestone below)
+See current milestone: v2.1 UI Polish & Observability
 
 ### Out of Scope
 
@@ -82,5 +82,15 @@ Design document for v2.0 cross-impact redesign at `.planning/designs/cross-impac
 | siblings → linked-repos rename | Repos may not be siblings but connected; linked-repos is more accurate | ✓ Good |
 | Cross-impact v2 as separate milestone | Service dependency intelligence is a major new capability, not a patch | — Pending |
 
+## Current Milestone: v2.1 UI Polish & Observability
+
+**Goal:** Make the graph UI production-quality with crisp rendering, usable zoom/pan, persistent project switching, and an embedded log terminal for real-time worker observability.
+
+**Target features:**
+- Persistent project switcher dropdown (switch repos without reload)
+- Collapsible log terminal panel with component filtering and search
+- Retina/HiDPI canvas rendering fix + larger fonts throughout
+- Zoom/pan sensitivity tuning
+
 ---
-*Last updated: 2026-03-15 after v1.0 milestone*
+*Last updated: 2026-03-16 after v2.0 milestone completion*
