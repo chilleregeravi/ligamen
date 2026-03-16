@@ -71,13 +71,15 @@ export function initLogTerminal() {
   // --- Poll ---
 
   function poll() {
-    let url = "/api/logs?limit=200";
+    const params = new URLSearchParams();
     if (state.logLastSince !== null) {
-      url += `&since=${encodeURIComponent(state.logLastSince)}`;
+      params.set("since", state.logLastSince);
     }
     if (state.logComponentFilter !== "all") {
-      url += `&component=${state.logComponentFilter}`;
+      params.set("component", state.logComponentFilter);
     }
+    const qs = params.toString();
+    const url = qs ? `/api/logs?${qs}` : "/api/logs";
 
     fetch(url)
       .then((res) => {
@@ -115,9 +117,10 @@ export function initLogTerminal() {
     el.textContent = `[${ts}] [${line.component || "?"}] ${line.msg || ""}`;
 
     // Level class
-    if (line.level === "error") {
+    const lvl = (line.level || "").toUpperCase();
+    if (lvl === "ERROR") {
       el.classList.add("log-line--error");
-    } else if (line.level === "warn") {
+    } else if (lvl === "WARN") {
       el.classList.add("log-line--warn");
     } else {
       el.classList.add("log-line--info");

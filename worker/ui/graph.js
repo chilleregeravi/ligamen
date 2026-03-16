@@ -23,10 +23,9 @@ let _detailCloseWired = false;
  * and wires interaction handlers.
  *
  * @param {string} hash - The project hash to load.
- * @param {HTMLCanvasElement} canvas - The graph canvas element.
- * @param {Function} fitToScreen - Callback to fit the loaded graph to screen.
+ * @param {HTMLCanvasElement} [canvas] - The graph canvas element (falls back to DOM).
  */
-export async function loadProject(hash, canvas, fitToScreen) {
+export async function loadProject(hash, canvas) {
   // Allow canvas to be omitted (e.g. called from project-switcher) — fall back to DOM
   if (!canvas) canvas = document.getElementById('graph-canvas');
   const projectParam = `?hash=${encodeURIComponent(hash)}`;
@@ -119,7 +118,38 @@ export async function loadProject(hash, canvas, fitToScreen) {
 
   setupInteractions(canvas);
   setupControls();
-  if (fitToScreen) document.getElementById("fit-btn").addEventListener("click", fitToScreen);
+
+  // fitToScreen — self-contained, always wired (works after project switch too)
+  const fitBtn = document.getElementById("fit-btn");
+  if (fitBtn) {
+    const container = document.getElementById("canvas-container");
+    // Remove old listener (if any from previous loadProject call) by replacing node
+    const newBtn = fitBtn.cloneNode(true);
+    fitBtn.parentNode.replaceChild(newBtn, fitBtn);
+    newBtn.addEventListener("click", () => {
+      const positions = Object.values(state.positions);
+      if (positions.length === 0) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const { x, y } of positions) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+      const PADDING = 60;
+      const cssW = container.clientWidth;
+      const cssH = container.clientHeight;
+      const graphW = maxX - minX || 1;
+      const graphH = maxY - minY || 1;
+      const scaleX = (cssW - PADDING * 2) / graphW;
+      const scaleY = (cssH - PADDING * 2) / graphH;
+      const scale = Math.max(0.15, Math.min(Math.min(scaleX, scaleY), 5));
+      state.transform.scale = scale;
+      state.transform.x = cssW / 2 - (minX + graphW / 2) * scale;
+      state.transform.y = cssH / 2 - (minY + graphH / 2) * scale;
+      render();
+    });
+  }
 
   // Wire detail-close only once — addEventListener is idempotent for named
   // functions, but we use a flag to be explicit and avoid redundant calls.
@@ -155,37 +185,7 @@ async function init() {
   watchDPR();
   resize();
 
-  function fitToScreen() {
-    const positions = Object.values(state.positions);
-    if (positions.length === 0) return;
-
-    // Compute bounding box of all node positions (CSS pixel space)
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const { x, y } of positions) {
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    }
-
-    const PADDING = 60; // px — breathing room around the graph
-    const cssW = container.clientWidth;
-    const cssH = container.clientHeight;
-    const graphW = maxX - minX || 1;
-    const graphH = maxY - minY || 1;
-
-    const scaleX = (cssW - PADDING * 2) / graphW;
-    const scaleY = (cssH - PADDING * 2) / graphH;
-    const scale = Math.min(Math.min(scaleX, scaleY), 5);
-    const clampedScale = Math.max(0.15, scale);
-
-    // Center the bounding box in the canvas
-    state.transform.scale = clampedScale;
-    state.transform.x = cssW / 2 - (minX + graphW / 2) * clampedScale;
-    state.transform.y = cssH / 2 - (minY + graphH / 2) * clampedScale;
-
-    render();
-  }
+  // fitToScreen is now self-contained inside loadProject() — always wired on every load.
 
   // Resolve project from URL or show picker
   const urlParams = new URLSearchParams(window.location.search);
@@ -213,7 +213,7 @@ async function init() {
   // (the server resolves either form). loadProject() always sends ?hash=.
   const resolvedHash = hash || project;
 
-  await loadProject(resolvedHash, canvas, fitToScreen);
+  await loadProject(resolvedHash, canvas);
   initLogTerminal();
   initProjectSwitcher(resolvedHash);
 }
