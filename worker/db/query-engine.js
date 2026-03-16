@@ -257,8 +257,13 @@ export class QueryEngine {
 
     // --- Upsert statements ---
     this._stmtUpsertRepo = db.prepare(`
-      INSERT OR REPLACE INTO repos (path, name, type, last_commit, scanned_at)
+      INSERT INTO repos (path, name, type, last_commit, scanned_at)
       VALUES (@path, @name, @type, @last_commit, @scanned_at)
+      ON CONFLICT(path) DO UPDATE SET
+        name = excluded.name,
+        type = excluded.type,
+        last_commit = COALESCE(excluded.last_commit, last_commit),
+        scanned_at = COALESCE(excluded.scanned_at, scanned_at)
     `);
 
     this._stmtUpsertService = db.prepare(`

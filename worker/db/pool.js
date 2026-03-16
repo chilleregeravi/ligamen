@@ -11,7 +11,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import Database from "better-sqlite3";
-import { openDb } from "./database.js";
+import { openDb, runMigrations } from "./database.js";
 import { QueryEngine } from "./query-engine.js";
 
 const dataDir =
@@ -174,36 +174,8 @@ export function getQueryEngineByHash(hash) {
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
     db.pragma("busy_timeout = 5000");
-    // TODO Phase 27+28: remove this inline migration block — migrations/004 and 005 now exist.
-    // This block handles DBs opened by hash where openDb() (which runs all migrations) cannot
-    // be used because we don't have the project root. Safe to remove once all DBs in the wild
-    // have been opened through the standard openDb() path and are at schema version >= 5.
-    try {
-      const currentVer =
-        db.prepare("SELECT MAX(version) FROM schema_versions").pluck().get() ??
-        0;
-      if (currentVer < 2) {
-        db.exec(
-          "ALTER TABLE services ADD COLUMN type TEXT NOT NULL DEFAULT 'service'",
-        );
-        db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(2);
-      }
-      if (currentVer < 3) {
-        db.exec(`
-          CREATE TABLE IF NOT EXISTS exposed_endpoints (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            service_id  INTEGER NOT NULL REFERENCES services(id),
-            method      TEXT,
-            path        TEXT NOT NULL,
-            handler     TEXT,
-            UNIQUE(service_id, method, path)
-          );
-        `);
-        db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(3);
-      }
-    } catch {
-      /* column may already exist */
-    }
+    // Run all pending migrations using the same files as openDb()
+    runMigrations(db);
     const qe = new QueryEngine(db);
     pool.set(`__hash__${hash}`, qe);
     return qe;

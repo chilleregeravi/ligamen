@@ -128,7 +128,7 @@ export function getDb() {
  *
  * @param {import('better-sqlite3').Database} db
  */
-function runMigrations(db) {
+export function runMigrations(db) {
   // Ensure migration tracker table exists
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_versions (
