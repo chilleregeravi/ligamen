@@ -2,8 +2,7 @@
   "mcpServers": {
     "allclear-impact": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js"]
+      "command": "${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js"
     }
   }
 }
