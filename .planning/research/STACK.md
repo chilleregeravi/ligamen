@@ -783,3 +783,346 @@ npm install @fastify/sse@^0.4.0
 
 *Stack research addendum for: AllClear v2.1 — UI Polish & Observability (HiDPI canvas, zoom tuning, log terminal)*
 *Researched: 2026-03-16*
+
+---
+---
+
+# Stack Addendum: v2.2 Scan Data Integrity
+
+**Milestone:** v2.2 — Upsert deduplication, scan versioning, cross-repo identity merging, cross-project MCP queries
+**Researched:** 2026-03-16
+**Confidence:** HIGH for SQLite upsert semantics and ATTACH DATABASE (official SQLite docs fetched directly); HIGH for constraint patterns (verified against existing schema); MEDIUM for identity resolution approach (derived from schema analysis + SQLite capabilities, no single authoritative source for this specific pattern)
+
+No new npm packages are required for this milestone. All capabilities are native SQLite features available in the bundled SQLite 3.51.3 (via better-sqlite3 12.8.0).
+
+---
+
+## Core Problem: Why the Current Upserts Fail
+
+The current `_stmtUpsertService` uses `INSERT OR REPLACE INTO services`:
+
+```sql
+INSERT OR REPLACE INTO services (repo_id, name, root_path, language, type)
+VALUES (@repo_id, @name, @root_path, @language, @type)
+```
+
+The `services` table has no UNIQUE constraint on `(repo_id, name)`. With only an `INTEGER PRIMARY KEY AUTOINCREMENT`, `INSERT OR REPLACE` has no uniqueness violation to detect — it always inserts a new row. This is the root cause of SCAN-01 (duplication on re-scan).
+
+The current workaround in `getGraph()` is `WHERE s.id IN (SELECT MAX(id) FROM services GROUP BY name)` — this masks the duplicates for display but leaves orphaned rows, broken FK references from connections, and stale data accumulating on every scan.
+
+---
+
+## Pattern 1: `ON CONFLICT DO UPDATE` (True Upsert)
+
+**SQLite version required:** 3.24.0+ (June 2018). SQLite 3.51.3 is bundled with better-sqlite3 12.8.0 — fully supported.
+
+`ON CONFLICT DO UPDATE` is a true in-place update. Unlike `INSERT OR REPLACE`, it does NOT delete and re-insert the row. This means:
+- The `id` (primary key) is preserved across scans — existing FK references in `connections` remain valid
+- FTS5 triggers fire correctly (`services_au` UPDATE trigger, not `services_ad` DELETE + `services_ai` INSERT)
+- The AUTOINCREMENT sequence is not consumed on conflict
+
+**Syntax:**
+
+```sql
+INSERT INTO services (repo_id, name, root_path, language, type)
+VALUES (@repo_id, @name, @root_path, @language, @type)
+ON CONFLICT(repo_id, name) DO UPDATE SET
+  root_path = excluded.root_path,
+  language  = excluded.language,
+  type      = excluded.type
+```
+
+The `ON CONFLICT(repo_id, name)` clause specifies which UNIQUE constraint triggers the upsert. The `excluded` table alias refers to the values from the failing INSERT.
+
+**Why NOT `INSERT OR REPLACE`:** `OR REPLACE` deletes the conflicting row before inserting. This cascades to `connections` (which references `services.id`) and would delete all connections for that service. With `foreign_keys = ON`, this means every re-scan would wipe all connection data for existing services. `ON CONFLICT DO UPDATE` avoids this entirely.
+
+---
+
+## Pattern 2: UNIQUE Constraint on `(repo_id, name)` — Migration 004
+
+The `services` table needs a composite UNIQUE constraint before `ON CONFLICT DO UPDATE` can target it:
+
+```sql
+-- Migration 004
+ALTER TABLE services ADD COLUMN ... -- not needed; constraint is on existing columns
+
+-- SQLite does not support ADD CONSTRAINT after table creation.
+-- The canonical approach: recreate the table with the constraint.
+CREATE TABLE services_new (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  repo_id   INTEGER NOT NULL REFERENCES repos(id),
+  name      TEXT    NOT NULL,
+  root_path TEXT    NOT NULL,
+  language  TEXT    NOT NULL,
+  type      TEXT    NOT NULL DEFAULT 'service',
+  UNIQUE(repo_id, name)
+);
+
+-- Deduplicate: keep only the MAX(id) row per (repo_id, name)
+INSERT INTO services_new
+SELECT id, repo_id, name, root_path, language, type
+FROM services
+WHERE id IN (SELECT MAX(id) FROM services GROUP BY repo_id, name);
+
+-- Remap connections to the surviving service IDs
+-- (connections referencing non-surviving IDs are stale — delete them)
+DELETE FROM connections
+WHERE source_service_id NOT IN (SELECT id FROM services_new)
+   OR target_service_id NOT IN (SELECT id FROM services_new);
+
+DROP TABLE services;
+ALTER TABLE services_new RENAME TO services;
+```
+
+**Important:** SQLite does not support `ALTER TABLE ... ADD CONSTRAINT`. Adding a UNIQUE constraint to an existing table requires the table-recreation pattern above. This must run inside a transaction in the migration.
+
+The same pattern applies to `repos`: add `UNIQUE(path)` to prevent duplicate repo rows on re-scan:
+
+```sql
+CREATE TABLE repos_new (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  path        TEXT    NOT NULL UNIQUE,
+  name        TEXT    NOT NULL,
+  type        TEXT    NOT NULL,
+  last_commit TEXT,
+  scanned_at  TEXT
+);
+INSERT INTO repos_new SELECT * FROM repos
+WHERE id IN (SELECT MIN(id) FROM repos GROUP BY path);
+DROP TABLE repos;
+ALTER TABLE repos_new RENAME TO repos;
+```
+
+---
+
+## Pattern 3: Scan Versioning with `scan_id` Foreign Key
+
+The existing `map_versions` table records version metadata but does not link to the data it captures. The VACUUM INTO snapshot approach copies the entire database — it cannot support querying "what did the graph look like in scan N?" without re-opening a snapshot file.
+
+**Recommended approach:** Add a `scan_id` column to `services` and `connections`. Each invocation of `/allclear:map` creates one `map_versions` row and stamps all rows it writes with that `scan_id`. The current scan is always the one with the highest `id` in `map_versions`.
+
+```sql
+-- Migration 005: add scan_id to services and connections
+ALTER TABLE services    ADD COLUMN scan_id INTEGER REFERENCES map_versions(id);
+ALTER TABLE connections ADD COLUMN scan_id INTEGER REFERENCES map_versions(id);
+```
+
+**Scan lifecycle in `persistFindings()`:**
+
+```javascript
+// 1. Create a scan version record before writing any data
+const scanId = qe.createScanVersion(`scan:${repoName}:${commit ?? 'manual'}`);
+
+// 2. Pass scanId into all upserts
+qe.upsertService({ ..., scan_id: scanId });
+qe.upsertConnection({ ..., scan_id: scanId });
+
+// 3. Purge stale data for this repo that wasn't touched in this scan
+// (services with an older scan_id for the same repo_id)
+db.prepare(`
+  DELETE FROM services
+  WHERE repo_id = ? AND scan_id != ?
+`).run(repoId, scanId);
+```
+
+**Why this is better than VACUUM INTO snapshots for versioning:** The snapshot approach produces a full database copy that must be opened as a separate SQLite file to query. The `scan_id` column approach allows `SELECT ... WHERE scan_id = ?` directly in the live database. Snapshots remain useful for full backup/restore; `scan_id` is for diff and history queries.
+
+**`getGraph()` change:** Filter to the latest scan per repo:
+
+```sql
+-- Services from the most recent scan per repo
+SELECT s.* FROM services s
+WHERE s.scan_id = (
+  SELECT MAX(scan_id) FROM services s2 WHERE s2.repo_id = s.repo_id
+)
+```
+
+---
+
+## Pattern 4: Cross-Repo Identity Merging with a Canonical Name Table
+
+The root cause of SCAN-02 (same service appears as multiple nodes when scanned from different repos) is that agent output uses inconsistent names: `"user-service"` vs `"UserService"` vs `"users"`.
+
+There are two distinct sub-problems:
+
+**Sub-problem A — Consistent naming from the agent:** The scan prompt must instruct the agent to use the service's `package.json` `name` field (or Cargo.toml `[package] name`, or `go.mod` module path) as the canonical service name. This is a prompt engineering fix, not a schema fix. No migration needed for this.
+
+**Sub-problem B — Cross-repo name resolution for connections:** When repo A says it connects to `"user-service"` but the service was scanned as `"users"` in its own repo, `_resolveServiceId("user-service")` returns null and the connection is dropped. The fix is a `service_aliases` table:
+
+```sql
+-- Migration 006: cross-repo identity aliases
+CREATE TABLE IF NOT EXISTS service_aliases (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  canonical_id    INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+  alias           TEXT    NOT NULL,
+  UNIQUE(alias)
+);
+```
+
+When the scan agent reports a connection target that doesn't resolve to a `services.name`, `_resolveServiceId()` checks `service_aliases.alias` as a fallback. The user (or a future auto-merge tool) populates `service_aliases` when they know two names refer to the same service.
+
+**Why not automatic fuzzy matching:** Automatically merging `"user-service"` and `"UserService"` via string similarity risks false positives in a codebase with many similarly-named services. The right tool for this is the agent scan prompt (fix the naming at source) + manual aliases for edge cases. Automatic merging is a future enhancement, not v2.2 scope.
+
+---
+
+## Pattern 5: Cross-Project MCP Queries via `ATTACH DATABASE`
+
+The MCP server currently only has access to the single project database opened at worker startup. A cross-project query (SCAN-04) requires reading from multiple per-project SQLite files under `~/.allclear/projects/`.
+
+**SQLite ATTACH DATABASE** allows joining across multiple database files in a single connection:
+
+```sql
+ATTACH DATABASE '/path/to/project-b/impact-map.db' AS proj_b;
+
+SELECT s.name, s.repo_id, 'project_b' AS source
+FROM proj_b.services s
+WHERE s.name = 'user-service'
+```
+
+**Implementation in better-sqlite3:**
+
+```javascript
+// Attach a project database read-only for cross-project queries
+function attachProject(db, alias, dbPath) {
+  // SQLite does not have a native read-only ATTACH in the standard API.
+  // Use URI filename with ?mode=ro to open read-only:
+  db.exec(`ATTACH DATABASE 'file:${dbPath}?mode=ro' AS ${alias}`);
+}
+
+// Detach after the query to release the file lock
+function detachProject(db, alias) {
+  db.exec(`DETACH DATABASE ${alias}`);
+}
+```
+
+**Important caveats:**
+- ATTACH/DETACH must be called outside a transaction
+- WAL mode on the attached database is independent — reads are safe concurrent with writes by other worker processes
+- Foreign key constraints do NOT cross schema boundaries — `proj_b.services.repo_id` does not resolve against the main database's `repos` table. Cross-project queries must JOIN manually or denormalize
+- The default SQLite limit is 10 attached databases (SQLITE_LIMIT_ATTACHED). This is sufficient for AllClear's typical use (2-5 projects)
+- Atomic cross-database transactions are not available — each ATTACH-ed database commits independently
+
+**MCP tool pattern for cross-project service lookup:**
+
+```javascript
+mcp.tool('impact_query_global', 'Find a service across all scanned projects', {
+  service: z.string(),
+}, async ({ service }) => {
+  const projectDbs = discoverProjectDbs(); // scan ~/.allclear/projects/*/impact-map.db
+  const results = [];
+
+  for (const { alias, dbPath } of projectDbs) {
+    try {
+      attachProject(db, alias, dbPath);
+      const rows = db.prepare(
+        `SELECT name, root_path, language FROM ${alias}.services WHERE name = ?`
+      ).all(service);
+      results.push(...rows.map(r => ({ ...r, project: alias })));
+    } finally {
+      detachProject(db, alias);
+    }
+  }
+
+  return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+});
+```
+
+**Alternative — read foreign project DBs as separate Database instances:** Open each project's `.db` file as a separate `new Database(path, { readonly: true })` instance and query them independently. This avoids the ATTACH limit and schema boundary constraints, at the cost of per-query open/close overhead. For MCP queries (infrequent, not latency-critical), this is simpler and recommended over ATTACH for more than 5 projects.
+
+---
+
+## Migration Order and Dependencies
+
+| Migration | What | Prerequisite |
+|-----------|------|--------------|
+| 004 | Add `UNIQUE(repo_id, name)` to `services`; add `UNIQUE(path)` to `repos`; deduplicate existing data | Must run before any ON CONFLICT DO UPDATE upserts |
+| 005 | Add `scan_id` column to `services` and `connections` | Must run after 004 (services must have stable IDs before scan_id FK is meaningful) |
+| 006 | Add `service_aliases` table | Can run independently; no data migration needed |
+
+All three migrations must handle existing data without data loss. Migration 004 is the most invasive — it uses the table-recreation pattern and must run in an explicit `BEGIN ... COMMIT` transaction.
+
+---
+
+## What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `INSERT OR REPLACE` for services/connections | Deletes + re-inserts on conflict, destroying the stable `id` and cascading through FK references. The existing workaround (`MAX(id) GROUP BY name`) becomes invalid after adding UNIQUE constraints | `ON CONFLICT DO UPDATE SET ...` |
+| Temporal tables (valid_from / valid_to columns) | Significant schema complexity for a local dev tool; the `scan_id` foreign key achieves the needed versioning with one column | `scan_id` column on services + connections |
+| History trigger tables (auto-audit) | Doubles row count on every UPDATE; the scan is already idempotent via upsert — history is captured by `map_versions` snapshots | `VACUUM INTO` snapshots for archival; `scan_id` for live diff |
+| Automatic fuzzy name merging | High false-positive risk for service identity (e.g., `auth` and `auth-service` might be different services). Breaks silently | Prompt engineering for consistent naming + manual `service_aliases` |
+| Cross-project ATTACH for write operations | Cross-database transactions are not atomic in SQLite — a crash mid-write leaves databases in inconsistent states | Each project DB is written only by its own worker; ATTACH is read-only |
+| ORM-level migration tools (Knex, Flyway) | Already have a custom migration runner in `worker/db/`; switching introduces a dependency and migration format change | Extend the existing numbered `00N_*.js` migration pattern |
+
+---
+
+## Upsert DDL Reference (migration-ready)
+
+Complete DDL for the updated `query-engine.js` prepared statements after migrations 004-006:
+
+```sql
+-- Repos: upsert by path (stable canonical key)
+INSERT INTO repos (path, name, type, last_commit, scanned_at)
+VALUES (@path, @name, @type, @last_commit, @scanned_at)
+ON CONFLICT(path) DO UPDATE SET
+  name        = excluded.name,
+  type        = excluded.type,
+  last_commit = excluded.last_commit,
+  scanned_at  = excluded.scanned_at
+
+-- Services: upsert by (repo_id, name) — preserves id, updates metadata
+INSERT INTO services (repo_id, name, root_path, language, type, scan_id)
+VALUES (@repo_id, @name, @root_path, @language, @type, @scan_id)
+ON CONFLICT(repo_id, name) DO UPDATE SET
+  root_path = excluded.root_path,
+  language  = excluded.language,
+  type      = excluded.type,
+  scan_id   = excluded.scan_id
+
+-- Connections: upsert by (source_service_id, target_service_id, protocol, method, path)
+-- Needs UNIQUE constraint on these 5 columns (add in migration 004)
+INSERT INTO connections (source_service_id, target_service_id, protocol, method, path,
+                         source_file, target_file, scan_id)
+VALUES (@source_service_id, @target_service_id, @protocol, @method, @path,
+        @source_file, @target_file, @scan_id)
+ON CONFLICT(source_service_id, target_service_id, protocol, method, path) DO UPDATE SET
+  source_file = excluded.source_file,
+  target_file = excluded.target_file,
+  scan_id     = excluded.scan_id
+
+-- exposed_endpoints already has UNIQUE(service_id, method, path) — keep INSERT OR IGNORE
+INSERT OR IGNORE INTO exposed_endpoints (service_id, method, path, handler)
+VALUES (?, ?, ?, ?)
+```
+
+**Note on `connections` UNIQUE constraint:** The current `connections` table has no UNIQUE constraint — only a primary key. Migration 004 must also add `UNIQUE(source_service_id, target_service_id, protocol, method, path)` on `connections` to enable the upsert. This is a table-recreation operation, same as for `services`.
+
+---
+
+## Version Compatibility (v2.2 additions)
+
+| Feature | SQLite Version | Notes |
+|---------|---------------|-------|
+| `ON CONFLICT DO UPDATE` (UPSERT) | 3.24.0+ (June 2018) | Available in bundled SQLite 3.51.3; single ON CONFLICT clause with conflict target |
+| Multiple `ON CONFLICT` clauses / DO UPDATE without target | 3.35.0+ (March 2021) | Also available; not needed for this milestone |
+| `ATTACH DATABASE 'file:...?mode=ro'` | 3.8.2+ (2013) | URI filenames with mode=ro; widely available |
+| Table recreation migration pattern | All versions | `CREATE TABLE ... AS SELECT` not used; explicit DDL + data copy pattern |
+| `ALTER TABLE ... ADD COLUMN` | All versions | Supported; but ADD CONSTRAINT is not — requires table recreation |
+
+---
+
+## Sources (v2.2 addendum)
+
+- `https://sqlite.org/lang_upsert.html` — UPSERT syntax, `ON CONFLICT DO UPDATE`, `excluded` alias, version 3.24.0 introduction, conflict target requirement (HIGH confidence — official SQLite docs, fetched 2026-03-16)
+- `https://sqlite.org/lang_conflict.html` — INSERT OR REPLACE semantics: delete + re-insert, trigger behavior, FK cascade implications (HIGH confidence — official SQLite docs)
+- `https://sqlite.org/lang_attach.html` — ATTACH DATABASE syntax, schema boundaries, FK cross-schema limitation confirmed (HIGH confidence — official SQLite docs, fetched 2026-03-16)
+- `https://sqlite.org/foreignkeys.html` — "Foreign keys may not cross schema boundaries" — FK constraint scope for ATTACH-ed databases (HIGH confidence — official SQLite docs, fetched 2026-03-16)
+- `https://sqlite.org/lang_createtable.html` — UNIQUE constraint syntax, composite UNIQUE on multiple columns, table-recreation as only path for ADD CONSTRAINT (HIGH confidence — official SQLite docs)
+- `https://sqlite.org/autoinc.html` — AUTOINCREMENT behavior with REPLACE: gaps in sequence; ON CONFLICT DO UPDATE does not consume a rowid on conflict (HIGH confidence — official SQLite docs)
+- `https://www.bytefish.de/blog/sqlite_logging_changes.html` — History table with valid_from/valid_to pattern; confirmed this approach is heavyweight for AllClear's needs (MEDIUM confidence — third-party blog, verified pattern is standard)
+- Direct analysis of `worker/db/migrations/001_initial_schema.js` through `003_exposed_endpoints.js` and `worker/db/query-engine.js` — existing schema structure, missing UNIQUE constraints, current INSERT OR REPLACE statements, `getGraph()` MAX(id) workaround (HIGH confidence — local filesystem, source of truth)
+
+---
+
+*Stack research addendum for: AllClear v2.2 — Scan Data Integrity (upsert dedup, scan versioning, cross-repo identity, cross-project MCP)*
+*Researched: 2026-03-16*

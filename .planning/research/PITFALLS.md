@@ -1,326 +1,149 @@
 # Pitfalls Research
 
-**Domain:** Canvas-based developer tool UI — adding HiDPI rendering, zoom/pan controls, real-time log terminal, and project switcher to existing v2.0 D3 Canvas graph
+**Domain:** SQLite-backed service dependency graph — adding idempotent upserts, cross-repo service identity merging, scan versioning, and cross-project MCP queries to an existing live system
 **Researched:** 2026-03-16
-**Confidence:** HIGH (MDN official docs confirmed; codebase inspected; community issues cross-referenced)
+**Confidence:** HIGH (SQLite official docs confirmed; codebase inspected; better-sqlite3 GitHub issues cross-referenced; Dexter's Log foreign key cascade post verified)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: HiDPI Canvas — Setting Physical Dimensions Without Scaling the Context
+### Pitfall 1: INSERT OR REPLACE Silently Deletes All Child Rows (Connections, Endpoints, Schemas, Fields)
 
 **What goes wrong:**
-The canvas element's `width` and `height` attributes control the drawing buffer resolution. CSS `width`/`height` control display size. When they are equal (the current state in `graph.js`: `canvas.width = container.clientWidth`), the canvas draws at 1:1 logical pixels. On a Retina/HiDPI display where `window.devicePixelRatio` is 2 or 3, the browser stretches those logical pixels to fill the physical pixel grid, producing blurry rendering for nodes, labels, and edges.
+`INSERT OR REPLACE` is not an update — it is a delete-then-reinsert. When the services table has a row with `(repo_id=1, name="auth-service")` and you INSERT OR REPLACE a new row for the same service, SQLite deletes the old row first, reassigns a new `id`, then inserts the fresh row. Every row in `connections`, `exposed_endpoints`, `schemas`, and `fields` that referenced the old `services.id` is cascade-deleted (because `foreign_keys = ON` is set in `database.js`). The service appears in the graph with the right name but zero connections and zero endpoints — silently, with no error.
 
 **Why it happens:**
-The distinction between CSS pixels and physical pixels is not obvious when building on standard displays. The current `resize()` function in `graph.js` sets `canvas.width = container.clientWidth` and `canvas.height = container.clientHeight` — CSS pixel values — making the drawing buffer the same resolution as the CSS size. This is the correct size for the display surface but half (or one-third) the resolution needed for crisp rendering on HiDPI screens.
+The current `_stmtUpsertService` in `query-engine.js` uses `INSERT OR REPLACE INTO services`. This was written before scan deduplication was a requirement. Without a UNIQUE constraint on `(repo_id, name)`, REPLACE never fires its conflict path — but as soon as migration 004 adds that UNIQUE constraint, every re-scan triggers the delete-then-reinsert path and wipes the connection graph for each re-scanned service.
 
 **How to avoid:**
-Multiply the drawing buffer by `devicePixelRatio`, set CSS size to the logical dimensions, and scale the 2D context once at the start of every `render()` call (or once after resize):
+Replace `INSERT OR REPLACE` with `INSERT ... ON CONFLICT(repo_id, name) DO UPDATE SET root_path=excluded.root_path, language=excluded.language, type=excluded.type`. This performs an in-place update that preserves the existing `id` and leaves all child rows intact.
 
-```javascript
-function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = container.clientWidth;
-  const cssH = container.clientHeight;
-  canvas.width = cssW * dpr;
-  canvas.height = cssH * dpr;
-  canvas.style.width = cssW + 'px';
-  canvas.style.height = cssH + 'px';
-  render();
-}
+```sql
+INSERT INTO services (repo_id, name, root_path, language, type)
+VALUES (@repo_id, @name, @root_path, @language, @type)
+ON CONFLICT(repo_id, name) DO UPDATE SET
+  root_path = excluded.root_path,
+  language  = excluded.language,
+  type      = excluded.type
 ```
 
-Inside `render()`, apply the DPR scale before the transform translate/scale:
-
-```javascript
-const dpr = window.devicePixelRatio || 1;
-ctx.clearRect(0, 0, canvas.width, canvas.height);
-ctx.save();
-ctx.scale(dpr, dpr);           // DPR scale first
-ctx.translate(state.transform.x, state.transform.y);
-ctx.scale(state.transform.scale, state.transform.scale);
-// ... draw ...
-ctx.restore();
-```
+Apply the same change to `repos` (upsert by `path`) and `repo_state` (upsert by `repo_id`) — both already use `INSERT OR REPLACE` and have the same latent risk.
 
 **Warning signs:**
-- Node labels appear slightly blurry or antialiased on macOS Retina displays
-- Taking a screenshot of the canvas reveals fuzzy circles and text compared to surrounding DOM elements
-- Text in the detail panel is crisp but canvas labels are noticeably lower quality
+- After a re-scan, the graph shows service nodes but no edges
+- `exposed_endpoints` table is empty after the second scan of any repo
+- `connections` count drops to zero immediately after `writeScan()` completes
 
 **Phase to address:**
-HiDPI rendering phase. Must be the first change to `renderer.js` and the `resize()` function. Getting DPR scaling right before adding new drawing code avoids having to re-audit every `ctx` call later.
+Schema migration phase (add UNIQUE constraint) must be paired atomically with the upsert syntax rewrite. If the UNIQUE constraint is added first (migration) before the upsert statements are rewritten (code), the first re-scan after deploying migration 004 will cascade-delete everything. Both changes must ship together.
 
 ---
 
-### Pitfall 2: HiDPI Canvas — Mouse Coordinates Are CSS Pixels, Canvas Buffer Is Physical Pixels
+### Pitfall 2: Adding UNIQUE Constraint to `services` Table Fails if Duplicate Rows Already Exist
 
 **What goes wrong:**
-After applying `devicePixelRatio` scaling, the drawing buffer is 2x or 3x larger in each dimension. But `e.offsetX` and `e.offsetY` from mouse events are still delivered in CSS pixels. If `hitTest()` and `toWorld()` in `utils.js` use raw `e.offsetX`/`e.offsetY` against the now-larger canvas, hit detection is off by a factor of `devicePixelRatio` — clicks register on the wrong node or in empty space.
+The current `services` table has no UNIQUE constraint on `(repo_id, name)`. Every re-scan appends new rows for the same service rather than updating existing ones. Production databases already contain multiple rows for the same `(repo_id, name)` pair — this is the bug that v2.2 is fixing. When migration 004 tries to create a new `services` table with `UNIQUE(repo_id, name)` and copies the old data into it (SQLite's required pattern for adding constraints), the `INSERT INTO new_services SELECT * FROM old_services` statement fails with `UNIQUE constraint failed` on the first duplicate it encounters. The migration transaction rolls back and the schema stays at version 3 forever.
 
 **Why it happens:**
-The browser always reports mouse coordinates in CSS pixels, regardless of `devicePixelRatio` or canvas internal scaling. The current `hitTest()` and `toWorld()` functions use `offsetX`/`offsetY` directly, which is correct today (no DPR scaling applied), but breaks the moment DPR scaling is introduced.
+SQLite cannot add constraints with `ALTER TABLE` — it requires the rename-create-copy-drop pattern. The copy step runs an unconstrained INSERT that fails if the source table contains duplicates. The migration author assumes the table is clean, but the whole reason for this migration is that it is not clean.
 
 **How to avoid:**
-Do NOT multiply mouse coordinates by DPR. The DPR scaling is applied to the canvas context inside `render()`, but the mouse coordinates and the `state.transform` object must remain in CSS pixel space throughout. The `toWorld()` function is already correct — it divides by `state.transform.scale` and subtracts the pan offset — as long as `state.transform` is maintained in CSS pixel units and the DPR scale is applied only inside the render context stack (not to the transform state).
+The copy step must deduplicate before inserting. Use a `GROUP BY` with `MAX(id)` to keep only the most recent row per `(repo_id, name)` pair:
 
-The key rule: `state.transform.x`, `state.transform.y`, `state.transform.scale`, and all positions in `state.positions` must stay in CSS pixel units. DPR scaling is a render-time detail only.
-
-**Warning signs:**
-- After adding DPR fix, clicking a node no longer selects it — click registers in empty space
-- Hit test works at scale=1 but breaks when zoomed
-- Tooltip position matches the cursor but the node highlight appears offset
-
-**Phase to address:**
-HiDPI rendering phase. Write a manual test: at 2x DPR, click on a visible node and verify it selects. Verify pan and zoom still work correctly. This is the most common integration failure when applying the DPR fix.
-
----
-
-### Pitfall 3: Canvas Width/Height Assignment During Resize Resets the Drawing Context
-
-**What goes wrong:**
-Setting `canvas.width` or `canvas.height` — even to the same value — resets the entire 2D rendering context to default state: clears the canvas, resets all style properties (`fillStyle`, `strokeStyle`, `lineWidth`), and discards all saved context states (`ctx.save()` stack). The current `resize()` function in `graph.js` sets `canvas.width` and then calls `render()` which rebuilds everything correctly. But if anyone adds `ctx.save()` calls that span a resize event (e.g., during an animation loop), those saved states are silently lost.
-
-**Why it happens:**
-This is specified HTML Canvas behavior (MDN: "Setting the width or height property resets the rendering context to its default state"). Developers expect property assignment to be non-destructive. In a continuous render loop with Web Workers posting messages, a resize mid-frame can corrupt in-flight state.
-
-**How to avoid:**
-The current pattern of calling `render()` immediately after `canvas.width = ...` is correct — the full redraw re-establishes all state. The risk is in the Web Worker message handler: `state.forceWorker.onmessage` calls `render()` on every tick. If a resize fires during a tick, `render()` is called with a valid context. This is safe because `render()` always starts with `ctx.clearRect()` and `ctx.save()`. Preserve this invariant: never hold persistent state in the 2D context between frames.
-
-**Warning signs:**
-- Canvas goes black intermittently after window resize
-- Styles appear different after resize (wrong colors, wrong line widths)
-- `ctx.restore()` throws "IndexSizeError" in console (mismatched save/restore stack after resize)
-
-**Phase to address:**
-HiDPI rendering phase (same phase as Pitfall 1 and 2). Handled by maintaining the existing render-from-scratch pattern.
-
----
-
-### Pitfall 4: Wheel Event Passive Flag Conflict — Zoom Fails Silently in Chrome
-
-**What goes wrong:**
-The current `interactions.js` correctly adds `{ passive: false }` to the wheel event listener, allowing `e.preventDefault()` to block page scroll during zoom. This works today. The risk arises when refactoring or when someone adds a second wheel listener elsewhere (e.g., inside the log terminal container) without the `{ passive: false }` flag. Chrome/Safari treat document-level wheel/touch events as passive by default. Calling `e.preventDefault()` inside a passive listener generates a warning in the console and the default scroll behavior is NOT suppressed — the page scrolls instead of zooming.
-
-**Why it happens:**
-Browsers introduced passive listeners to improve scroll performance on touch devices. Any wheel listener attached without `{ passive: false }` on a Canvas element will silently fail to prevent default scroll. The error message ("Unable to preventDefault inside passive event listener") appears in the console but does not throw — the developer may not notice until testing on a touchpad-heavy device.
-
-**How to avoid:**
-The existing canvas wheel listener is correct. When adding the log terminal panel, if the terminal container also needs scroll-independent behavior, each scroll-intercepting listener needs explicit `{ passive: false }`. Document this constraint in a comment on both listeners so it is not accidentally removed during refactoring:
-
-```javascript
-// { passive: false } is required — without it, e.preventDefault() is silently ignored
-// and the browser scrolls the page instead of zooming the canvas.
-canvas.addEventListener('wheel', handler, { passive: false });
+```sql
+INSERT INTO services_new (id, repo_id, name, root_path, language, type)
+SELECT MAX(id), repo_id, name, root_path, language, type
+FROM services_old
+GROUP BY repo_id, name;
 ```
 
+Then migrate `connections`, `schemas`, and `fields` to re-point to the surviving `MAX(id)` rows. Rows referencing a deleted duplicate `id` must be updated to reference the surviving `id`, or deleted if their source and target both resolve to the same surviving service.
+
 **Warning signs:**
-- Console warning: "Unable to preventDefault inside passive event listener due to target being treated as passive"
-- Zoom works on some browsers/versions but not others
-- Canvas scrolls vertically when user intends to zoom via trackpad
+- Migration 004 fails with `SQLITE_CONSTRAINT_UNIQUE` on first run against a real database
+- Worker fails to start because `runMigrations()` throws and `_db` is never set
+- Schema version stays at 3 after worker restart attempts
 
 **Phase to address:**
-Zoom/pan tuning phase. Add a comment to the existing wheel listener now to prevent regression. When adding the terminal panel, apply the same flag to any scroll interceptor in the terminal.
+Migration 004 implementation phase. Write the migration against a database that already has duplicates — not against a fresh test database. Add an integration test that seeds duplicates before running migration 004.
 
 ---
 
-### Pitfall 5: Trackpad Two-Finger Scroll vs. Pinch-to-Zoom — Both Fire as `wheel` Events
+### Pitfall 3: FTS5 Index Desynchronization After `INSERT OR REPLACE` Reassigns Row IDs
 
 **What goes wrong:**
-On macOS with a trackpad, two-finger scroll and pinch-to-zoom both arrive as `wheel` events. The current implementation uses `e.deltaY` with a fixed multiplier (`delta = e.deltaY < 0 ? 1.1 : 0.9`) — this treats ALL wheel input as zoom. On a trackpad, a two-finger scroll to read the page becomes an unintended zoom gesture. The user gets unexpected zoom when they want to pan vertically.
+The `services_fts` table is a content-mode FTS5 table backed by `services.rowid`. When `INSERT OR REPLACE` deletes the old service row (old `id` = 42) and inserts a new one (new `id` = 99), the `services_ad` trigger fires on delete (removes rowid 42 from the FTS index) and `services_ai` fires on insert (adds rowid 99). This is correct. However, `services_fts MATCH 'auth-service'` now returns rowid 99, which maps to the newly created service row. Any stale FTS results cached by the `search()` function that reference the old rowid 42 will return no rows from the backing table — FTS5 says the service exists but the joined query returns nothing. More seriously: after the duplicate-elimination migration, some rowids change en masse. The FTS index is not rebuilt. All FTS searches silently return stale or empty results until the index is rebuilt with `INSERT INTO services_fts(services_fts) VALUES('rebuild')`.
 
 **Why it happens:**
-Trackpad pinch events have `e.ctrlKey === true` (this is a browser convention, not a real Ctrl press). Regular two-finger scroll has `e.ctrlKey === false`. Developers miss this distinction and use a single `deltaY` handler for all wheel input.
+FTS5 content tables maintain their own shadow index. They synchronize through triggers on INSERT/UPDATE/DELETE. When rows are deleted and reinserted with new IDs (by REPLACE or by migration), the trigger chain fires correctly for individual upserts but the FTS index can diverge if a bulk operation bypasses triggers (e.g., a direct `INSERT INTO services_new SELECT ... FROM services_old` inside a migration — this goes directly to the new table's triggers, but the old FTS table still has the old rowids).
 
 **How to avoid:**
-Check `e.ctrlKey` to distinguish pinch from scroll. If `ctrlKey` is true, the event is a pinch — apply zoom. If `ctrlKey` is false, the event is a two-finger scroll — apply pan:
+After any migration that rebuilds the `services` table (the rename-create-copy-drop pattern), explicitly rebuild all FTS5 indexes as the final step of the same migration transaction:
 
-```javascript
-canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  if (e.ctrlKey) {
-    // Pinch-to-zoom (trackpad) or Ctrl+scroll (mouse)
-    const delta = e.deltaY < 0 ? 1.1 : 0.9;
-    // ... apply zoom ...
-  } else {
-    // Two-finger scroll (trackpad) — pan instead
-    state.transform.x -= e.deltaX;
-    state.transform.y -= e.deltaY;
-    render();
-  }
-}, { passive: false });
+```sql
+INSERT INTO services_fts(services_fts) VALUES('rebuild');
+INSERT INTO connections_fts(connections_fts) VALUES('rebuild');
+INSERT INTO fields_fts(fields_fts) VALUES('rebuild');
 ```
 
+This is a full O(N) rebuild but runs only once per migration and is safe in a transaction.
+
 **Warning signs:**
-- User reports "zooms too aggressively when scrolling" on a MacBook
-- Two-finger scroll on a trackpad zooms instead of panning
-- Mouse wheel zoom works correctly but trackpad feels wrong
+- FTS5 search returns service names but the JOIN to `services` returns no rows
+- `search()` function returns results with IDs that no longer exist in the `services` table
+- FTS results are a subset of actual services, missing recently re-scanned ones
 
 **Phase to address:**
-Zoom/pan sensitivity tuning phase. This is a targeted change to `interactions.js` wheel handler.
+Migration 004 implementation phase. Add the FTS rebuild as the last step of the migration, inside the same transaction.
 
 ---
 
-### Pitfall 6: Project Switcher — No State Teardown Before Loading New Graph Data
+### Pitfall 4: Cross-Repo Service Identity Merging Creates False Edges by Name Collision
 
 **What goes wrong:**
-The current `graph.js` `init()` is a one-shot function: load project, initialize force worker, attach interaction listeners, render. When the persistent project switcher dropdown is added (switch project without full page reload), calling `init()` again or partially re-running it without tearing down the previous state causes:
-
-1. Two `state.forceWorker` Web Workers running simultaneously — both posting position updates, causing visual flicker and unpredictable node positions.
-2. Duplicate event listeners on the canvas — every `addEventListener` from `setupInteractions()` called again adds a second listener. Clicks now fire twice. Pan fires twice.
-3. `state.positions` from the previous project leaking into the new render if not cleared — ghost positions from project A appear briefly when switching to project B.
-4. The `state.blastCache` from project A persisting into project B — impact queries return wrong results until cache is invalidated.
+The v2.2 goal is to merge services with the same name across repos into one graph node. The `_resolveServiceId(name)` function in `query-engine.js` already does unscoped name lookup: `SELECT id FROM services WHERE name = ?`. If two repos each have a service named `worker` (a common generic name), the first scan creates `services(id=1, repo_id=1, name='worker')`. The second scan resolves `worker` to `id=1` and writes connections from repo 2's `worker` to repo 1's `worker`. The graph shows a self-referencing node. Impact queries traverse these phantom edges and report the wrong services as "affected." The user sees false positives on every `allclear:cross-impact` run.
 
 **Why it happens:**
-`init()` was designed as a one-shot startup, not as a re-entrant function. Adding a project switcher is the first time the UI needs to re-initialize. None of the existing teardown steps exist because they were never needed.
+Service names are not globally unique across independent repos. `worker`, `server`, `api`, `gateway`, `proxy`, `scheduler` are common across any team's portfolio. Name-only resolution assumes names are globally canonical — this is only safe when the team has enforced a naming convention across repos, which most teams have not.
 
 **How to avoid:**
-Before re-initializing for a new project, execute a full teardown:
+The identity merging strategy must be explicit, not implicit. Two options:
 
-```javascript
-function teardown() {
-  // 1. Terminate the force worker
-  if (state.forceWorker) {
-    state.forceWorker.terminate();
-    state.forceWorker = null;
-  }
-  // 2. Remove all canvas event listeners (use named functions, not anonymous)
-  canvas.removeEventListener('mousemove', onMouseMove);
-  canvas.removeEventListener('mousedown', onMouseDown);
-  // etc.
-  // 3. Reset all state
-  state.graphData = { nodes: [], edges: [], mismatches: [] };
-  state.positions = {};
-  state.selectedNodeId = null;
-  state.blastNodeId = null;
-  state.blastSet = new Set();
-  state.blastCache = {};
-  state.transform = { x: 0, y: 0, scale: 1 };
-}
-```
+1. **Agent-enforced canonical names**: The scan agent prompt instructs the agent to use the service's published name (from package.json, Cargo.toml, go.mod, etc.) not its folder name. Validation in `validateFindings()` rejects names that are too generic (block-list: `server`, `worker`, `api`, `app`, `main`).
 
-This requires that all event handler functions in `setupInteractions()` be named (not anonymous) so they can be removed. Currently they are anonymous arrow functions — this must change before adding the project switcher.
+2. **Explicit cross-repo link table**: Add a `service_aliases` table that maps `(repo_id, local_name) → canonical_service_id`. Merging is only applied when an alias mapping exists. Default: no merging — services in different repos are always distinct nodes unless explicitly aliased.
+
+Option 2 is safer. Option 1 requires perfect agent compliance and has no enforcement fallback.
 
 **Warning signs:**
-- Clicking a node selects it twice (detail panel opens and immediately closes)
-- Console shows two Web Workers consuming CPU after first project switch
-- Positions from the previous project flash on-screen for one frame when switching
-- Impact query (Shift+click) returns results from the wrong project
+- Impact graph shows a service connecting to itself (self-loop edge)
+- `/allclear:cross-impact` reports services in unrelated repos as affected
+- Two repos each have a node named `api` but only one appears in the graph (the other was merged into it)
 
 **Phase to address:**
-Project switcher phase. Refactor `setupInteractions()` to use named functions before implementing the dropdown. Implement and test teardown before any data loading.
+Cross-repo identity merging phase. This is the highest-risk feature in v2.2. Start with option 1 (canonical names + block-list validation) as the MVP, not option 2, to avoid the complexity of the alias table. Block generic names at validation time before any merge logic runs.
 
 ---
 
-### Pitfall 7: SSE Log Stream — Server Memory Leak from Zombie Connections
+### Pitfall 5: MCP Server Resolves DB Path from `process.cwd()` — Wrong DB When Invoked from Any Repo
 
 **What goes wrong:**
-The log terminal streams worker logs to the browser via Server-Sent Events (SSE). When the browser tab is closed or refreshed, the SSE connection closes. If the Fastify HTTP server's `request.raw.on('close', ...)` handler is not registered, the server-side `res` object remains in the active connections list indefinitely. Over hours of development use (multiple tab closes, log panel opens/closes), zombie SSE connections accumulate, and the Node.js worker process leaks memory progressively.
+The MCP server in `worker/mcp/server.js` calls `resolveDbPath(process.env.ALLCLEAR_PROJECT_ROOT || process.cwd())`. When Claude Code invokes the MCP server, `process.cwd()` is the directory Claude Code was launched from, not the repo being queried. If the user opens Claude Code in `~/sources/frontend` and asks `allclear_impact` about a service in `~/sources/backend`, the MCP server opens `~/.allclear/projects/<hash-of-frontend>/impact-map.db` — a different database than the one the `backend` worker populated. The tool returns empty results with no error.
 
 **Why it happens:**
-SSE endpoints keep the HTTP response open — they never call `res.end()` until the stream terminates. When the client disconnects unexpectedly (tab close, network drop), the server is notified via the `request.raw.on('close')` event, not via an explicit close call. Developers who implement SSE for the first time often miss this event and never clean up the connection from their active clients set.
+The MCP server is a separate process from the worker. It doesn't know which worker is running or which project the agent is currently working in. `process.cwd()` reflects the shell working directory at MCP server startup, not the project being analyzed.
 
 **How to avoid:**
-Every SSE endpoint handler in the Fastify server must register a cleanup callback on the raw request close event:
-
-```javascript
-const clients = new Set();
-
-fastify.get('/logs/stream', (request, reply) => {
-  reply.raw.setHeader('Content-Type', 'text/event-stream');
-  reply.raw.setHeader('Cache-Control', 'no-cache');
-  reply.raw.setHeader('Connection', 'keep-alive');
-  reply.raw.flushHeaders();
-
-  const send = (data) => reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
-  clients.add(send);
-
-  // Critical: clean up on client disconnect
-  request.raw.on('close', () => {
-    clients.delete(send);
-  });
-});
-```
+The MCP tools must accept a `projectRoot` parameter and pass it to `resolveDbPath()`. When the agent calls `allclear_impact({ service: "auth-service", projectRoot: "/Users/me/sources/backend" })`, the tool opens the correct per-project DB. The `projectRoot` parameter should be optional (falls back to `ALLCLEAR_PROJECT_ROOT` env var, then `process.cwd()`) so existing single-project usage is unaffected. Validate the resolved path: if the DB file does not exist at the resolved location, return a structured error `{ error: "no_scan_data", hint: "Run /allclear:map first" }` rather than silently returning empty results.
 
 **Warning signs:**
-- Worker process memory increases monotonically across development sessions
-- `clients` Set grows without bound (add a `console.error` log for Set size on each connection)
-- Worker crashes with out-of-memory error after several hours of use
+- MCP tool returns `{ results: [] }` for a service that definitely exists in the graph
+- Running `allclear_impact` from a different terminal directory changes the results
+- Two repos with different services appear to share the same MCP query result set
 
 **Phase to address:**
-Log terminal phase. The close event handler must be present in the first SSE endpoint implementation — not added after observing the leak.
-
----
-
-### Pitfall 8: SSE Log Stream — Unbounded Log Buffer Causing DOM Memory Growth
-
-**What goes wrong:**
-If the log terminal appends every SSE event as a new DOM element (e.g., `div` per log line) without any upper bound, and the worker emits logs at high frequency during a scan (hundreds of log lines per second), the log panel DOM grows without limit. After a long scan session, the browser tab consumes hundreds of MB of memory, the log panel becomes unresponsive, and scrolling is janky.
-
-**Why it happens:**
-Naive log terminal implementations: `const line = document.createElement('div'); line.textContent = data.message; logContainer.appendChild(line)`. There is no cap on `logContainer.children.length`.
-
-**How to avoid:**
-Maintain a ring buffer: cap the DOM at N lines (e.g., 500). When the buffer is full, remove the oldest line before appending the new one:
-
-```javascript
-const MAX_LOG_LINES = 500;
-
-function appendLog(message) {
-  const line = document.createElement('div');
-  line.className = 'log-line';
-  line.textContent = message;
-  logContainer.appendChild(line);
-
-  while (logContainer.children.length > MAX_LOG_LINES) {
-    logContainer.removeChild(logContainer.firstChild);
-  }
-
-  // Auto-scroll only if user is already at the bottom
-  if (isAtBottom(logContainer)) {
-    logContainer.scrollTop = logContainer.scrollHeight;
-  }
-}
-```
-
-**Warning signs:**
-- After a full repo scan, the browser tab memory in DevTools shows > 100 MB
-- Scrolling the log panel becomes sluggish after 1000+ log lines
-- `logContainer.children.length` in console grows without stopping
-
-**Phase to address:**
-Log terminal phase. Implement the ring buffer in the first version of the log terminal — not as an optimization added later.
-
----
-
-### Pitfall 9: SSE Auto-Reconnect Flooding the Server on Worker Restart
-
-**What goes wrong:**
-`EventSource` automatically reconnects when the connection drops. When the worker restarts (e.g., after a version mismatch, or during development with nodemon), all browser tabs with the log terminal open immediately attempt to reconnect. If several browser tabs are open simultaneously, they all reconnect at the same instant and flood the just-starting worker with SSE connections before it has finished initializing.
-
-**Why it happens:**
-The default SSE reconnect delay is 3 seconds, but all clients retry at the same time (they all got disconnected simultaneously). There is no jitter. With 3 open tabs, the worker receives 3 simultaneous SSE connections 3 seconds after startup — typically before the database connection pool is initialized.
-
-**How to avoid:**
-Add a `retry:` field to the SSE stream with per-client jitter:
-
-```javascript
-// Send initial retry with jitter (2000-5000ms)
-const jitter = 2000 + Math.random() * 3000;
-reply.raw.write(`retry: ${Math.round(jitter)}\n\n`);
-```
-
-Also, ensure the SSE endpoint is registered after all critical initialization (DB, scan state) completes in the worker startup sequence. The health check endpoint (`/health`) should gate SSE connections if the worker is not yet ready.
-
-**Warning signs:**
-- Worker logs show a burst of SSE connections immediately after restart
-- Worker crashes on restart due to DB initialization race (SSE handler fires before DB is open)
-- Multiple browser tabs all reconnect at t+3s exactly (no jitter visible in logs)
-
-**Phase to address:**
-Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-reference worker startup ordering.
+Cross-project MCP queries phase. All five MCP tool handlers must be updated to accept `projectRoot`. Add an integration test that opens two different project DBs and verifies each tool queries the correct one.
 
 ---
 
@@ -328,13 +151,12 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Skip DPR scaling, use `canvas.width = container.clientWidth` | Simpler resize logic | Blurry rendering on all Retina/HiDPI displays; labels unreadable at scale | Never — DPR fix is 5 lines |
-| Anonymous arrow functions in `setupInteractions()` | Slightly less code | Cannot remove listeners; project switch causes duplicate handlers; must rewrite before adding switcher | Never — name all handlers from the start |
-| Hard-code `devicePixelRatio = 2` | Works for most Macs today | Wrong on 3x displays, wrong on 1x screens (wastes GPU memory), will break on new hardware | Never — always use `window.devicePixelRatio || 1` |
-| Append unlimited log lines to DOM | Simplest implementation | Tab memory bloat after long scans; log panel janks at 1000+ lines | Never — ring buffer is trivial |
-| Skip SSE `request.raw.on('close')` cleanup | Saves 3 lines | Worker memory leaks monotonically across dev sessions; eventually crashes | Never — close handler is mandatory for SSE correctness |
-| Full page reload for project switch | Zero teardown code needed | Loses zoom/pan position; loses selection state; visible flash | Acceptable for MVP; replace with soft switch in follow-up |
-| Merge DPR scale into `state.transform` | Fewer ctx.scale() calls | Confuses CSS-pixel coordinates with physical-pixel coordinates; breaks hit testing | Never — DPR scale is a render-time detail, not a logical transform |
+| Keep `INSERT OR REPLACE` for services without adding UNIQUE constraint | No migration needed | Next re-scan appends duplicates forever; graph dedup stays as `MAX(id) GROUP BY name` workaround | Never — the workaround is in `getGraph()` and is already noted as tech debt (SCAN-01..04) |
+| Add UNIQUE constraint migration without deduplicating first | Simpler migration SQL | Migration fails on any real database with existing scans; worker refuses to start | Never — dedup must precede constraint |
+| Name-only service identity merging without block-list | Simpler merge code | False edges from generic names (`worker`, `api`, `server`) corrupt the graph | Never without block-list; never for unrecognized names |
+| Skip `projectRoot` parameter on MCP tools | No API change needed | All MCP queries silently query wrong DB in multi-repo setups | Never — defeats the entire purpose of cross-project queries |
+| Skip FTS rebuild after migration | Faster migration | FTS search returns stale or wrong rowids until next full re-scan | Never — FTS rebuild is O(rows) not O(DB size); cheap |
+| Snapshot files without size cap | Simpler code | Unbounded disk growth; 100 scans × 5 MB snapshot = 500 MB in `~/.allclear` | Acceptable only during early testing; add retention before shipping |
 
 ---
 
@@ -342,12 +164,12 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Canvas 2D + HiDPI | Applying DPR scale to `e.offsetX`/`e.offsetY` (mouse coordinates) | Mouse coordinates are always CSS pixels — only the context drawing scale is DPR-adjusted, never the input coordinates |
-| Canvas resize + force worker | Sending old `canvas.width`/`canvas.height` to force worker after resize | After DPR fix, `canvas.width` is `cssW * dpr`; send CSS dimensions (divide by DPR) to the force worker for layout bounds |
-| SSE + Fastify | Using `reply.send()` instead of writing to `reply.raw` | `reply.send()` ends the HTTP response; SSE requires writing to `reply.raw` with the connection held open |
-| Wheel event + log terminal | Adding a scroll listener to the terminal container without `{ passive: false }` | Both the canvas zoom handler and any terminal scroll interception need `{ passive: false }` to call `e.preventDefault()` |
-| Project switcher + Web Worker | Calling `worker.terminate()` and then immediately starting a new worker | `terminate()` is asynchronous internally; new worker postMessage may fire before old worker has exited if positions overlap in the state object — always null-check `state.forceWorker` |
-| ES modules + no bundler | Using bare specifier imports (`import { x } from 'lodash'`) | Without import maps or a bundler, bare specifiers throw in browser. All imports must use relative paths (`./modules/state.js`) or CDN URLs with full path |
+| `INSERT OR REPLACE` + `foreign_keys = ON` | Assuming REPLACE is a safe UPDATE synonym | REPLACE deletes and reinserts, firing ON DELETE CASCADE on all child tables; use `ON CONFLICT DO UPDATE` to update in-place |
+| FTS5 content table + table rebuild migration | Skipping FTS rebuild after rename-create-copy-drop | After migration, call `INSERT INTO services_fts(services_fts) VALUES('rebuild')` to resync the shadow index |
+| `ON CONFLICT DO UPDATE` + `excluded.` alias | Referencing column without `excluded.` prefix | In `DO UPDATE SET name = name` the right-hand `name` refers to the existing row value, not the proposed new value; use `excluded.name` for the incoming value |
+| `ON CONFLICT(col)` + no UNIQUE index on that column | Upsert clause silently ignored | SQLite requires a UNIQUE index on the conflict-target columns for `ON CONFLICT(col)` to activate; without the index, every row is treated as a fresh insert |
+| VACUUM INTO snapshot + WAL mode | Using `cp` to copy the DB file | `cp` copies the WAL sidecar, which may be in mid-transaction; `VACUUM INTO` creates a clean, consistent copy without WAL sidecars |
+| Cross-project MCP + `ALLCLEAR_PROJECT_ROOT` env | Setting env variable once at server start | MCP server is a long-running process; env var is fixed at startup; per-call `projectRoot` parameter is the correct mechanism for per-request DB routing |
 
 ---
 
@@ -355,11 +177,10 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| DPR × scale multiplied without CSS size fix | Canvas renders at 4x resolution (2x DPR × 2x CSS upscale) — wasted GPU work | Set `canvas.style.width = cssW + 'px'` as well as `canvas.width = cssW * dpr` | Immediately on any HiDPI display where CSS size is not constrained |
-| DOM log terminal without ring buffer | Browser tab memory > 100 MB after scan; log scroll jank | Cap DOM at 500 lines; remove oldest on append | After 500+ log events (one medium scan) |
-| Continuous `render()` from force worker while SSE also triggers renders | Main thread renders at 60 fps from Web Worker ticks AND additionally re-renders on every log event | Separate render loop (rAF-gated) from log appends; log terminal is DOM-only, does not trigger canvas redraw | Immediately when log events arrive at > 10 hz during scan |
-| Project switch without worker termination | Two Web Workers posting positions → 120 `render()` calls/second → visible flicker | Terminate old worker before starting new one | On first project switch if teardown is skipped |
-| SSE zombie connections | Worker memory grows 1-5 MB per abandoned connection | Register `request.raw.on('close', cleanup)` on every SSE endpoint | After 10+ tab-open/close cycles in a development session |
+| Snapshot retention not enforced | `~/.allclear/projects/` grows unbounded; disk full errors | Enforce `history-limit` from `allclear.config.json` on every `createSnapshot()` call (already coded in `database.js`, verify it is called after every scan) | After ~20 scans of a medium-size repo (5 MB snapshot × 20 = 100 MB per project) |
+| FTS5 `'rebuild'` called inside a large transaction | Rebuild holds a write lock for the duration; other reads block | Run FTS rebuild as its own transaction after the migration transaction commits, not nested inside it | When DB has > 10,000 service rows (uncommon at current scale) |
+| `getGraph()` with `MAX(id) GROUP BY name` workaround | Graph query slows as duplicate rows accumulate (O(N²) GROUP BY on unindexed `name`) | Fixing the upsert (Pitfall 1) eliminates duplicates; workaround becomes unnecessary and should be removed post-migration | After 10+ re-scans of a large repo without the upsert fix |
+| Storing scan history in `map_versions` with `snapshot_path` pointing to a deleted file | `getVersions()` returns rows whose snapshot files were manually deleted; history UI shows dead links | On each `createSnapshot()` call, verify file exists before recording; or accept orphan rows and handle missing files gracefully in the UI | First time a developer manually clears `~/.allclear` to free disk space |
 
 ---
 
@@ -367,9 +188,9 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| SSE log endpoint with no filtering | Internal file paths, env vars, secrets appearing in worker logs stream to browser | Filter log messages server-side; redact lines matching `/(key|secret|token|password)/i` before streaming to SSE |
-| SSE endpoint accessible without project isolation | Log events from project A visible to a browser tab viewing project B | Scope SSE streams by project identifier; reject connections that don't specify a valid project parameter |
-| `reply.raw.write()` with unsanitized log text | Log injection: a crafted log message containing `\n\ndata:` could inject fake SSE events | Sanitize log text: strip newlines and SSE control characters before writing |
+| MCP `projectRoot` parameter passed directly to `resolveDbPath()` without validation | Path traversal: attacker-controlled `projectRoot = "../../etc"` causes DB open attempt on arbitrary path | Validate `projectRoot` is an absolute path under a set of allowed roots (e.g., parent directory of `ALLCLEAR_DATA_DIR`, or must be an existing directory on disk); reject any path containing `..` segments |
+| MCP server opens DB in read-write mode for cross-project queries | Agent tools that are supposed to be read-only can modify another project's scan data | MCP server already uses `readonly: true` — preserve this; never open the cross-project DB with write access from MCP tools |
+| `ALLCLEAR_PROJECT_ROOT` env var accepted without sanitization | Env injection from a crafted `.env` file in a scanned repo could redirect MCP queries | Document that `ALLCLEAR_PROJECT_ROOT` is trusted input; scan workers should never read `.env` files from scanned repos into the current process environment |
 
 ---
 
@@ -377,26 +198,23 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Auto-scroll overrides user scroll position in log terminal | Developer scrolls up to read an old log line; terminal snaps back to bottom on next event | Only auto-scroll when the user's scroll position is already at the bottom (within 20px) |
-| Project switch resets zoom/pan to origin | After switching projects, the graph always starts at scale=1, pan=(0,0) — annoying if the user had a useful view | Persist last zoom/pan per project in `sessionStorage`; restore on project load |
-| Log terminal open by default takes vertical space from graph | On small screens (13" laptop), the graph area is cut in half | Log terminal starts collapsed; user must explicitly open it; remember state in `sessionStorage` |
-| Project switcher dropdown shows hash strings instead of names | `__hash__abc123` is not a useful project name for a dropdown | Show folder name from `projectRoot` path; fall back to first 8 chars of hash only if path is missing |
-| Zoom sensitivity same for mouse wheel and trackpad | Mouse wheel (large deltaY increments) and trackpad two-finger scroll (tiny deltaY increments) need different multipliers | Detect input type via `e.deltaMode` and presence of `ctrlKey`; apply different sensitivity scaling |
+| Re-scan shows "scan complete" but graph is empty due to cascade delete (Pitfall 1) | User assumes the scan found no services; re-scans repeatedly, worsening the situation | Write a post-scan integrity check: after `writeScan()`, query `SELECT COUNT(*) FROM connections` and warn if it drops to zero after previously being non-zero |
+| Migration fails silently and worker falls back to old schema | User runs `/allclear:map`, gets old duplicate-filled graph, assumes the fix didn't work | `runMigrations()` already wraps each migration in a transaction; on failure, log the migration error to the shared logger with `component: 'db'` and surface it in the log terminal |
+| Cross-project MCP returns empty results with no indication of why | Agent concludes the service doesn't exist or has no dependencies | Structured error response: `{ error: "no_scan_data", projectRoot: "...", hint: "Run /allclear:map in that project first" }` |
+| Scan version history shows timestamps but no label | User can't distinguish a post-refactor scan from a pre-refactor scan | Auto-label each version with the git commit short hash and the number of services found: `"abc1234 — 12 services"` |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **HiDPI rendering:** Verify canvas nodes are pixel-crisp on a Retina display — capture a screenshot and inspect at 1:1 pixel zoom; labels should have no antialiasing blur
-- [ ] **HiDPI hit testing:** After applying DPR fix, click exactly on a node on a 2x display and verify it selects (not the empty space beside it)
-- [ ] **Wheel event on scroll overlay:** Open the log terminal panel positioned over the canvas; scroll inside the terminal; verify the canvas does NOT zoom simultaneously
-- [ ] **Project switch teardown:** Switch projects 3 times rapidly; verify `ps` shows exactly one Web Worker process, and no duplicate event listeners fire (instrument with a counter)
-- [ ] **SSE cleanup:** Open the log terminal, close the browser tab, reopen — verify the server's active connections count returns to 0 (add a `/debug/connections` endpoint to check)
-- [ ] **Log ring buffer:** Trigger a full scan and let it run; verify `logContainer.children.length` never exceeds the cap (500) in DevTools
-- [ ] **SSE reconnect jitter:** Restart the worker while 3 browser tabs are open; verify reconnect times are spread out (not all at exactly t+3s)
-- [ ] **Trackpad vs mouse wheel:** Test on a trackpad — two-finger scroll should pan, not zoom; pinch should zoom, not pan
-- [ ] **Canvas resize with DPR:** Resize the browser window; verify graph is not blurry at the new size (DPR scaling must reapply in the resize handler)
-- [ ] **Force worker dimensions after resize:** After a window resize, verify the force simulation layout respects the new canvas CSS dimensions (not the physical pixel dimensions)
+- [ ] **Upsert preserves child rows:** After re-scanning a repo, verify `SELECT COUNT(*) FROM connections` is non-zero and matches the pre-scan count (not reset to zero)
+- [ ] **Migration 004 survives duplicates:** Seed a test DB with 3 duplicate `(repo_id, name)` rows, run migration 004, verify it completes and produces exactly 1 row per unique pair
+- [ ] **FTS5 remains in sync after migration:** After migration 004, run `SELECT name FROM services_fts WHERE services_fts MATCH '"auth-service"'` and verify it returns the surviving row's `id`, not a deleted one
+- [ ] **ON CONFLICT activates (UNIQUE index exists):** Run `EXPLAIN QUERY PLAN INSERT INTO services ... ON CONFLICT(repo_id, name) DO UPDATE ...` and confirm it shows "UNIQUE INDEX" in the plan, not a full table scan
+- [ ] **No false cross-repo edges:** Seed two repos each with a service named `api`, scan both, verify the graph shows two distinct `api` nodes (one per repo), not one merged node with phantom edges
+- [ ] **MCP queries correct project DB:** With two project DBs open, call `allclear_impact` with `projectRoot` pointing to each; verify results are different and match the correct DB
+- [ ] **Snapshot retention respected:** After 15 scans, verify `ls ~/.allclear/projects/<hash>/snapshots/` shows at most `history-limit` (default: 10) files
+- [ ] **MCP `projectRoot` validated:** Pass `projectRoot = "../../etc"` to an MCP tool and verify it returns an error rather than attempting to open that path
 
 ---
 
@@ -404,12 +222,12 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Blurry canvas after HiDPI fix (incorrect implementation) | LOW | Verify `canvas.style.width`/`height` CSS properties are set to CSS pixel values; verify DPR scale is applied inside `ctx.save()`/`ctx.restore()` block, not to `state.transform` |
-| Duplicate event listeners after project switch | MEDIUM | Audit `setupInteractions()` to replace all anonymous arrow functions with named functions; add `AbortController` as alternative to named-function removal |
-| SSE memory leak already in production | MEDIUM | Add `request.raw.on('close', cleanup)` to all existing SSE endpoints; restart worker to reset current connections |
-| Log DOM bloat causing tab slowdown | LOW | Add ring buffer cap; call `logContainer.innerHTML = ''` to clear existing DOM immediately |
-| Wrong zoom behavior on trackpad | LOW | Add `e.ctrlKey` check to wheel handler; 2-line change to `interactions.js` |
-| Force worker receiving physical pixel canvas dimensions | LOW | Audit all places `canvas.width` and `canvas.height` are passed to force worker; divide by `devicePixelRatio` before passing |
+| Cascade delete wiped connections after REPLACE (Pitfall 1) | HIGH | Re-scan all repos from scratch to rebuild the connection graph; ensure upsert fix is deployed first or re-scan will repeat the deletion |
+| Migration 004 failed, worker stuck at schema v3 | MEDIUM | Fix the migration SQL to include dedup step; or manually deduplicate via SQLite CLI (`DELETE FROM services WHERE id NOT IN (SELECT MAX(id) FROM services GROUP BY repo_id, name)`) then rerun migration |
+| FTS5 index desync after migration | LOW | Run `INSERT INTO services_fts(services_fts) VALUES('rebuild')` via better-sqlite3 or SQLite CLI; no data loss, only index rebuild |
+| False cross-repo edges from name collision | MEDIUM | Identify the generic service names involved; add them to the block-list in `validateFindings()`; re-scan affected repos to replace the bad data |
+| MCP queries wrong project DB | LOW | Add `projectRoot` parameter to the affected tool call; or set `ALLCLEAR_PROJECT_ROOT` env var correctly; no data corruption — wrong DB was read-only |
+| Snapshot files accumulating unbounded | LOW | Delete snapshots directory manually: `rm -rf ~/.allclear/projects/<hash>/snapshots/`; worker creates a fresh snapshot on next scan |
 
 ---
 
@@ -417,34 +235,31 @@ Log terminal phase. Add the retry jitter to the first SSE implementation. Cross-
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| HiDPI blurry rendering | HiDPI canvas rendering phase | Screenshot at 2x DPR shows crisp nodes and labels |
-| Mouse coordinate mismatch after DPR fix | HiDPI canvas rendering phase | Click test on 2x display selects node under cursor |
-| Canvas resize clears context state | HiDPI canvas rendering phase (same) | Resize window 5 times; no visual corruption, no console errors |
-| Passive wheel event conflict | Zoom/pan tuning phase | No console warning about passive listeners; zoom works in Chrome, Firefox, Safari |
-| Trackpad vs mouse wheel sensitivity | Zoom/pan tuning phase | Trackpad two-finger scroll pans; pinch zooms; mouse wheel zooms |
-| Project switch state teardown | Project switcher phase | 3 rapid project switches show 1 worker, 0 duplicate handlers |
-| SSE zombie connection leak | Log terminal phase | Server connection count returns to 0 after all browser tabs closed |
-| DOM log buffer unbounded growth | Log terminal phase | After full scan, log DOM node count stays <= 500 |
-| SSE reconnect flood after worker restart | Log terminal phase | 3 tabs reconnect with spread-out retry timing visible in logs |
+| INSERT OR REPLACE cascade-deletes child rows | Upsert rewrite phase (must ship with UNIQUE constraint migration) | After re-scan, `SELECT COUNT(*) FROM connections` equals pre-scan count |
+| Migration 004 fails on existing duplicates | Migration 004 implementation | Migration test: seed duplicates → run migration → verify 1 row per `(repo_id, name)` |
+| FTS5 index desync after migration | Migration 004 implementation | Post-migration FTS search returns correct rowids matching current `services.id` values |
+| `ON CONFLICT DO UPDATE` not activating (missing index) | Upsert rewrite phase | `EXPLAIN QUERY PLAN` confirms UNIQUE INDEX usage |
+| Cross-repo false edges from name collision | Cross-repo identity merging phase | Two repos with `api` service → two distinct graph nodes |
+| MCP queries wrong project DB | Cross-project MCP queries phase | Two-project integration test with `projectRoot` parameter |
+| `projectRoot` path traversal | Cross-project MCP queries phase | Fuzzing test rejects `..` path segments |
+| Snapshot disk growth | Scan versioning phase | After 15 scans, snapshot count ≤ `history-limit` |
 
 ---
 
 ## Sources
 
-- [MDN: HTMLCanvasElement.width — context reset on assignment](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/width) — Documents the context reset behavior on width/height assignment
-- [MDN: Window.devicePixelRatio](https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio) — DPR definition, ResizeObserver `devicePixelContentBoxSize` usage
-- [web.dev: High DPI Canvas](https://web.dev/articles/canvas-hidipi) — Official Google guidance on DPR scaling pattern
-- [kirupa.com: Canvas High-DPI Retina rendering](https://www.kirupa.com/canvas/canvas_high_dpi_retina.htm) — Practical three-step pattern (buffer size, context scale, CSS size)
-- [MDN: Element.wheel event](https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event) — deltaMode, passive listener behavior
-- [tigerabrodi.blog: Trackpad pinch-to-zoom vs scroll in Canvas](https://tigerabrodi.blog/how-to-handle-trackpad-pinch-to-zoom-vs-two-finger-scroll-in-javascript-canvas-apps) — ctrlKey convention for trackpad pinch detection
-- [Excalibur.js Issue #1195: wheel passive event listener](https://github.com/excaliburjs/Excalibur/issues/1195) — Real-world example of passive wheel event breaking canvas zoom
-- [expressjs/express Issue #2248: EventSource memory leak](https://github.com/expressjs/express/issues/2248) — Server-side SSE connection accumulation without close handler
-- [MDN: EventSource.close()](https://developer.mozilla.org/en-US/docs/Web/API/EventSource/close) — Client-side cleanup requirement
-- [nestjs/nest Issue #11601: SSE memory leak](https://github.com/nestjs/nest/issues/11601) — Server-side SSE cleanup patterns
-- [ben-botto/Medium: Zooming at Mouse Coordinates with Affine Transforms](https://medium.com/@benjamin.botto/zooming-at-the-mouse-coordinates-with-affine-transformations-86e7312fd50b) — Correct zoom-to-cursor formula (matches current implementation)
-- Codebase inspection: `worker/ui/modules/renderer.js`, `interactions.js`, `state.js`, `utils.js`, `graph.js`, `project-picker.js` — Confirmed specific anti-patterns (anonymous handlers, no DPR scaling, no teardown)
+- [SQLite UPSERT official documentation](https://sqlite.org/lang_upsert.html) — Confirms UPSERT syntax added in SQLite 3.24.0 (2018-06-04); `excluded.` qualifier behavior; `ON CONFLICT(col)` requires UNIQUE index on target column
+- [Dexter's Log: INSERT ON CONFLICT REPLACE with ON DELETE CASCADE deletes child records](https://dexterslog.com/posts/insert-on-conflict-replace-with-on-delete-cascade-in-sqlite/) — Confirmed failure mode: REPLACE deletes parent first, cascade fires, child rows destroyed before new parent is inserted
+- [better-sqlite3 Issue #654: FTS5 triggers fail to transact with RETURNING clause](https://github.com/WiseLibs/better-sqlite3/issues/654) — Root cause is SQLite bug; fixed in better-sqlite3 v7.4.6
+- [SQLite Forum: Corrupt FTS5 table after declaring triggers a certain way](https://sqlite.org/forum/info/da59bf102d7a7951740bd01c4942b1119512a86bfa1b11d4f762056c8eb7fc4e) — FTS5 UPDATE trigger must use delete-then-reinsert; wrong order corrupts the index
+- [simonh.uk: SQLite FTS5 Triggers](https://simonh.uk/2021/05/11/sqlite-fts5-triggers/) — Correct AFTER INSERT/DELETE/UPDATE trigger patterns for external content FTS5 tables
+- [Sling Academy: Best Practices for UNIQUE Constraints in SQLite](https://www.slingacademy.com/article/best-practices-for-using-unique-constraints-in-sqlite/) — Adding UNIQUE constraint requires rename-create-copy-drop; pre-existing duplicates abort the copy INSERT
+- [Miguel Grinberg: Fixing ALTER TABLE errors with Flask-Migrate and SQLite](https://blog.miguelgrinberg.com/post/fixing-alter-table-errors-with-flask-migrate-and-sqlite) — Batch mode migration pattern; unnamed constraint handling
+- [Sequelize Issue #12823: Multi-column UNIQUE constraint corrupted during migration](https://github.com/sequelize/sequelize/issues/12823) — Real-world example of multi-column UNIQUE being flattened to per-column UNIQUE during SQLite migration rebuild
+- [Datadog Security Labs: SQL injection in MCP server](https://securitylabs.datadoghq.com/articles/mcp-vulnerability-case-study-SQL-injection-in-the-postgresql-mcp-server/) — MCP server input validation requirements; parameter sanitization before DB path resolution
+- Codebase inspection: `worker/db/query-engine.js` (`_stmtUpsertService`, `_resolveServiceId`, `getGraph()` MAX(id) workaround), `worker/db/database.js` (`writeScan()`, `openDb()` pragma ordering), `worker/db/migrations/001_initial_schema.js` (FTS5 trigger definitions, no UNIQUE on services), `worker/mcp/server.js` (`resolveDbPath()` from `process.cwd()`) — confirmed specific anti-patterns
 
 ---
 
-*Pitfalls research for: AllClear v2.1 — UI Polish & Observability (HiDPI canvas, zoom/pan, log terminal, project switcher)*
+*Pitfalls research for: AllClear v2.2 — Scan Data Integrity (idempotent upserts, cross-repo service identity, scan versioning, cross-project MCP queries)*
 *Researched: 2026-03-16*

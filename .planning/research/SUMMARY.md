@@ -1,199 +1,190 @@
 # Project Research Summary
 
-**Project:** AllClear v2.1 — UI Polish & Observability
-**Domain:** Canvas-based developer tool graph UI — HiDPI rendering, zoom/pan controls, log terminal, project switcher
+**Project:** AllClear v2.2 — Scan Data Integrity
+**Domain:** SQLite-backed service dependency graph — idempotent re-scan, stale-row cleanup, cross-repo service identity, cross-project MCP queries
 **Researched:** 2026-03-16
-**Confidence:** HIGH
+**Confidence:** HIGH — all four research areas grounded in direct codebase inspection + official SQLite/MCP docs
 
 ## Executive Summary
 
-AllClear v2.1 adds four production-quality features to the already-shipped v2.0 D3 Canvas graph: HiDPI/Retina rendering, tuned zoom/pan controls, an embedded log terminal panel, and a persistent project switcher. Research was conducted against the live codebase (all UI modules inspected directly) and against official MDN, D3, Fastify, and npm sources. The recommended approach is a phased build ordered by dependency: canvas rendering fixes first (independent, highest value), then the log terminal server route, then the log terminal UI, and finally the project switcher which requires a `graph.js` refactor. Every feature has a well-understood implementation pattern; no novel design work is required.
+AllClear v2.2 is a targeted bug-fix and capability milestone for an already-shipped system. The graph UI, agent scanning, MCP server, FTS5 search, snapshot mechanism, and project switcher are all working. The problems being solved are: (1) every re-scan appends duplicate rows rather than replacing them, causing the graph to grow unboundedly and impact queries to fan out incorrectly; (2) the MCP server resolves its database path from `process.cwd()` at startup, so agents working in any repo other than the one the server launched from see empty query results; and (3) there is no enforced naming convention for services across repos, causing the same logical service to appear as multiple unconnected nodes. All three problems have known root causes confirmed by direct codebase inspection.
 
-The two highest-risk areas are the project switcher teardown and the SSE log stream. The project switcher requires refactoring all anonymous event handler functions in `setupInteractions()` to named functions before the feature can work correctly — skipping this causes duplicate listeners, double-firing clicks, and two simultaneous Web Workers. The SSE log endpoint requires an explicit `request.raw.on('close')` cleanup handler or the worker process will leak memory across development sessions. Both risks are well-documented and preventable; they are non-obvious the first time but each has a concrete 3-5 line fix.
+The recommended approach is to address the data corruption problem first, before adding any new capability. Migration 004 adds the UNIQUE constraint on `(repo_id, name)` that makes idempotent upserts possible, but this migration has a critical dependency ordering requirement: the upsert SQL in `_stmtUpsertService` must switch from `INSERT OR REPLACE` to `INSERT ... ON CONFLICT DO UPDATE` at the same time the constraint is added. If the constraint lands first, the first re-scan after migration wipes all child rows (connections, endpoints, schemas, fields) via `ON DELETE CASCADE`. This constraint-and-upsert change must ship as a single atomic change. The scan version bracket (migration 005 + `beginScan`/`endScan` methods) then builds on the clean upsert to provide stale-row cleanup. The MCP cross-project query feature is fully independent and can be developed in parallel.
 
-The v2.1 milestone deliberately avoids over-engineering. The log terminal uses HTTP polling (not WebSockets), the graph UI uses vanilla JS + D3 (no React, no bundler), and the worker is a single Node.js process (no pm2, no daemon manager). These constraints are load-bearing: they keep the install story simple, keep the worker process inspectable, and avoid toolchain dependencies that complicate the plugin distribution model. Every recommended approach stays consistent with these constraints.
+The principal risk is the migration itself: production databases already contain duplicate `(repo_id, name)` rows — the exact data the migration must eliminate. A naive `CREATE TABLE ... AS SELECT *` copy fails on the first duplicate encountered. The migration must deduplicate with `SELECT MAX(id) ... GROUP BY repo_id, name` during the copy step, and must rebuild the FTS5 index afterward because row IDs change. Both requirements are well-documented with concrete SQL. A second risk is cross-repo service identity: the existing `_resolveServiceId()` name lookup is unscoped by repo, meaning two repos each containing a service named `api` or `worker` will have their connections merged into phantom edges. This must be addressed with a validation block-list rather than automatic name merging.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing v2.0 stack (better-sqlite3, Fastify 5, @modelcontextprotocol/sdk, D3 v7, Node.js 20+) requires only two new npm packages for v2.1. `@fastify/sse` (0.4.0, Fastify 5 compatible) handles the SSE log streaming endpoint. `@xterm/xterm` (6.0.0) and `@xterm/addon-fit` (0.11.0) are loaded browser-side via CDN — they are not Node.js dependencies. The HiDPI canvas fix, zoom tuning, and project switcher require zero new packages; they are pure JavaScript changes to existing modules.
+The v2.2 work is entirely within the existing worker stack: `better-sqlite3` 12.8.0 for synchronous SQLite access, `@modelcontextprotocol/sdk` 1.27.1 for the MCP stdio server, and `fastify` 5.8.2 for the HTTP/REST layer. No new dependencies are required. The migration system in `db/database.js` auto-discovers all `*.js` files in `db/migrations/` sorted alphabetically — dropping two new migration files is sufficient to extend the schema on next `openDb()`. The MCP server refactor switches from a module-level DB connection to per-call resolution via the existing `pool.js` module, which already handles multi-project DB caching for the HTTP layer.
 
 **Core technologies:**
-- `@fastify/sse` 0.4.0: SSE endpoint for log streaming — official Fastify plugin, Fastify v5 peer dep verified, async generator API
-- `@xterm/xterm` 6.0.0 (CDN only): Terminal emulator for log display — battle-tested (powers VS Code's terminal), full ANSI support, Canvas renderer built-in; use scoped `@xterm/xterm`, not legacy unscoped `xterm` (5.3.0, abandoned)
-- `@xterm/addon-fit` 0.11.0 (CDN only): Resize xterm to fill its container — required companion, same release cycle as xterm
-- `window.devicePixelRatio` + `ctx.scale(dpr, dpr)`: HiDPI canvas fix — zero dependencies, MDN-documented three-step pattern, backwards-compatible at dpr=1
-- `e.ctrlKey` wheel event check: Trackpad pinch vs two-finger scroll detection — browser convention, widely supported in Chrome/Safari/Firefox
+- `better-sqlite3` 12.8.0: synchronous SQLite with WAL + FTS5 — the only write path; the target of the UNIQUE constraint change
+- `@modelcontextprotocol/sdk` 1.27.1: MCP stdio server — agent-facing interface; needs per-call `resolveDb()` for cross-project support
+- `db/pool.js` (existing): project-hash-keyed QueryEngine cache — already used by the HTTP server; MCP server must adopt the same pattern
+- `db/migrations/` auto-discovery (existing): drop new migration files and they run automatically; no changes to `database.js` needed
 
-**Critical version notes:**
-- Node.js 20+ required (established in v2.0; driven by better-sqlite3 12.x and Fastify 5.x)
-- `@fastify/sse` 0.4.0 requires Fastify v5 — will not work with Fastify v4
-- The scoped `@xterm/xterm` package is the current package; the unscoped `xterm` package stopped updates at 5.3.0
+**Critical version requirements:**
+- Node.js 20+ (required by `better-sqlite3` 12.x and `fastify` 5.x — already in use)
+- SQLite 3.24+ for `ON CONFLICT DO UPDATE` UPSERT syntax (shipped with `better-sqlite3` 12.x — already satisfied)
 
 ### Expected Features
 
-Research confirms all four v2.1 features are standard patterns in developer tooling, with reference implementations in VS Code, Grafana, Chrome DevTools, and Figma. Missing HiDPI rendering is an immediate visual regression on any Mac (Retina display default since 2012); it reads as "unfinished" to any developer audience.
+The features research is unusually precise because the root causes of all defects were identified in source. This milestone is a repair, not a greenfield build.
 
-**Must have (v2.1 table stakes):**
-- HiDPI/Retina canvas rendering — blurry canvas on any Mac reads as unfinished; standard 5-line fix
-- Zoom/pan with mouse wheel and drag — every graph tool (Grafana, Kibana, network maps) supports this as a baseline
-- Fit-to-screen / reset view button — escape hatch required for any pan-able canvas
-- Project switcher without page reload — forcing a full reload to change projects is a regression from SPA behavior
-- Log terminal panel (collapsible) — developer tools always surface observability; hiding logs behind `tail -f` creates friction
+**Must have (table stakes — v2.2 core):**
+- Migration 004: `UNIQUE(repo_id, name)` on `services` and composite unique on `connections` — foundation for all other fixes; includes dedup step for existing rows and FTS5 rebuild
+- `INSERT OR REPLACE` → `INSERT ... ON CONFLICT DO UPDATE` in `_stmtUpsertService` — must ship with migration 004 atomically or cascade-delete wipes child rows
+- Scan version bracket: `beginScan(repoId)` / `endScan(repoId, scanVersionId)` — new scan_versions table (migration 005); stale-row DELETE runs atomically after new scan succeeds
+- Remove `MAX(id) GROUP BY name` workaround from `getGraph()` — becomes incorrect after migration 004, must be removed
+- Agent prompt naming rule: lowercase-hyphenated convention enforced in `agent-prompt-deep.md` — cheapest identity fix; no schema change
+- Cross-project MCP queries: optional `project` param on all 5 MCP tools; per-call `resolveDb()` via `pool.js`
 
-**Should have (competitive):**
-- Live-tail toggle — VS Code and Grafana Loki pattern; prevents auto-scroll from disrupting log inspection
-- Component filter in log panel — narrows to scanner/mcp/api subsystem, same as VS Code Output Channel selector
-- Log search (text filter) — grep-style; add when users ask "how do I find the error that just happened?"
-- Persistent project selection via `localStorage` — eliminates re-selection friction every session
-- Zoom level indicator (%) — discoverability; low effort once zoom is tuned
+**Should have (v2.2.x — after core is confirmed working):**
+- Cross-repo canonical service identity: `service_registry` table + normalization function — add when multi-repo name divergence is confirmed in production
+- Scan version history panel in graph UI: `GET /versions` endpoint + history dropdown — infrastructure already exists (`map_versions` table, `createSnapshot()`)
 
-**Defer to v2.2+:**
-- Smooth animated zoom transitions on +/- buttons — polish only, not blocking
-- Log export (copy/download) — add if users need to share logs
-- Multi-project side-by-side comparison — rare use case, doubles DOM/Canvas complexity
-- Full xterm PTY integration — overkill for structured JSON log viewing; 300KB+ dependency for zero additional value over a styled div
+**Defer to v2.3+:**
+- Diff view between scan versions (services/connections added/removed)
+- Config-file service name aliases (`allclear.config.json`) for teams with naming debt
+
+**Anti-features (do not build):**
+- Fuzzy service name matching (Levenshtein / embeddings) — false merges are correctness bugs; a merged `user-service`/`users-service` creates phantom impact paths
+- Auto-repair of historical connections on identity merge — rewrites audit history; breaks snapshot consistency
+- Global shared SQLite DB for all projects — concurrent write from multiple workers causes `SQLITE_BUSY`; per-project isolation is explicit by design
+- Automatic incremental scan on every file save — agent scan invokes Claude twice per repo; commit-based incremental scan is already built
 
 ### Architecture Approach
 
-The v2.1 additions follow the existing one-concern-per-module pattern already established in the codebase. Two new modules are created (`log-terminal.js`, `project-switcher.js`), five existing modules are modified (`state.js`, `renderer.js`, `interactions.js`, `graph.js`, `index.html`), and one server route is added to `http.js`. No changes to the worker process architecture are required — HTTP and MCP stdio continue to coexist in a single Node.js process. The phased build order is determined by module dependencies, not by arbitrary grouping.
+All v2.2 changes are contained within `worker/`. No new top-level components are introduced. The changes follow the existing extension patterns: new migration files auto-discovered by `db/database.js`, new QueryEngine methods injected following the same pattern as `upsertRepo`/`persistFindings`, and MCP server switching from module-level DB to per-call resolution using the `pool.js` cache that the HTTP server already uses. The most structurally significant change is the MCP server: it currently opens one DB for its entire lifetime and closes it after each tool call; after v2.2, pool.js owns the connection and callers must stop calling `db.close()`.
 
-**Major components:**
-1. `renderer.js` (MODIFIED) — wrap draw sequence in `ctx.scale(dpr, dpr)` after `ctx.save()`; font size adjustments for legibility at normal zoom
-2. `interactions.js` (MODIFIED) — wheel delta tuning; `e.ctrlKey` check for trackpad pinch vs two-finger scroll
-3. `graph.js` (MODIFIED) — extract `loadProject(hash)` from `init()`; call `initProjectSwitcher()` and `initLogTerminal()` after first load; wire fit-to-screen button
-4. `project-switcher.js` (NEW) — populate `#project-select` from `/projects`, handle `onchange`, full teardown then re-init via `loadProject()`
-5. `log-terminal.js` (NEW) — 2s polling of `GET /api/logs`, ring-buffer DOM cap at 500 lines, component filter, live-tail toggle
-6. `worker/server/http.js` (MODIFIED) — add `GET /api/logs` route reading from `~/.allclear/logs/worker.log`; accept `dataDir` via options object
-7. `state.js` (MODIFIED) — add `currentProject`, `logPanelOpen`, `logFilter`, `logComponentFilter` fields
+**Major components and their v2.2 changes:**
 
-**Key architectural rule:** `state.transform`, `state.positions`, and all mouse coordinates must remain in CSS pixel space throughout. `devicePixelRatio` scaling is applied once at render-time (`ctx.scale(dpr, dpr)`) and nowhere else. Applying DPR to coordinates breaks hit testing, drag, and pan.
+1. `db/migrations/004_dedup_constraints.js` (NEW) — UNIQUE index on `services(repo_id, name)` + `canonical_name` column; dedup step in migration copy; FTS5 rebuild
+2. `db/migrations/005_scan_versions.js` (NEW) — `scan_versions` table; nullable `scan_version_id` FK columns on `services` and `connections`
+3. `db/query-engine.js` (MODIFIED) — +`beginScan`, +`endScan`; `persistFindings` accepts `scanVersionId`; `getGraph` removes MAX(id) workaround
+4. `scan/manager.js` (MODIFIED) — `beginScan` before agent invocation; `endScan` after `persistFindings` on success path only (failure leaves old data intact)
+5. `mcp/server.js` (MODIFIED) — `resolveDb()` helper; +`project` param on all 5 tools; stop closing pool-owned connections
+6. `db/pool.js` (MODIFIED) — remove inline migration workaround in `getQueryEngineByHash()` lines 178-202 after migration files 004+005 are in place
+
+Unchanged: `db/database.js`, `server/http.js` (already uses pool.js with `?project=` and `?hash=`).
 
 ### Critical Pitfalls
 
-1. **HiDPI mouse coordinate mismatch** — After `ctx.scale(dpr, dpr)`, `e.offsetX`/`e.offsetY` remain CSS pixels. Never multiply mouse coordinates by DPR. The DPR scale wraps only the canvas context draw stack, not `state.transform` or any input coordinate. Violation breaks click-to-select by a factor of `devicePixelRatio`.
+1. **`INSERT OR REPLACE` cascade-deletes child rows when UNIQUE constraint is active** — REPLACE is delete-then-reinsert; `ON DELETE CASCADE` fires and wipes connections, endpoints, schemas, fields for every re-scanned service. Switch to `INSERT ... ON CONFLICT(repo_id, name) DO UPDATE SET ...` which updates in-place and preserves the existing `id`. This change must ship in the same PR as migration 004; deploying the migration before the code change causes silent data loss on the first re-scan.
 
-2. **Project switcher without full teardown** — `init()` was designed as a one-shot startup. Re-running without teardown creates: (a) two simultaneous `forceWorker` Web Workers — visual flicker and double CPU; (b) duplicate canvas event listeners — clicks fire twice; (c) state from project A leaking into project B. Teardown requires named handler functions (currently anonymous in `setupInteractions()`), `forceWorker.terminate()`, and full state reset. Refactor anonymous handlers before implementing the switcher.
+2. **Migration 004 fails on existing databases with duplicate rows** — SQLite's rename-create-copy-drop pattern fails if the source table has duplicates. The copy INSERT fires the new UNIQUE constraint and aborts. The copy step must deduplicate: `SELECT MAX(id), repo_id, name, ... FROM services_old GROUP BY repo_id, name`. Test this migration against a database that already has duplicate rows — not a clean test fixture.
 
-3. **SSE zombie connection leak** — SSE endpoints keep HTTP responses open indefinitely. Without `request.raw.on('close', cleanup)`, browser tab closes accumulate zombie connections. Worker memory grows 1-5 MB per abandoned connection and eventually crashes. The close handler is mandatory; it must be in the first implementation, not added later.
+3. **FTS5 index desync after migration** — After the rename-create-copy-drop migration rebuilds the `services` table with new row IDs, the FTS5 shadow index retains stale rowids. Add `INSERT INTO services_fts(services_fts) VALUES('rebuild')` as the final step of migration 004, inside the same migration transaction.
 
-4. **Trackpad two-finger scroll fires as wheel event** — On macOS, both two-finger scroll and pinch-to-zoom arrive as `wheel` events. Current code treats all wheel input as zoom. Check `e.ctrlKey`: `true` = pinch (zoom); `false` = two-finger scroll (pan via `state.transform.x -= e.deltaX`).
+4. **Cross-repo false edges from generic service names** — `_resolveServiceId(name)` does an unscoped lookup across all repos. Two repos with a service named `api`, `worker`, or `server` will have their connections merged into phantom edges. Add a validation block-list in `validateFindings()` that rejects generic names before any identity resolution runs.
 
-5. **DOM log buffer unbounded growth** — Naive `logContainer.appendChild(line)` with no cap causes 100+ MB tab memory after a scan session and janky scrolling at 1000+ lines. Cap at 500 lines with a ring buffer: remove `logContainer.firstChild` when `children.length > MAX`.
+5. **MCP server resolves wrong DB from `process.cwd()`** — The MCP server is a long-running process; its CWD reflects where Claude Code was launched, not the repo the agent is querying. All five tool handlers must accept an optional `project` parameter and call `resolveDb(params.project)` per-call. Return a structured error `{ error: "no_scan_data", hint: "Run /allclear:map first" }` when the resolved DB does not exist — never return silent empty results.
 
 ## Implications for Roadmap
 
-The dependency graph established in architecture research produces a clear, four-phase build order.
+The dependency graph is clear from research: schema changes precede application code that uses them; the UNIQUE constraint and upsert rewrite ship together; the scan version bracket builds on the dedup foundation; MCP cross-project queries are fully independent. This produces three focused phases.
 
-### Phase 1: Canvas Rendering Fixes
+### Phase 1: Schema Foundation + Upsert Repair
 
-**Rationale:** Independent of all other v2.1 work; touches only `renderer.js`, `graph.js`, and `interactions.js`; no server changes; no new modules. Affects every user immediately on any Retina Mac. Getting the renderer correct before adding new modules avoids re-auditing every `ctx` call later. Phase 2 (log API) can be developed in parallel.
+**Rationale:** Everything else depends on the UNIQUE constraint being present and the upsert SQL being correct. These changes also carry the highest risk — if done incorrectly, existing user data is silently corrupted on the first re-scan. Isolating them as Phase 1 enables targeted testing before any other changes land. Migration 004 must be tested against a database seeded with duplicate rows; this is the only way to catch the dedup failure mode.
 
-**Delivers:** Crisp rendering on all HiDPI displays; usable zoom/pan with trackpad pinch vs scroll detection; natural wheel sensitivity; fit-to-screen button.
+**Delivers:** Idempotent re-scan with no data corruption. The graph no longer grows unboundedly. The `MAX(id) GROUP BY name` workaround is removed. FTS5 index is rebuilt and correct. Agent prompt enforces lowercase-hyphenated naming to prevent the identity problem from growing.
 
-**Addresses:** HiDPI fix + font size bump, zoom sensitivity tuning, `scaleExtent` bounds, trackpad pinch vs scroll, fit-to-screen reset.
+**Addresses:** Migration 004 (UNIQUE constraints + dedup + FTS5 rebuild), upsert SQL rewrite (`ON CONFLICT DO UPDATE`), remove `getGraph()` workaround, agent prompt naming convention, validation block-list for generic service names
 
-**Avoids:** Blurry canvas pitfall, mouse coordinate mismatch pitfall, passive wheel event conflict pitfall, trackpad scroll-as-zoom pitfall.
+**Avoids:** Pitfall 1 (cascade delete), Pitfall 2 (migration fails on duplicates), Pitfall 3 (FTS5 desync), Pitfall 4 (generic name false edges)
 
-**Research flag:** Standard. MDN and web.dev documentation is definitive. No additional research needed.
+**Research flag:** Standard patterns. SQLite UPSERT syntax and migration dedup are documented in official SQLite docs. Implementation approach is fully specified in ARCHITECTURE.md with working SQL. No additional research needed.
 
-### Phase 2: Log Terminal API (parallel with Phase 1)
+### Phase 2: Scan Version Bracket + Stale-Row Cleanup
 
-**Rationale:** Server-side only; zero UI work; touches different files from Phase 1. The log terminal UI (Phase 3) is blocked on this endpoint; building it in parallel with Phase 1 saves wall-clock time.
+**Rationale:** Depends on Phase 1 — the UNIQUE constraint must exist before `scan_version_id` stamping is meaningful. The scan version bracket makes re-scan atomic: new rows carry the new `scan_version_id`; stale rows from prior scans are deleted within the same transaction after the new scan succeeds. Failure at any point leaves old data intact.
 
-**Delivers:** `GET /api/logs?since=&component=&limit=` route on Fastify server; reads `~/.allclear/logs/worker.log`; returns `{ lines: [] }` with filtered JSON. Pass `dataDir` into `createHttpServer()` via options object — do not hardcode in `http.js`.
+**Delivers:** Re-scan replaces the prior scan's data rather than appending. Deleted services and connections are removed from the graph. Partial scan failures leave old data valid and queryable.
 
-**Addresses:** Log terminal data API, server-side log filtering.
+**Addresses:** Migration 005 (scan_versions table + FK columns on services and connections), `QueryEngine.beginScan` / `endScan`, modified `persistFindings` (accepts `scanVersionId`), modified `scan/manager.js` (bracket calls)
 
-**Avoids:** Hardcoding `dataDir` in `http.js` (breaks `--data-dir` CLI override used in tests).
+**Avoids:** Anti-pattern: delete-all-then-reinsert (destroys FK refs mid-transaction); partial write leaving graph in corrupt half-old/half-new state; `scan_version_id NOT NULL` (migration 005 must add nullable column — existing rows have no version ID)
 
-**Research flag:** Standard. Fastify GET route pattern with query params is well-established in the existing `http.js`. No additional research needed.
+**Research flag:** Standard patterns. Scan version bracket is analogous to Apache Iceberg snapshots and dbt `strategy: check_timestamp`. Implementation fully specified in ARCHITECTURE.md with complete code examples. No additional research needed.
 
-### Phase 3: Log Terminal UI
+### Phase 3: Cross-Project MCP Queries
 
-**Rationale:** Depends on Phase 2 (the `/api/logs` endpoint must exist). New module `log-terminal.js` is fully isolated from graph rendering — it can be scaffolded without touching graph code.
+**Rationale:** Fully independent of Phases 1 and 2 — no schema changes, no dependency on scan version bracket. Can be developed in parallel with Phase 2 or sequenced after. The change is contained to `mcp/server.js` and adoption of the `pool.js` pattern already used by `server/http.js`.
 
-**Delivers:** Collapsible log panel below `#canvas-container`; 2s polling with `since` timestamp; ring-buffer DOM cap at 500 lines; component filter dropdown; auto-scroll with bottom-detection; `@fastify/sse` for SSE streaming (ceiling option; polling is sufficient for MVP).
+**Delivers:** Agents working in any repo can query any project's graph by passing `project` (absolute path or 12-char hash) to any of the 5 MCP tools. Falls back to existing `ALLCLEAR_PROJECT_ROOT` / `process.cwd()` behavior when parameter is absent — no breaking change for single-project users.
 
-**Addresses:** Log terminal base panel, live-tail toggle, component filter, log search, SSE close-handler cleanup.
+**Addresses:** Cross-project MCP queries, `mcp/server.js` refactor to per-call `resolveDb()`, `pool.js` inline migration workaround removal, `projectRoot` path traversal validation
 
-**Avoids:** SSE zombie connection leak (close handler mandatory from first implementation), unbounded DOM buffer (ring buffer at 500 from first implementation), SSE reconnect flood (jitter on `retry:` field), SSE log injection (strip newlines from log text before writing to SSE).
+**Avoids:** Pitfall 5 (wrong DB from CWD); path traversal security (reject `..` segments; validate path is an existing directory before opening DB); pool connection lifecycle (stop calling `db.close()` in tool handlers after switching to pool.js)
 
-**Research flag:** SSE close-handler zombie leak (Pitfall 7 in PITFALLS.md) needs explicit attention during implementation. It is non-obvious and the source of the most common production SSE bugs.
-
-### Phase 4: Project Switcher
-
-**Rationale:** Requires the `loadProject(hash)` extraction from `graph.js`, which is safest after Phase 1 (renderer is stable). The named-handler refactor of `setupInteractions()` must gate this phase — it is a prerequisite with its own risk surface.
-
-**Delivers:** Persistent `#project-select` dropdown populated from `/projects`; in-place project switching without page reload; `localStorage` persistence of selected project; full state teardown (named handlers, `forceWorker.terminate()`, state reset) before reload.
-
-**Addresses:** Project switcher, persistent project selection.
-
-**Avoids:** No-teardown pitfall — duplicate Web Workers, duplicate listeners, state leakage from project A to B. Named-function refactor of `setupInteractions()` is the prerequisite gate.
-
-**Research flag:** The teardown/tearup sequence (Pitfall 6 in PITFALLS.md) is the primary implementation concern. The teardown function code example in PITFALLS.md should be reviewed before writing `project-switcher.js`.
+**Research flag:** Standard patterns. The `pool.js` caching pattern is already in use by the HTTP server; extending it to MCP is a mechanical refactor. The DB ownership change (stop closing pool connections) is the only non-obvious element, explicitly documented in ARCHITECTURE.md Anti-Pattern 3. No additional research needed.
 
 ### Phase Ordering Rationale
 
-- Phase 1 before Phase 4: Renderer stability before `graph.js` refactor. Both touch `graph.js` but for different reasons; combining them risks introducing coordinate bugs that are harder to diagnose with two concurrent changes.
-- Phase 2 parallel with Phase 1: Server and canvas code are completely decoupled — `http.js` and `renderer.js` share no code. Running in parallel saves wall-clock time with no coordination cost.
-- Phase 3 after Phase 2: The UI polls the endpoint; the endpoint must exist for integration testing. Module scaffolding can start before Phase 2 completes, but end-to-end validation requires Phase 2 done.
-- Phase 4 last: The named-handler refactor creates risk for Phase 1 interactions if rushed. Phase 4 is the only phase that modifies existing canvas event handler wiring; doing it last contains the blast radius.
+- Phase 1 must precede Phase 2: the scan version bracket stamps rows with `scan_version_id`; without the UNIQUE constraint in place, the bracket adds overhead without the dedup guarantee that makes stale-row DELETE safe. The stale-row `endScan` delete relies on the new scan having replaced (not appended) the previous rows.
+- Phase 3 is independent: `mcp/server.js` and `pool.js` share no state with the migration or QueryEngine changes. Can be a parallel workstream or follow Phase 1, depending on developer bandwidth.
+- The v2.2.x features (cross-repo canonical identity, scan history UI) must not start until Phase 1 is confirmed working in production — canonical identity depends on the UNIQUE constraint being stable and the naming convention enforcement being in place.
 
 ### Research Flags
 
-Needs attention during implementation:
-- **Phase 3 (Log Terminal):** SSE zombie connection leak (PITFALLS.md Pitfall 7) — explicit close handler required in first implementation.
-- **Phase 4 (Project Switcher):** Full teardown before re-init (PITFALLS.md Pitfall 6) — named-handler refactor is a prerequisite gate; do not skip.
+Phases needing deeper research before implementation:
+- **Cross-repo canonical service identity (v2.2.x):** The `service_registry` table design and the query rewrites for impact tools to follow registry IDs rather than service IDs involve non-trivial schema and query changes. Needs a dedicated research pass before implementation starts.
+- **Scan version history UI (v2.2.x):** REST endpoint and UI panel are straightforward, but a future diff-between-versions feature (v2.3+) requires a diffing strategy worth researching before committing to a data model.
 
-Standard patterns (no additional research needed):
-- **Phase 1 (Canvas Fixes):** MDN `devicePixelRatio` pattern is definitive; three-step HiDPI fix has broad codebase precedent.
-- **Phase 2 (Log API):** Fastify GET route with query params follows the existing `http.js` pattern exactly.
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (schema + upsert):** SQLite UPSERT with `ON CONFLICT DO UPDATE`, migration dedup with `GROUP BY MAX(id)`, FTS5 rebuild — all documented in official SQLite docs and confirmed by codebase inspection.
+- **Phase 2 (scan version bracket):** Analogous to standard ETL snapshot patterns; implementation fully specified in ARCHITECTURE.md with working code examples.
+- **Phase 3 (MCP cross-project):** The `pool.js` pattern is already live in the HTTP server; extending it to MCP is a mechanical refactor with a clear implementation path in ARCHITECTURE.md.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All packages verified against npm registry and GitHub releases on 2026-03-16; version compatibility confirmed for Node.js 20+, Fastify 5, xterm 6 |
-| Features | HIGH | Reference implementations exist in VS Code, Grafana, Chrome DevTools for every feature; all patterns are stable and well-documented |
-| Architecture | HIGH | Based on direct codebase inspection of all UI modules and server; no inference required; existing module boundaries are well-defined |
-| Pitfalls | HIGH | MDN official docs confirmed; specific issue trackers (expressjs, nestjs, excaliburjs) cross-referenced for SSE and canvas pitfalls |
+| Stack | HIGH | All v2.2 work uses already-deployed libraries. No new packages. better-sqlite3 12.8.0, @modelcontextprotocol/sdk 1.27.1, fastify 5.8.2 already running in production. |
+| Features | HIGH | Root causes confirmed by direct source inspection of `query-engine.js`, `database.js`, `pool.js`, `manager.js`, `mcp/server.js`. Feature scope maps directly to documented tech debt SCAN-01..04 in PROJECT.md. Comparison with GitHub Dependency Graph, Datadog APM, dbt snapshots cross-validates the design. |
+| Architecture | HIGH | All affected files identified, all code paths traced. Build order (steps 1-7) in ARCHITECTURE.md is unambiguous. Working code examples provided for all new methods and migration SQL. Integration points documented with before/after patterns. |
+| Pitfalls | HIGH | SQLite UPSERT and FTS5 behaviors confirmed against official docs. `INSERT OR REPLACE` + `ON DELETE CASCADE` failure mode confirmed against Dexter's Log (specific SQLite behavior). MCP CWD pitfall confirmed by direct code reading of `mcp/server.js`. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Zoom sensitivity final tuning:** The D3 wheel delta formula (SENSITIVITY = 0.001) is a documented starting point, not a validated constant. Budget one round of manual trackpad testing after implementation. The `scaleExtent([0.15, 5])` bounds are a reasonable starting point but may need adjustment for large graphs.
-- **xterm.js vs styled div decision:** FEATURES.md flags xterm.js as a potential anti-feature (overkill for structured JSON log output); STACK.md includes it as the recommended package for ANSI rendering. The implementation team should decide during Phase 3 based on the actual log format encountered in the worker. Either approach is architecturally valid; only the `log-terminal.js` module changes.
-- **Log file rotation scope:** The `/api/logs` route reads the entire log file on each poll; for a long-running worker, this grows without bound. Log rotation (cap at 1MB, rotate to `worker.log.1`) is out of scope for v2.1. Mitigate in v2.1 by reading only the last 500 lines server-side. Flag for v2.2.
-- **Force worker canvas dimensions after resize:** After the DPR fix, `canvas.width` is `cssW * dpr`. The force simulation layout respects CSS dimensions, not physical pixel dimensions. Any `canvas.width` / `canvas.height` passed to the force worker must be divided by `devicePixelRatio` first. Verify this integration point during Phase 1 testing.
+- **Generic service name block-list completeness:** The research recommends blocking `server`, `worker`, `api`, `app`, `main` — but the complete list appropriate for this team's repos is unknown. During Phase 1 implementation, audit actual service names in existing project DBs before finalizing the block-list.
+- **Snapshot retention verification:** Research notes that `history-limit` enforcement is coded in `database.js` but flags the need to confirm it is called on every scan path. Verify this during Phase 2 implementation before shipping.
+- **MCP `projectRoot` allowed-roots policy:** PITFALLS.md recommends validating `projectRoot` against a set of allowed roots. The exact policy (e.g., "must be under HOME", "must appear in `~/.allclear/projects/`") needs a decision during Phase 3 implementation.
+- **pool.js `getQueryEngineByHash` refactor safety:** Lines 178-202 of `pool.js` contain an inline migration workaround for schema v2/v3. Confirm all callers are safe before removing these lines after migration files 004+005 land.
+- **`ON DELETE CASCADE` on `connections.source_service_id` / `target_service_id`:** The `endScan` delete order (connections before services) assumes FK cascade may or may not be present. Verify the migration 001 schema to confirm whether cascade is enabled; if not, the multi-step explicit delete in `endScan` is the required approach and must be respected.
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-- `https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio` — DPR definition, matchMedia pattern for DPR change detection
-- `https://web.dev/articles/canvas-hidipi` — Three-step HiDPI canvas pattern: multiply dimensions, CSS scale back, scale context
-- `https://github.com/fastify/fastify/releases` — Fastify 5.8.2 current, Node.js v20+ required
-- `npm info @fastify/sse` — version 0.4.0, peerDependencies `fastify ^5.x`, verified 2026-03-16
-- `npm info @xterm/xterm` — version 6.0.0, published Jan 2026, verified 2026-03-16
-- `npm info @xterm/addon-fit` — version 0.11.0, requires xterm v4+, verified 2026-03-16
-- `https://d3js.org/d3-zoom` — wheel delta formula, `zoom.wheelDelta()` customization, `scaleExtent`
-- Direct codebase inspection: `worker/ui/graph.js`, `worker/ui/modules/*.js`, `worker/ui/index.html`, `worker/server/http.js`, `worker/index.js` — confirmed anonymous handler pattern, no DPR scaling, no teardown, `#project-select` hidden
+- `worker/db/query-engine.js` — `_stmtUpsertService` (INSERT OR REPLACE), `getGraph()` MAX(id) workaround, `_resolveServiceId` cross-repo lookup, `persistFindings`
+- `worker/db/database.js` — migration auto-discovery, `openDb()` lifecycle, FK pragma ordering
+- `worker/db/pool.js` — project hash to DB path, pool cache, `listProjects()`, inline migration workaround (lines 178-202)
+- `worker/db/migrations/001_initial_schema.js` — confirmed absence of UNIQUE constraint on services; FTS5 trigger definitions
+- `worker/db/migrations/002_service_type.js`, `003_exposed_endpoints.js` — current max schema version is 3
+- `worker/scan/manager.js` — `scanRepos()` call sites for `upsertRepo`, `persistFindings`, `setRepoState`
+- `worker/mcp/server.js` — module-level `dbPath`; local `openDb()`; `db.close()` pattern in tool handlers
+- `.planning/PROJECT.md` — SCAN-01..04 tech debt, v2.2 milestone goals
+- [SQLite UPSERT official docs](https://sqlite.org/lang_upsert.html) — `ON CONFLICT DO UPDATE` syntax, `excluded.` qualifier, UNIQUE index requirement
+- [SQLite ON CONFLICT](https://sqlite.org/lang_conflict.html) — REPLACE semantics (delete-then-reinsert)
+- [GitHub Dependency Graph deduplication GA](https://github.blog/changelog/2025-05-05-dependency-graph-deduplication-is-now-generally-available/) — idempotent ingestion pattern cross-validation
+- [Anthropic MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) — `McpServer` + `StdioServerTransport` patterns
+- [code.claude.com/docs/en/plugins](https://code.claude.com/docs/en/plugins) — Plugin structure, SKILL.md format, hooks.json (v1 stack reference)
 
 ### Secondary (MEDIUM confidence)
 
-- `https://tigerabrodi.blog/how-to-handle-trackpad-pinch-to-zoom-vs-two-finger-scroll-in-javascript-canvas-apps` — `e.ctrlKey` convention for trackpad pinch detection
-- `https://github.com/excaliburjs/Excalibur/issues/1195` — Passive wheel event breaking canvas zoom (real-world example)
-- `https://github.com/expressjs/express/issues/2248` — SSE connection accumulation without close handler
-- `https://github.com/nestjs/nest/issues/11601` — SSE cleanup patterns in Node.js servers
-- `https://d3js.org/d3-zoom` — sensitivity tuning is documented but trackpad delta behavior varies by driver (MEDIUM for sensitivity constants specifically)
-
-### Tertiary (for reference)
-
-- `https://medium.com/@benjamin.botto/zooming-at-the-mouse-coordinates-with-affine-transformations-86e7312fd50b` — Zoom-to-cursor formula (matches current implementation)
-- `https://newreleases.io/project/github/xtermjs/xterm.js/release/6.0.0` — xterm.js 6.0.0 breaking changes (Canvas renderer addon removed, now built-in)
+- [Dexter's Log: INSERT OR REPLACE with ON DELETE CASCADE](https://dexterslog.com/posts/insert-on-conflict-replace-with-on-delete-cascade-in-sqlite/) — confirmed cascade-delete failure mode for Pitfall 1
+- [Datadog Service Dependencies API](https://docs.datadoghq.com/api/latest/service-dependencies/) — cross-repo service identity patterns
+- [Apache Iceberg snapshot versioning](https://medium.com/towards-data-engineering/mastering-snapshot-versioning-in-apache-iceberg-a-deep-dive-5e0200612ce8) — scan version bracket analogy
+- [Sling Academy: UNIQUE constraints in SQLite](https://www.slingacademy.com/article/best-practices-for-using-unique-constraints-in-sqlite/) — rename-create-copy-drop migration pattern; pre-existing duplicate failure mode
+- [SQLite FTS5 trigger patterns](https://simonh.uk/2021/05/11/sqlite-fts5-triggers/) — correct FTS5 external content table trigger ordering
+- [Datadog Security Labs: SQL injection in MCP server](https://securitylabs.datadoghq.com/articles/mcp-vulnerability-case-study-SQL-injection-in-the-postgresql-mcp-server/) — MCP input validation requirements
+- [Airbyte: idempotency in data pipelines](https://airbyte.com/data-engineering-resources/idempotency-in-data-pipelines) — ETL dedup pattern reference
 
 ---
 *Research completed: 2026-03-16*

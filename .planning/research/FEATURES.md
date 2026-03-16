@@ -1,11 +1,28 @@
 # Feature Research
 
-**Domain:** Developer tool graph UI — UI polish and observability for v2.1 milestone
+**Domain:** Developer tool — scan data integrity for a local service dependency graph (SQLite-backed, agent-scanned)
 **Researched:** 2026-03-16
-**Confidence:** HIGH (core patterns are well-established in developer tooling; D3 and Canvas APIs are stable)
+**Confidence:** HIGH (patterns verified against SQLite official docs, codebase inspection, and established dependency-tool design)
 
-> **Scope note:** This document covers v2.1 features only. v2.0 features (D3 Canvas graph, worker daemon,
-> detail panel, click/hover/drag interactions) are already shipped and are dependencies, not targets.
+> **Scope note:** This document covers v2.2 features only. All v2.0/v2.1 capabilities (graph UI,
+> agent scanning, MCP tools, FTS5 search, snapshot mechanism, project switcher, log terminal) are
+> already shipped and are **dependencies**, not targets. Features below fix or extend existing
+> infrastructure — they must not break it.
+
+---
+
+## Current State of the Codebase (Evidence Base)
+
+These are confirmed facts from reading the source, not assumptions:
+
+| Problem | Where it lives | Root cause |
+|---------|---------------|------------|
+| Duplicate service rows on re-scan | `services` table has no UNIQUE constraint on `(repo_id, name)` | INSERT OR REPLACE in `upsertService` inserts a new row instead of updating the existing one because `INSERT OR REPLACE` on a table with only `PRIMARY KEY` as the unique index assigns a new `id` |
+| `getGraph()` dedup workaround | `query-engine.js` line 547: `WHERE s.id IN (SELECT MAX(id) FROM services GROUP BY name)` | Symptom-fix only — connections still reference old service IDs; impact queries on old IDs return no results |
+| No cross-repo identity | Each repo scan produces its own service rows; if `auth-service` appears in repo A's scan and is referenced by repo B's scan, they get separate IDs with no link | No global name registry or canonical service identity table |
+| MCP server locked to one project | `resolveDbPath()` in `mcp/server.js` uses `process.cwd()` at startup; agents in other repos see empty results | DB path is resolved once at process start; no per-call project switching |
+| Agent naming variability | `agent-prompt-deep.md` says "service name" but gives no normalization rule; agent can emit "auth-service", "AuthService", "auth_service" for the same logical service | Prompt does not enforce a canonical naming convention |
+| Scan versioning orphan cleanup | `createSnapshot()` in `database.js` retains N versions but the connections/services of the *previous* scan are never pruned — they accumulate | Re-scan appends; no "replace this repo's scan data" transaction |
 
 ---
 
@@ -13,110 +30,102 @@
 
 ### Table Stakes (Users Expect These)
 
-Features expected in any production-quality developer tool graph UI. Missing these makes the tool feel
-like a prototype.
+Features that any re-scannable dependency tool must have. Without these, re-scanning actively harms
+data quality — which is worse than no re-scan at all.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| HiDPI/Retina canvas rendering | On any Mac with Retina display (default since 2012) a blurry canvas immediately reads as "unfinished"; developer tools are used on high-DPI screens | LOW | Standard `devicePixelRatio` fix: multiply canvas width/height by ratio, scale context, set CSS dimensions to unscaled size; one-time setup on resize |
-| Zoom/pan with mouse wheel + drag | Every graph UI (Grafana, Kibana, network maps) supports wheel-to-zoom and drag-to-pan as baseline interactions; without them users feel stuck | LOW | Already partially working; tuning `d3.zoom().wheelDelta()` multiplier controls sensitivity; `scaleExtent([min, max])` prevents runaway zoom |
-| Fit-to-screen / reset view button | Any graph that can be panned off-screen needs a "reset" button; users expect one visible control to restore the initial centered view | LOW | `zoom.transform()` with `d3.zoomIdentity` + smooth transition via `selection.transition().duration(300)` |
-| Zoom level indicator or controls (+/-) | VS Code, Figma, every canvas tool shows current zoom %; optional +/- buttons provide discoverability for users who don't know wheel zooms | LOW | Read `d3.zoomTransform(element).k`, format as %, update on every zoom event; +/- buttons call `zoom.scaleBy()` |
-| Project switcher (no reload) | Any tool managing multiple projects needs in-place switching; forcing a page reload to change projects is a regression from typical SPA behavior | MEDIUM | `<select>` or custom dropdown; on change: fetch new project's data from worker REST API, re-render graph without page navigation; persist selection to `localStorage` |
-| Log/output panel accessible without leaving UI | Developer tools all provide observability (VS Code output panel, Chrome DevTools console, Webpack output); hiding logs behind file tail creates friction | MEDIUM | Collapsible panel at bottom or side; reads from worker's structured JSON log file via REST endpoint or EventSource; shows latest N lines on open |
+| Feature | Why Expected | Complexity | Depends On |
+|---------|--------------|------------|------------|
+| Idempotent re-scan (upsert by identity key) | Every ETL tool, SBOM generator, and dependency tracker treats re-ingestion as "replace not append." GitHub Dependency Graph deduplication (GA May 2025) is the same pattern. Without it, each scan adds phantom rows, impact queries fan out incorrectly, and the graph grows unboundedly. | MEDIUM | Requires adding UNIQUE constraint `(repo_id, name)` on `services` and `(source_service_id, target_service_id, protocol, method, path)` on `connections` — delivered as a new migration |
+| Stale-row cleanup after re-scan | Re-scanning a repo should remove services and connections that no longer exist in that repo. Without cleanup, deleted services linger as ghost nodes. Tools like dbt snapshots and Iceberg handle this with explicit "replace partition" semantics. | MEDIUM | Depends on idempotent upsert (above); requires a DELETE WHERE repo_id = ? AND id NOT IN (just-upserted IDs) within the same transaction |
+| Schema migration for new constraints | Users who already have a database must have the UNIQUE constraints applied via a migration, not require a database wipe. The existing migration system (`schema_versions` table, numbered files in `db/migrations/`) handles this. | LOW | Existing migration infrastructure; add `004_scan_integrity.js` |
+| Scan transaction atomicity | All writes for a single repo scan (upsert services + delete stale + upsert connections + delete stale connections + update repo_state) must succeed or fail together. A partial write leaves the graph in a corrupt half-old/half-new state. | LOW | `better-sqlite3` supports synchronous transactions; wrap `persistFindings()` in `db.transaction()` |
 
 ### Differentiators (Competitive Advantage)
 
-Features that elevate the UI from functional to developer-grade. Not strictly required but clearly
-differentiate a serious tool.
+Features that go beyond the table stakes and provide meaningful additional value for multi-repo workflows.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Log terminal with component filter | Most embedded log views show all output; filtering by component (scanner, mcp, api) lets users focus on the subsystem they care about — same pattern as VS Code Output Channel selector | MEDIUM | Worker logs include `component` field in structured JSON; filter as a `<select>` or button group that re-queries or hides rows client-side; avoids needing separate log channels |
-| Log terminal with live-tail toggle | VS Code terminal auto-scrolls to newest output; Grafana Loki live tail; ability to "pause" scroll while inspecting a specific log line is standard | LOW | Toggle boolean; when enabled, `scrollIntoView()` on each new log entry; when disabled, freeze scroll position; debounce renders to avoid jank on log bursts |
-| Log search (text filter) | Grep-style search in the log panel reduces time to find an error vs scrolling; used in lnav, Tailviewer, VS Code output filtering | LOW | Client-side substring or regex filter on already-loaded log lines; input debounced ~200ms; highlight matching text in results |
-| Canvas font size bump (larger throughout) | HiDPI fix alone makes the canvas sharp but node labels often remain too small at default zoom; explicit font size increase improves readability at all zoom levels | LOW | `ctx.font` on node labels, edge labels, tooltip text — increase base size from typical 10-11px to 13-14px; test at 1x and 2x DPI |
-| Smooth zoom transitions on +/- button clicks | Wheel zoom is instant; button-driven zoom that uses `transition().duration(250)` feels polished vs a jump — this is what Figma and browser zoom do | LOW | Pass `{duration: 250}` option to `zoom.scaleBy()` transition; wheel zoom stays instantaneous (transitions on wheel feel laggy) |
-| Persistent project selection across reloads | `localStorage` persistence so the last-viewed project is pre-selected on next open; removes the step of re-selecting every session | LOW | Write selected project ID to `localStorage` on change; read on page load; validate against available projects before applying |
+| Feature | Value Proposition | Complexity | Depends On |
+|---------|-------------------|------------|------------|
+| Cross-repo canonical service identity | When service "payments" is scanned from repo A and referenced by repo B, they should resolve to the same graph node. Tools like Datadog APM and ServiceNow CMDB use a "canonical name registry" pattern: a `service_registry` table keyed on normalized service name; foreign-keyed from `services`. This enables a single graph node with multiple repo sources. | HIGH | Requires schema change: `service_registry (id, canonical_name)` + FK from `services.registry_id`; impact queries must follow registry IDs, not service IDs; requires normalization function (lowercase, strip hyphens/underscores) |
+| Agent naming convention enforcement | Instruct the deep-scan agent to emit service names in a specific normalized form (e.g., lowercase-hyphenated: `auth-service`, not `AuthService`). This is the cheapest form of canonical identity — prevents divergence before it reaches the DB. | LOW | Requires adding a naming rule section to `agent-prompt-deep.md`; no schema change needed; prevents the cross-repo identity problem from growing |
+| Cross-project MCP queries (any working directory) | MCP tools currently resolve the DB path from `process.cwd()` at startup. Agents working in any repo should be able to query the full graph regardless of which project they launched from. Pattern: read `~/.allclear/projects/` directory, enumerate available project DBs, accept optional `project` parameter on each tool call, or merge all project DBs into a unified query. | MEDIUM | MCP server changes only; no schema change; risk of opening multiple SQLite files simultaneously (mitigated by read-only mode + per-call open/close already in place) |
+| Scan version history browsable in UI | The `map_versions` table and `createSnapshot()` function already exist. The UI has no way to view or restore a previous version. Exposing this as a "History" panel or dropdown in the graph UI closes the loop. | MEDIUM | Depends on existing `map_versions` table and `VACUUM INTO` snapshot mechanism; requires a new REST endpoint `GET /versions` and UI component |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Full xterm.js terminal emulator | "Real terminal" with ANSI colors, cursor — used in VS Code, Hyper | AllClear's log panel shows structured JSON log output from a file, not an interactive shell. xterm.js is designed for PTY-backed interactive terminals; adding it here brings a ~300 KB dependency and PTY plumbing for zero additional value over a styled `<div>` with colored JSON rows | Styled log rows with JSON field highlighting; color-code log levels (ERROR=red, WARN=yellow, INFO=white); no xterm dependency needed |
-| WebSocket streaming for real-time logs | "Live updates feel more real-time" | WebSocket adds server-side connection management and reconnect logic to the worker. The log file already exists on disk; polling it every 1-2 seconds via a simple HTTP endpoint is indistinguishable to the user for this use case | HTTP polling with `EventSource` (SSE) as the ceiling; polling every 1-2s is imperceptible latency for a log viewer |
-| Multi-project side-by-side comparison | Show two project graphs at once | Doubles DOM/Canvas complexity, breaks the existing layout, and the use case (comparing two dependency graphs side by side) is rare. Users can switch between graphs in seconds | Single-project switcher with fast switching; visual comparison not supported in v2.1 |
-| Infinite zoom (no scale limits) | "I want to zoom in as much as I want" | Without `scaleExtent` limits, users zoom into individual pixels and lose orientation; zooming out too far makes all nodes invisible. Scale limits are a UX feature, not a restriction | Set `scaleExtent([0.1, 5])` — 10% to 500% zoom; covers all realistic use cases without getting lost |
-| Custom log level color themes / theming | "I want dark/light mode, custom colors" | Theming adds significant CSS scope for marginal benefit in a single-user localhost tool; colors can always be adjusted later | Use sensible defaults (dark background, red errors, yellow warnings, white info); single consistent theme for v2.1 |
+| Fuzzy service name matching (Levenshtein / embedding similarity) | "auth-service" and "auth_service" should merge automatically | Fuzzy matching introduces false merges (e.g., "user-service" and "users-service" are different services). In a dependency graph, a false merge is a correctness bug, not a cosmetic one — it creates phantom impact paths. Embedding-based matching requires ChromaDB to be running, which is optional. | Enforce exact normalized form via agent prompt; require explicit `allclear.config.json` override for known aliases. Correctness over convenience. |
+| Auto-repair of historical connections on identity merge | "When I merge two service identities, rewrite all old connection rows to point to the new canonical ID" | This retroactively rewrites audit history. Snapshots become inconsistent with the live DB. Connection rows that were accurate at scan time become misleading. | Re-scan after a rename to generate correct data; the new scan replaces old rows via the upsert mechanism |
+| Global shared SQLite database (single file for all projects) | "One query to see all projects" | SQLite under concurrent write from multiple workers (one per project) without WAL lock coordination causes `SQLITE_BUSY` errors. Per-project isolation is an explicit design decision for this reason. AllClear PROJECT.md: "per-project DB isolation via hash of project root." | Cross-project MCP queries that open each project DB read-only and merge results in memory — no shared write DB needed |
+| Automatic incremental scan on every file save | "Scan should run whenever I save a file" | The two-phase agent scan is expensive (invokes Claude twice per repo). Triggering it on every save would saturate the agent runner and degrade Claude Code performance. | Commit-based incremental scan (already built in `buildScanContext()`): scan only when HEAD changes; user-triggered with `/allclear:map` |
+| Schema drift alerts (notify when agent output format changes) | "Tell me when the agent started returning different field names" | This requires version-pinning the agent prompt output schema and comparing it on every scan — significant validation overhead for a problem that is solved by simply keeping the prompt stable and using Zod schema validation on findings (already exists in `findings.js`) | `parseAgentOutput()` in `findings.js` already validates against a schema; a parse failure is surfaced as a scan error |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[HiDPI canvas fix]
-    (standalone — no dependencies on other v2.1 features)
-    └──enhances──> [Larger fonts throughout] (both address visual quality; do together)
+[Migration 004: UNIQUE constraints on services(repo_id, name) and connections(...)]
+    └──required by──> [Idempotent upsert (INSERT OR REPLACE works correctly)]
+    └──required by──> [Stale-row cleanup (safe to DELETE WHERE id NOT IN)]
 
-[D3 zoom behavior (existing v2.0)]
-    └──required by──> [Zoom sensitivity tuning]
-    └──required by──> [Fit-to-screen / reset button]
-    └──required by──> [Zoom level indicator]
-    └──required by──> [Smooth zoom transitions on button clicks]
+[Idempotent upsert]
+    └──required by──> [Scan transaction atomicity (wrap in db.transaction())]
+    └──required by──> [Stale-row cleanup (must know which IDs were just written)]
 
-[Worker REST API (existing v2.0)]
-    └──required by──> [Project switcher] (needs endpoint listing available projects)
-    └──required by──> [Log terminal panel] (needs endpoint serving log lines)
+[Stale-row cleanup]
+    └──enhances──> [Cross-repo canonical service identity (no stale ghost nodes to confuse merge)]
 
-[Worker structured JSON log file (existing v2.0)]
-    └──required by──> [Log terminal panel]
-    └──required by──> [Component filter] (depends on `component` field in log entries)
+[Agent naming convention enforcement (prompt change)]
+    └──reduces need for──> [Cross-repo canonical service identity (fewer divergent names reach DB)]
+    └──does NOT replace──> [Cross-repo canonical service identity (runtime enforcement still needed)]
 
-[Log terminal panel]
-    └──required by──> [Live-tail toggle] (toggle is a behavior of the panel)
-    └──required by──> [Log search] (search operates on panel content)
-    └──required by──> [Component filter] (filter operates on panel content)
+[Cross-repo canonical service identity]
+    └──required by──> [Impact queries across repo boundaries (MCP tools work correctly)]
+    └──conflicts with──> [Fuzzy name matching (anti-feature — choose one approach)]
 
-[Project switcher]
-    └──enhances──> [Persistent project selection] (persist the switcher's value)
+[Existing map_versions + VACUUM INTO (v2.0 shipped)]
+    └──required by──> [Scan version history UI (GET /versions endpoint + UI component)]
+
+[Existing per-project DB isolation]
+    └──required by──> [Cross-project MCP queries (enumerate project DBs, open read-only per call)]
 ```
 
 ### Dependency Notes
 
-- **HiDPI fix is fully independent**: Can be implemented and shipped first; touches only canvas setup code.
-- **Zoom tuning depends on existing d3.zoom**: No new infrastructure needed — only parameter adjustments to existing behavior.
-- **Log panel depends on a log-serving API endpoint**: The worker daemon writes structured JSON logs to file already; a simple REST endpoint to read the last N lines (or an SSE endpoint for streaming) is the only new backend work.
-- **Project switcher depends on a project-listing API endpoint**: Worker needs to expose `GET /projects` listing available project IDs; graph data endpoint already exists per project.
-- **All log panel sub-features (filter, search, live-tail) depend on the base panel existing first**: Implement the base panel before adding sub-features.
+- **Migration 004 is the critical foundation**: Every other table-stakes feature depends on the UNIQUE constraints it adds. It must ship first and handle the case where users already have duplicate rows (migrate with dedup step: keep MAX(id) per group, delete rest, then add constraint).
+- **Stale-row cleanup must be atomic with upsert**: If cleanup runs separately from upsert, a crash between them leaves the graph in a half-pruned state. Both must be in the same `db.transaction()`.
+- **Agent prompt naming convention is cheap and should ship alongside Migration 004**: It prevents the identity problem from growing while the schema fix cleans up existing data.
+- **Cross-repo identity is independent of the MCP cross-project query feature**: Identity is about merging the same service seen from different repos into one node. Cross-project queries are about querying different project databases from any working directory. They solve different problems and can ship independently.
+- **Scan version history UI depends only on existing infrastructure**: The `map_versions` table, `createSnapshot()`, and the REST server already exist. This is a new endpoint + UI widget with no schema changes needed.
 
 ---
 
-## MVP Definition (v2.1)
+## MVP Definition (v2.2)
 
-### Launch With (v2.1 core)
+### Launch With (v2.2 core — fixes the stated bugs)
 
-Minimum for the milestone to deliver its stated goal: "production-quality with crisp rendering, usable
-zoom/pan, persistent project switching, and an embedded log terminal."
+Minimum for the milestone to deliver its stated goal: "Fix data duplication from re-scanning and
+cross-repo conflicts. Add scan versioning and cross-project MCP queries."
 
-- [ ] HiDPI canvas fix + larger fonts — crisp rendering on all developer machines
-- [ ] Zoom/pan sensitivity tuning + `scaleExtent` limits — usable wheel zoom without runaway behavior
-- [ ] Fit-to-screen reset button — escape hatch when graph is panned off-screen
-- [ ] Project switcher dropdown — switch repos without page reload; persist selection to `localStorage`
-- [ ] Log terminal panel (collapsible) — view worker output without leaving the UI; shows last N lines on open
+- [ ] Migration 004: UNIQUE constraints on `services(repo_id, name)` and `connections(source_service_id, target_service_id, protocol, method, path)` — with dedup step for existing rows — the foundation everything else stands on
+- [ ] Idempotent `persistFindings()` wrapped in `db.transaction()` with stale-row DELETE — re-scan replaces, not appends
+- [ ] Remove `MAX(id) GROUP BY name` workaround from `getGraph()` — the workaround becomes incorrect after constraint is added
+- [ ] Agent prompt naming rule: lowercase-hyphenated convention enforced in `agent-prompt-deep.md` — cheapest identity fix
+- [ ] Cross-project MCP queries: MCP tools accept optional `project_root` parameter; fall back to enumerating all known project DBs when none specified — agents in any repo see the full graph
 
-### Add After Validation (v2.1.x)
+### Add After Validation (v2.2.x)
 
-Features to add once the base panel is confirmed working.
+Features to add once core dedup and MCP cross-project queries are confirmed working.
 
-- [ ] Live-tail toggle in log panel — triggered when users complain that auto-scroll disrupts inspection
-- [ ] Component filter in log panel — add when log volume is high enough that filtering is needed
-- [ ] Log search — add when users ask "how do I find the error that just happened?"
-- [ ] Zoom level indicator (% display) — add for discoverability; low effort once zoom is tuned
+- [ ] Cross-repo canonical service identity: `service_registry` table + normalization function — add when multiple repos with overlapping service names are confirmed working and divergence reappears
+- [ ] Scan version history panel in graph UI: `GET /versions` endpoint + history dropdown — add when users ask "what changed since yesterday?"
 
-### Future Consideration (v2.2+)
+### Future Consideration (v2.3+)
 
-- [ ] Smooth animated zoom transitions on +/- buttons — polish, not blocking
-- [ ] Log export (copy to clipboard, download .log) — add if users need to share logs
+- [ ] Diff view between scan versions (which services/connections were added/removed) — add when history browsing is shipped and users want to understand changes
+- [ ] Config-file service name aliases (`allclear.config.json` `"service-aliases": {"AuthService": "auth-service"}`) — add if teams with legacy naming need a migration path without re-scanning
 
 ---
 
@@ -124,51 +133,45 @@ Features to add once the base panel is confirmed working.
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| HiDPI/Retina canvas fix | HIGH | LOW | P1 — visual regression on every Mac |
-| Larger fonts throughout | HIGH | LOW | P1 — pair with HiDPI fix |
-| Zoom sensitivity tuning | HIGH | LOW | P1 — usability baseline |
-| Fit-to-screen reset button | HIGH | LOW | P1 — escape hatch |
-| Project switcher (no reload) | HIGH | MEDIUM | P1 — stated milestone goal |
-| Log terminal panel (base) | HIGH | MEDIUM | P1 — stated milestone goal |
-| Live-tail toggle | MEDIUM | LOW | P2 — behavior enhancement |
-| Component filter | MEDIUM | LOW | P2 — depends on log volume |
-| Log search | MEDIUM | LOW | P2 — convenience feature |
-| Zoom level indicator | LOW | LOW | P2 — discoverability |
-| Smooth button zoom transitions | LOW | LOW | P3 — polish only |
-| Persistent project selection | MEDIUM | LOW | P1 — pairs with project switcher |
+| Migration 004: UNIQUE constraints + dedup | HIGH — fixes root cause of all duplication bugs | MEDIUM — migration must handle existing duped rows safely | P1 — foundation |
+| Idempotent persistFindings + stale-row cleanup | HIGH — re-scan no longer corrupts the graph | MEDIUM — transaction wrapping + DELETE WHERE id NOT IN | P1 — table stakes |
+| Remove MAX(id) workaround from getGraph() | HIGH — workaround breaks after constraint is added | LOW — delete ~5 lines, replace with direct query | P1 — required cleanup |
+| Agent prompt naming convention | HIGH — prevents divergence at source | LOW — add one section to agent-prompt-deep.md | P1 — cheap, immediate value |
+| Cross-project MCP queries | HIGH — agents in any repo see the full graph | MEDIUM — enumerate project DBs, add optional param to tools | P1 — stated milestone goal |
+| Cross-repo canonical service identity | MEDIUM — needed only when services appear in multiple repos | HIGH — schema change + query rewrites + normalization | P2 — add after P1 confirms benefit |
+| Scan version history UI | MEDIUM — adds browsability to already-captured snapshots | MEDIUM — new REST endpoint + UI panel | P2 — infrastructure already exists |
+| Config-file service name aliases | LOW — only needed for teams with established naming debt | LOW — config parsing + alias table | P3 — future |
 
 **Priority key:**
-- P1: Required to meet the v2.1 milestone goal
-- P2: Should add in same milestone pass if time allows
-- P3: Nice to have, v2.2+
+- P1: Required to meet the v2.2 milestone goal
+- P2: Should add once P1 is stable and confirmed correct
+- P3: Future consideration
 
 ---
 
 ## Competitor Feature Analysis
 
-Reference implementations in the developer tool space for each feature area.
+How established tools handle each of the four research questions.
 
-| Feature | VS Code | Grafana | Chrome DevTools | AllClear v2.1 approach |
-|---------|---------|---------|-----------------|------------------------|
-| Embedded log/output panel | Output panel, collapsible, per-channel filter | Log browser panel with live tail | Console tab with level filter | Collapsible bottom panel, component filter, live-tail toggle |
-| Project switcher | Workspace / folder switcher in title bar | Dashboard picker in top nav | N/A | `<select>` in header bar; `localStorage` persistence |
-| HiDPI canvas | N/A (DOM-based) | Canvas panels use devicePixelRatio | DevTools canvas uses devicePixelRatio | Standard `devicePixelRatio` multiply + CSS scale |
-| Zoom controls | Ctrl+= / Ctrl+- with % indicator | Scroll to zoom + magnifying glass button | N/A (DOM zoom) | Wheel zoom + +/- buttons + fit-to-screen; `scaleExtent([0.1, 5])` |
+| Problem | GitHub Dependency Graph | Datadog APM Service Map | dbt Snapshots | AllClear v2.2 approach |
+|---------|------------------------|------------------------|---------------|------------------------|
+| Idempotent ingestion | Deduplication GA May 2025 — each submission replaces the previous for that manifest+SHA | Traces replace previous state per service+env; no accumulation | `strategy: check_timestamp` — replaces changed rows, keeps unchanged | `INSERT OR REPLACE` on UNIQUE `(repo_id, name)`; DELETE stale within transaction |
+| Service identity across repos | Repository-scoped packages; cross-repo links via package name match (exact string) | Global service registry keyed on `service` tag string (must be consistent across all instrumented code) | N/A (single repo scope) | Agent-enforced naming convention (lowercase-hyphenated) + optional `service_registry` canonical identity table |
+| Scan versioning / history | Dependency graph snapshot per commit SHA; history via git log | No history — live state only | Immutable snapshots with `dbt snapshot`; configurable retention | `map_versions` table + VACUUM INTO snapshot files; configurable `history-limit` in `allclear.config.json` |
+| Cross-project querying | GitHub-scoped; cross-org via API with org token | Global APM — all envs in one query; filter by env | dbt project-scoped | MCP tools accept `project_root` param; enumerate `~/.allclear/projects/` DBs read-only and merge results in memory |
 
 ---
 
 ## Sources
 
-- [D3 d3-zoom documentation — d3js.org](https://d3js.org/d3-zoom) — HIGH confidence (official docs)
-- [d3-zoom GitHub repository](https://github.com/d3/d3-zoom) — HIGH confidence (source + README)
-- [MDN — Window.devicePixelRatio](https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio) — HIGH confidence (official Web API docs)
-- [Kirupa — Canvas HiDPI/Retina](https://www.kirupa.com/canvas/canvas_high_dpi_retina.htm) — MEDIUM confidence (tutorial, well-known source)
-- [VS Code Panel UX Guidelines](https://code.visualstudio.com/api/ux-guidelines/panel) — HIGH confidence (official VS Code extension docs)
-- [VS Code Terminal Basics](https://code.visualstudio.com/docs/terminal/basics) — HIGH confidence (official docs)
-- [D3 Zoom and Pan — d3indepth.com](https://www.d3indepth.com/zoom-and-pan/) — MEDIUM confidence (tutorial)
-- [Logdy — Web-based real-time log viewer](https://logdy.dev/) — MEDIUM confidence (product, pattern reference)
-- [xterm.js — xtermjs.org](https://xtermjs.org/) — HIGH confidence (official docs; used to confirm xterm is overkill for this use case)
+- SQLite `INSERT OR REPLACE` / UPSERT — [sqlite.org/lang_upsert.html](https://sqlite.org/lang_upsert.html) — HIGH confidence (official docs)
+- SQLite ON CONFLICT clause — [sqlite.org/lang_conflict.html](https://sqlite.org/lang_conflict.html) — HIGH confidence (official docs)
+- GitHub Dependency Graph Deduplication GA — [github.blog/changelog/2025-05-05](https://github.blog/changelog/2025-05-05-dependency-graph-deduplication-is-now-generally-available/) — HIGH confidence (official changelog)
+- Datadog Service Dependencies API — [docs.datadoghq.com/api/latest/service-dependencies](https://docs.datadoghq.com/api/latest/service-dependencies/) — HIGH confidence (official docs)
+- Idempotency in data pipelines — [airbyte.com/data-engineering-resources/idempotency-in-data-pipelines](https://airbyte.com/data-engineering-resources/idempotency-in-data-pipelines) — MEDIUM confidence (industry reference)
+- Apache Iceberg snapshot versioning — [medium.com/towards-data-engineering — Iceberg snapshots](https://medium.com/towards-data-engineering/mastering-snapshot-versioning-in-apache-iceberg-a-deep-dive-5e0200612ce8) — MEDIUM confidence (tutorial, pattern reference)
+- Codebase inspection: `worker/db/query-engine.js`, `worker/db/database.js`, `worker/db/migrations/001_initial_schema.js`, `worker/mcp/server.js`, `worker/scan/manager.js` — HIGH confidence (source of truth for current state)
 
 ---
-*Feature research for: AllClear v2.1 — UI Polish & Observability*
+*Feature research for: AllClear v2.2 — Scan Data Integrity*
 *Researched: 2026-03-16*
