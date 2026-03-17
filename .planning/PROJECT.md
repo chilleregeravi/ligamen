@@ -49,7 +49,15 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ### Active
 
-(Defined per milestone — see current milestone below)
+## Current Milestone: v2.3 Type-Specific Detail Panels
+
+**Goal:** Make the graph detail panel show type-appropriate data for library and infrastructure nodes — exported types/interfaces for libraries, managed resources for infra — with proper data storage replacing the broken "METHOD PATH" parser.
+
+**Target features:**
+- Type-conditional exposed data storage (library exports, infra resources stored correctly)
+- Library detail panel showing exported types/interfaces and consumer services
+- Infra detail panel showing managed resources and provisioned services
+- Service detail panel unchanged (already works)
 
 ### Out of Scope
 
@@ -100,4 +108,4 @@ Known tech debt: setupControls() listener accumulation on project switch, no log
 | Per-call resolveDb in MCP server | Module-level DB resolution was wrong for cross-project queries | ✓ Good |
 
 ---
-*Last updated: 2026-03-17 after v2.2 milestone completion*
+*Last updated: 2026-03-17 after v2.3 milestone start*

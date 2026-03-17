@@ -21,12 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Planning next milestone
+**Current focus:** v2.3 Type-Specific Detail Panels
 
 ## Current Position
 
-All milestones through v2.2 shipped.
-Last activity: 2026-03-17 — v2.1 + v2.2 milestone audit and completion
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-17 — Milestone v2.3 started
 
 Progress: [██████████] 100%
 
