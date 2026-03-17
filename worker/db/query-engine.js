@@ -615,6 +615,26 @@ export class QueryEngine {
       )
       .all();
 
+    // Attach exposes per service node
+    try {
+      const allExposes = this._db
+        .prepare('SELECT service_id, method, path, kind, handler FROM exposed_endpoints')
+        .all();
+      const exposesByServiceId = {};
+      for (const row of allExposes) {
+        if (!exposesByServiceId[row.service_id]) exposesByServiceId[row.service_id] = [];
+        exposesByServiceId[row.service_id].push(row);
+      }
+      for (const svc of services) {
+        svc.exposes = exposesByServiceId[svc.id] || [];
+      }
+    } catch {
+      // migration 007 not yet applied — exposes not available
+      for (const svc of services) {
+        svc.exposes = [];
+      }
+    }
+
     const connections = this._db
       .prepare(
         `

@@ -24,6 +24,7 @@ import * as migration002 from "../../worker/db/migrations/002_service_type.js";
 import * as migration003 from "../../worker/db/migrations/003_exposed_endpoints.js";
 import * as migration004 from "../../worker/db/migrations/004_dedup_constraints.js";
 import * as migration005 from "../../worker/db/migrations/005_scan_versions.js";
+import * as migration006 from "../../worker/db/migrations/006_dedup_repos.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -52,7 +53,7 @@ function makeQE() {
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-  for (const m of [migration001, migration002, migration003, migration004, migration005]) {
+  for (const m of [migration001, migration002, migration003, migration004, migration005, migration006]) {
     db.transaction(() => {
       m.up(db);
       db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(m.version);
