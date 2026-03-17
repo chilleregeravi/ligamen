@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Type-Specific Detail Panels
-status: ready_to_plan
-stopped_at: Roadmap created — Phase 30 ready to plan
-last_updated: "2026-03-17T00:00:00.000Z"
-last_activity: "2026-03-17 — v2.3 roadmap created (3 phases: 30-32)"
+status: planning
+stopped_at: Completed 30-storage-correctness 30-01-PLAN.md
+last_updated: "2026-03-17T15:23:23.635Z"
+last_activity: 2026-03-17 — Roadmap created, Phase 30 ready to plan
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -41,6 +41,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 28 | 28-02 | 7min | 2 | 3 |
+| Phase 30-storage-correctness P30-01 | 2min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -50,6 +51,8 @@ Progress: [░░░░░░░░░░] 0%
 - [v2.3]: Embed exposes in /graph response — not a per-click fetch; avoids async rendering state and 20-200ms click latency
 - [v2.3]: Migration 007 must purge malformed rows before fixed parser lands — INSERT OR IGNORE silently blocks correct rows when malformed rows occupy the same UNIQUE key
 - [v2.3]: utils.js infra guard must commit before detail-panel.js changes — prevents infra nodes falling through to service renderer during incremental work
+- [Phase 30-storage-correctness]: DELETE predicate confirmed: method IS NULL AND path NOT LIKE '/% correctly targets malformed library/infra rows while preserving valid null-method REST rows
+- [Phase 30-storage-correctness]: kind column is NOT NULL DEFAULT 'endpoint' — enforces discriminant on all future inserts, ALTER TABLE default backfills existing rows without an UPDATE sweep
 
 ### Pending Todos
 
@@ -63,6 +66,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17
-Stopped at: Roadmap created — Phase 30 ready to plan
+Last session: 2026-03-17T15:23:23.632Z
+Stopped at: Completed 30-storage-correctness 30-01-PLAN.md
 Resume file: None
