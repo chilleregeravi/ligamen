@@ -68,11 +68,11 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
   3. After re-scanning a library repo, `SELECT path, kind FROM exposed_endpoints WHERE service_id = <lib_id>` returns full function signatures (e.g., `"functionName(param: T): R"`) with `kind = 'export'` — not whitespace-split fragments
   4. After re-scanning an infra repo, `SELECT path, kind FROM exposed_endpoints WHERE service_id = <infra_id>` returns full resource references (e.g., `"k8s:deployment/payment"`) with `kind = 'resource'`
   5. Service node re-scan continues to produce REST-format rows (`method = 'GET'`, `path = '/orders'`) with `kind = 'endpoint'`
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 30-01: Migration 007 — add `kind` column and purge malformed rows
-- [ ] 30-02: Fix `persistFindings()` — type-conditional dispatch on `svc.type`
+- [ ] 30-01-PLAN.md — Migration 007: add kind column and purge malformed rows
+- [ ] 30-02-PLAN.md — Fix persistFindings() type-conditional dispatch on svc.type
 
 ### Phase 31: API Surface Extension
 **Goal**: The `/graph` HTTP response includes `exposes` arrays on each node and the browser graph state exposes them for click-time panel rendering
