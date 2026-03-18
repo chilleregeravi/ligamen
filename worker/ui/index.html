@@ -360,6 +360,54 @@
       .log-line--hidden {
         display: none;
       }
+      #filters-btn {
+        background: #2d3748;
+        border: 1px solid #4a5568;
+        color: #e2e8f0;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #filters-btn:hover,
+      #filters-btn.active {
+        border-color: #63b3ed;
+        color: #63b3ed;
+      }
+      #filter-panel {
+        background: #1a1f2e;
+        border-bottom: 1px solid #2d3748;
+        padding: 10px 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+      .filter-section {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 100px;
+      }
+      .filter-section-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #718096;
+        margin-bottom: 2px;
+      }
+      #filter-boundary,
+      #filter-language {
+        background: #2d3748;
+        border: 1px solid #4a5568;
+        color: #e2e8f0;
+        padding: 3px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        min-width: 80px;
+      }
     </style>
   </head>
   <body>
@@ -377,45 +425,39 @@
         autocomplete="off"
       />
       <button id="fit-btn" title="Fit all nodes to screen">Fit</button>
-      <div id="filters">
-        <span>Protocol:</span>
-        <label class="filter-label"
-          ><input type="checkbox" data-protocol="rest" checked /> REST</label
-        >
-        <label class="filter-label"
-          ><input type="checkbox" data-protocol="grpc" checked /> gRPC</label
-        >
-        <label class="filter-label"
-          ><input type="checkbox" data-protocol="events" checked />
-          Events</label
-        >
-        <label class="filter-label"
-          ><input type="checkbox" data-protocol="internal" checked />
-          Internal</label
-        >
-        <label class="filter-label"
-          ><input type="checkbox" data-protocol="sdk" checked /> SDK</label
-        >
-      </div>
-      <div id="legend">
-        <span class="legend-item"
-          ><span class="legend-dot" style="background: #4299e1"></span
-          >Service</span
-        >
-        <span class="legend-item"
-          ><span class="legend-dot" style="background: #f6ad55"></span
-          >Frontend</span
-        >
-        <span class="legend-item"
-          ><span class="legend-dot" style="background: #9f7aea"></span
-          >Library</span
-        >
-        <span class="legend-item"
-          ><span style="color: #fc8181; font-weight: bold">✗</span>
-          Mismatch</span
-        >
-      </div>
+      <button id="filters-btn">Filters</button>
       <span id="node-info">Loading...</span>
+    </div>
+    <div id="filter-panel" style="display: none;">
+      <!-- populated by filter-panel.js in plan 02 -->
+      <div class="filter-section">
+        <span class="filter-section-label">Protocol</span>
+        <label class="filter-label"><input type="checkbox" data-protocol="rest" checked /> REST</label>
+        <label class="filter-label"><input type="checkbox" data-protocol="grpc" checked /> gRPC</label>
+        <label class="filter-label"><input type="checkbox" data-protocol="events" checked /> Events</label>
+        <label class="filter-label"><input type="checkbox" data-protocol="sdk" checked /> SDK</label>
+        <label class="filter-label"><input type="checkbox" data-protocol="internal" checked /> Internal</label>
+      </div>
+      <div class="filter-section">
+        <span class="filter-section-label">Layer</span>
+        <label class="filter-label"><input type="checkbox" data-layer="services" checked /> Services</label>
+        <label class="filter-label"><input type="checkbox" data-layer="libraries" checked /> Libraries</label>
+        <label class="filter-label"><input type="checkbox" data-layer="infra" checked /> Infra</label>
+        <label class="filter-label"><input type="checkbox" data-layer="external" checked /> External</label>
+      </div>
+      <div class="filter-section">
+        <span class="filter-section-label">Show</span>
+        <label class="filter-label"><input type="checkbox" id="filter-mismatches-only" /> Mismatches only</label>
+        <label class="filter-label"><input type="checkbox" id="filter-hide-isolated" /> Hide isolated nodes</label>
+      </div>
+      <div class="filter-section">
+        <span class="filter-section-label">Boundary</span>
+        <select id="filter-boundary"><option value="">All</option></select>
+      </div>
+      <div class="filter-section">
+        <span class="filter-section-label">Language</span>
+        <select id="filter-language"><option value="">All</option></select>
+      </div>
     </div>
     <div id="canvas-container">
       <canvas id="graph-canvas"></canvas>
