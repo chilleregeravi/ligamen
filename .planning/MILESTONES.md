@@ -1,10 +1,28 @@
 # Milestones
 
+## v3.0 Layered Graph & Intelligence (Shipped: 2026-03-18)
+
+**Phases completed:** 6 phases, 11 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Migration 008 adds `actors`, `actor_connections`, and `node_metadata` tables for external system tracking and extensible metadata
+- Deterministic layered layout engine replaces D3 force simulation — services/libraries/infra in stable rows with row wrapping
+- Boundary grouping via `allclear.config.json` — dashed rounded rectangles with labels around service clusters
+- External actor detection from scan `crossing` field — hexagon nodes in dedicated right column with detail panel
+- Protocol-differentiated edge styles: solid (REST), dashed (gRPC), dotted (events), arrowed (SDK), red (mismatch)
+- Minimal top bar with collapsible filter panel — protocol, layer, boundary, language, mismatch-only, hide-isolated filters
+- ChromaDB embeddings enriched with boundary context and actor relationships
+- MCP `impact_query` and `impact_search` responses carry type-aware summaries and actor relationship sentences
+
+---
+
 ## v2.3 Type-Specific Detail Panels (Shipped: 2026-03-18)
 
 **Phases completed:** 3 phases, 5 plans, 0 tasks
 
 **Key accomplishments:**
+
 - Migration 007 adds `kind` column to `exposed_endpoints` with COALESCE unique index for NULL-safe dedup
 - `persistFindings()` type-conditional dispatch: services split METHOD/PATH, libraries store raw signatures, infra stores raw resource refs
 - `getGraph()` attaches per-node `exposes` arrays with graceful pre-migration degradation
@@ -18,6 +36,7 @@
 **Phases completed:** 3 phases, 5 plans, 0 tasks
 
 **Key accomplishments:**
+
 - UNIQUE(repo_id, name) constraint with in-place dedup + ON CONFLICT DO UPDATE upsert preserving row IDs across re-scans
 - Scan version bracket (beginScan/endScan) with atomic stale-row cleanup — failed scans leave prior data intact
 - Agent prompt service naming convention enforcing manifest-derived, lowercase-hyphenated names
@@ -30,6 +49,7 @@
 **Phases completed:** 5 phases, 11 plans, 0 tasks
 
 **Key accomplishments:**
+
 - HiDPI/Retina-crisp canvas rendering with devicePixelRatio scaling and smooth exponential zoom/pan
 - Shared structured logger with component tags across all worker modules (zero console.log in production code)
 - Collapsible log terminal with 2s polling, ring buffer, component filter, keyword search, and auto-scroll
@@ -42,6 +62,7 @@
 **Phases completed:** 8 phases, 19 plans, 0 tasks
 
 **Key accomplishments:**
+
 - (none recorded)
 
 ---
@@ -51,7 +72,7 @@
 **Phases completed:** 13 phases, 17 plans, 0 tasks
 
 **Key accomplishments:**
+
 - (none recorded)
 
 ---
-

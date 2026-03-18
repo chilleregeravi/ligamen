@@ -189,13 +189,53 @@
 
 ---
 
+## Milestone: v3.0 — Layered Graph & Intelligence
+
+**Shipped:** 2026-03-18
+**Phases:** 6 | **Plans:** 11
+
+### What Was Built
+- Deterministic layered layout engine replacing D3 force simulation
+- Boundary grouping via config with dashed rounded rectangle rendering
+- External actor detection and hexagon rendering in right column
+- Protocol-differentiated edge styles (solid/dashed/dotted/red)
+- Collapsible filter panel with 7 filter types
+- ChromaDB and MCP response enrichment with boundary + actor context
+- `node_metadata` extensibility table for future STRIDE/vuln views
+
+### What Worked
+- Thorough design discussion before milestone creation — the mockup-first approach prevented rework
+- Parallel planning of phases 36-38 saved significant time
+- Integration checker caught two real bugs (crossing field drop, node.boundary missing) before release
+- Bug review caught 10+ issues including XSS, null guards, idempotency, event listener leaks
+
+### What Was Inefficient
+- Phase 34 (Layout Engine) planner didn't account for row wrapping with many nodes — had to fix post-verification
+- Boundary config reading failed silently due to `qe.db` vs `qe._db` — private field access pattern is fragile
+- VALIDATION.md was missing for Phase 34, blocking the plan checker — the orchestrator should generate it automatically
+- Visual verification items accumulated across phases — should batch these earlier
+
+### Patterns Established
+- Layer boxes for non-service layers (Libraries, Infrastructure) auto-generated from node positions
+- Separate X/Y padding for boundary boxes to cover node label widths
+- `_filterPanelWired` guard pattern to prevent event listener leaks on project switch
+- Enrichment functions (`enrichImpactResult`, `enrichSearchResult`) as best-effort wrappers with null-db guards
+
+### Key Lessons
+- Always verify the full data pipeline (prompt → validator → DB → API → UI) before shipping — the `crossing` field was in the prompt and schema but dropped in `writeScan`
+- Private field naming (`_db`) creates fragile coupling when accessed from other modules — consider a public accessor
+- Row wrapping is essential for any grid layout with variable node counts — MAX_PER_ROW should be a design constant, not an afterthought
+- The milestone discussion phase (C4 vs current, app vs plugin, actor sources) was the most valuable part — it prevented building features that don't fit the plugin model
+
+---
+
 ## Cross-Milestone Trends
 
-| Metric | v1.0 | v2.0 | v2.1 | v2.2 | v2.3 |
-|--------|------|------|------|------|------|
-| Phases | 13 | 8 | 5 | 3 | 3 |
-| Plans | 17 | 19 | 11 | 5 | 5 |
-| Requirements | 79 | 8 | 13 | 5 | 9 |
-| Tests | 150 | ~50 | ~20 | ~30 | ~30 |
-| LOC | 4,323 | ~7,000 | ~7,500 | ~8,000 | ~9,000 |
-| Timeline | 1 day | 1 day | 1 day | 1 day | 1 day |
+| Metric | v1.0 | v2.0 | v2.1 | v2.2 | v2.3 | v3.0 |
+|--------|------|------|------|------|------|------|
+| Phases | 13 | 8 | 5 | 3 | 3 | 6 |
+| Plans | 17 | 19 | 11 | 5 | 5 | 11 |
+| Requirements | 79 | 8 | 13 | 5 | 9 | 33 |
+| Tests | 150 | ~50 | ~20 | ~30 | ~30 | ~60 |
+| LOC | 4,323 | ~7,000 | ~7,500 | ~8,000 | ~9,000 | ~12,000 |
+| Timeline | 1 day | 1 day | 1 day | 1 day | 1 day | 1 day |

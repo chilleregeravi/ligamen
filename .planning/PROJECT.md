@@ -52,21 +52,19 @@ Every edit is automatically formatted and linted, every quality check runs with 
 - ✓ Infra detail panel showing managed resources grouped by prefix, plus wired services — v2.3
 - ✓ XSS-safe detail panel rendering with `escapeHtml()` on scan-derived strings — v2.3
 
+- ✓ Deterministic layered layout replacing force simulation (services/libraries/infra rows with row wrapping) — v3.0
+- ✓ Boundary grouping via `allclear.config.json` with dashed rounded rectangle rendering — v3.0
+- ✓ External actor detection from scan `crossing` field, hexagon nodes in right column — v3.0
+- ✓ Node shapes per type: circles (services), outline diamonds (libraries), filled diamonds (infra), hexagons (actors) — v3.0
+- ✓ Protocol-differentiated edge styles: solid (REST), dashed (gRPC), dotted (events), red (mismatch) — v3.0
+- ✓ Minimal top bar with collapsible filter panel (protocol, layer, boundary, language, mismatch, isolated) — v3.0
+- ✓ `node_metadata` table for future extensible view data (STRIDE, vulns) — v3.0
+- ✓ ChromaDB embeddings enriched with boundary + actor context — v3.0
+- ✓ MCP impact responses with type-aware summaries and actor relationship sentences — v3.0
+
 ### Active
 
-## Current Milestone: v3.0 Layered Graph & Intelligence
-
-**Goal:** Replace force-directed graph with deterministic layered layout, surface external system actors, and enrich the data model for richer MCP impact responses.
-
-**Target features:**
-- Deterministic layered layout (services top, libraries middle, infra bottom, externals right)
-- External system actors detected from scan shown as distinct hexagon nodes
-- Visual boundary grouping within service layer (user-defined in config)
-- Different node shapes per type (circle, diamond, hexagon)
-- Minimal top bar with collapsible filter panel (protocol, layer, mismatch, boundary, language)
-- Metadata extension table (`node_metadata`) for future view data without schema rewrites
-- Richer ChromaDB embeddings with boundary context, actor relationships, connection metadata
-- Enriched MCP tool responses returning type-aware, boundary-aware impact context
+(Defined per milestone — see current milestone below)
 
 ### Out of Scope
 
@@ -79,11 +77,11 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ## Context
 
-Shipped v2.3 with ~9,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 32 phases across 5 milestones, 57 plans. Plugin installed via marketplace and operational.
+Shipped v3.0 with ~12,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 38 phases across 6 milestones, 68 plans. Plugin installed via marketplace and operational.
 
-Architecture: commands/ for user-invoked features, skills/ for auto-invoked knowledge, hooks/ for formatting/linting/guarding, worker/ for Node.js daemon (db/, server/, scan/, mcp/, ui/ subdirectories), lib/ for shared bash/JS libraries. Agent scan prompts modularized into type-specific variants (service, library, infra) with shared common component. Detail panel renders type-appropriate views per node type.
+Architecture: commands/ for user-invoked features, skills/ for auto-invoked knowledge, hooks/ for formatting/linting/guarding, worker/ for Node.js daemon (db/, server/, scan/, mcp/, ui/ subdirectories), lib/ for shared bash/JS libraries. Agent scan prompts modularized into type-specific variants (service, library, infra) with shared common component. Graph UI uses deterministic layered layout with boundary grouping, external actor hexagons, and protocol-differentiated edges. Filter panel provides protocol, layer, boundary, language, mismatch, and isolated-node toggles.
 
-Known tech debt: setupControls() listener accumulation on project switch, no log rotation, db/database.js has console.log in script-mode guard, getQueryEngineByHash inline migration workaround, renderLibraryConnections() unused `outgoing` parameter.
+Known tech debt: no log rotation, db/database.js has console.log in script-mode guard, getQueryEngineByHash inline migration workaround, renderLibraryConnections() unused `outgoing` parameter, node_metadata table unused (forward-looking for STRIDE/vuln views), query-engine-upsert.test.js pre-existing failure (test schema missing migrations 5-8).
 
 ## Constraints
 
@@ -119,6 +117,15 @@ Known tech debt: setupControls() listener accumulation on project switch, no log
 | Embed exposes in /graph response | Single-load pattern avoids per-click API calls and async rendering complexity | ✓ Good |
 | escapeHtml on scan-derived strings | Function signatures contain angle brackets that would be interpreted as HTML | ✓ Good |
 | Infra guard first in getNodeType() | Before name heuristics — node named 'k8s-infra-lib' correctly returns 'infra' | ✓ Good |
+| Custom grid layout over Dagre/ELK | Simple row-based layout per type layer; no external dependency needed for <100 nodes | ✓ Good |
+| Separate actors table over extending services | Actors don't have repos, languages, or exposes — half the columns would be NULL | ✓ Good |
+| node_metadata table for extensibility | Avoids migration bloat when future views (STRIDE, vulns, deployment) add data | ✓ Good |
+| Outbound external actors from scan only | No config-based or inferred inbound actors — reduces hallucination risk | ✓ Good |
+| Synthetic negative IDs for actor nodes | Avoids collision with service IDs in shared nodes array | ✓ Good |
+| Services top, libraries middle, infra bottom | Infra is the foundation services run on — matches mental model | ✓ Good |
+| Minimal top bar with collapsible filter panel | Keeps UI clean; all power behind one button | ✓ Good |
+| Layered scanning approach | Core scan unchanged; future views get their own optional scan passes | ✓ Good |
+| Boundary config in allclear.config.json | User-defined grouping avoids hallucination from auto-inference | ✓ Good |
 
 ---
-*Last updated: 2026-03-18 after v3.0 milestone started*
+*Last updated: 2026-03-18 after v3.0 milestone*
