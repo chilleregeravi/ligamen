@@ -16,9 +16,10 @@ import { NODE_RADIUS } from "./state.js";
 export const ACTOR_COLUMN_RESERVE_RATIO = 0.18;
 
 const PADDING = 40;
-const BOX_PAD = 50;
-const LABEL_HEIGHT = 28;  // space above nodes for boundary label
-const NODE_LABEL_CLEARANCE = 24;  // space below nodes for name + type labels
+const BOX_PAD_Y = 50;       // vertical padding above/below nodes
+const BOX_PAD_X = 80;       // horizontal padding — must cover half of longest node label
+const LABEL_HEIGHT = 28;    // space above nodes for boundary label
+const NODE_LABEL_CLEARANCE = 30;  // space below nodes for name + type labels
 
 /**
  * Compute deterministic grid positions for all nodes.
@@ -147,15 +148,15 @@ export function computeLayout(nodes, boundaries, canvasW, canvasH) {
     const topExtra = LABEL_HEIGHT;
     const bottomExtra = NODE_LABEL_CLEARANCE;
     const boxH = Math.max(
-      NODE_RADIUS * 2 + BOX_PAD * 2 + topExtra + bottomExtra,
-      maxY - minY + BOX_PAD * 2 + topExtra + bottomExtra,
+      NODE_RADIUS * 2 + BOX_PAD_Y * 2 + topExtra + bottomExtra,
+      maxY - minY + BOX_PAD_Y * 2 + topExtra + bottomExtra,
     );
 
     boundaryBoxes.push({
       label: boundary.label || boundary.name,
-      x: minX - BOX_PAD,
-      y: minY - BOX_PAD - topExtra,
-      w: maxX - minX + BOX_PAD * 2,
+      x: minX - BOX_PAD_X,
+      y: minY - BOX_PAD_Y - topExtra,
+      w: maxX - minX + BOX_PAD_X * 2,
       h: boxH,
     });
   }
@@ -182,10 +183,10 @@ export function computeLayout(nodes, boundaries, canvasW, canvasH) {
     const bottomExtra = NODE_LABEL_CLEARANCE;
     layerBoxes.push({
       label: LAYER_LABELS[name] || name,
-      x: minX - BOX_PAD,
-      y: minY - BOX_PAD - topExtra,
-      w: maxX - minX + BOX_PAD * 2,
-      h: Math.max(NODE_RADIUS * 2 + BOX_PAD * 2 + topExtra + bottomExtra, maxY - minY + BOX_PAD * 2 + topExtra + bottomExtra),
+      x: minX - BOX_PAD_X,
+      y: minY - BOX_PAD_Y - topExtra,
+      w: maxX - minX + BOX_PAD_X * 2,
+      h: Math.max(NODE_RADIUS * 2 + BOX_PAD_Y * 2 + topExtra + bottomExtra, maxY - minY + BOX_PAD_Y * 2 + topExtra + bottomExtra),
     });
   }
 
