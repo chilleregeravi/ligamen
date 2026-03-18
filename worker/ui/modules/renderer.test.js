@@ -87,11 +87,21 @@ check(
   "ctx.stroke()"
 );
 
-// Hexagon loop must be removed
+// Library branch must NOT use hexagon loop (hexagons are for actors only)
+const libBranchIdx = src.indexOf('nodeType === "library" || nodeType === "sdk"');
+const libSection = libBranchIdx !== -1 ? src.slice(libBranchIdx, libBranchIdx + 500) : '';
 check(
-  !src.match(/for\s*\(\s*let i\s*=\s*0\s*;.*i\s*<\s*6/),
-  "NODE-02 — hexagon loop removed (no for i < 6)",
+  !libSection.match(/for\s*\(\s*let i\s*=\s*0\s*;.*i\s*<\s*6/),
+  "NODE-02 — library branch has no hexagon loop (diamonds only)",
   null
+);
+
+// Actor branch SHOULD use hexagon loop (NODE-04)
+check(
+  src.includes('nodeType === "actor"') &&
+  src.match(/nodeType === "actor"[\s\S]*?for\s*\(\s*let i\s*=\s*0\s*;.*i\s*<\s*6/),
+  "NODE-04 — actor branch uses hexagon loop (for i < 6)",
+  "hexagon loop in actor branch"
 );
 
 // ── NODE-03: Infra uses filled diamond ────────────────────────────────────

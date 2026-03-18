@@ -33,7 +33,7 @@ export function showDetailPanel(node) {
 
   const nodeType = getNodeType(node);
   const typeColor = getNodeColor(node);
-  let html = `<h3>${node.name}</h3>`;
+  let html = `<h3>${escapeHtml(node.name)}</h3>`;
 
   html += `<div class="detail-section">
     <div class="detail-label">Type</div>
@@ -48,7 +48,7 @@ export function showDetailPanel(node) {
   if (node.repo_name) {
     html += `<div class="detail-section">
       <div class="detail-label">Repository</div>
-      <div class="detail-value">${node.repo_name}</div>
+      <div class="detail-value">${escapeHtml(node.repo_name)}</div>
     </div>`;
   }
 
@@ -217,6 +217,7 @@ function renderServiceConnections(outgoing, incoming, nameById) {
 
 function renderActorDetail(node) {
   const actor = node._actorData;
+  if (!actor) return '<div class="detail-value" style="color: #718096">No actor data</div>';
   const typeColor = getNodeColor(node);
 
   let html = `<h3>${escapeHtml(actor.name)}</h3>`;

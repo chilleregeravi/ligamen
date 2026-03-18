@@ -97,7 +97,7 @@ export function up(db) {
   `);
 
   db.exec(`
-    INSERT INTO actor_connections (actor_id, service_id, direction, protocol, path)
+    INSERT OR IGNORE INTO actor_connections (actor_id, service_id, direction, protocol, path)
     SELECT a.id, c.source_service_id, 'outbound', c.protocol, c.path
     FROM connections c
     JOIN services s_target ON s_target.id = c.target_service_id

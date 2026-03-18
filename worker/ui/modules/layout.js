@@ -116,7 +116,7 @@ export function computeLayout(nodes, boundaries, canvasW, canvasH) {
   // ── 6. Position actor nodes in the reserved right column ─────────────
   if (actorNodes.length > 0) {
     // Center of the actor column: past usableW, centered in the reserved area
-    const actorColumnX = PADDING + usableW + Math.round(canvasW * ACTOR_COLUMN_RESERVE_RATIO) / 2;
+    const actorColumnX = PADDING + usableW + actorReserve / 2;
     const actorSpacingY = (canvasH - PADDING * 2) / Math.max(actorNodes.length, 1);
 
     for (let i = 0; i < actorNodes.length; i++) {

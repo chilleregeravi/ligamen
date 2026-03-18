@@ -865,7 +865,7 @@ export class QueryEngine {
       // Detect external actors: when crossing='external', the target is an
       // external system. Create/upsert an actor for it and link to the source
       // service via actor_connections.
-      if (conn.crossing === "external" && this._stmtUpsertActor) {
+      if (conn.crossing === "external" && this._stmtUpsertActor && this._stmtGetActorByName) {
         const actorName = conn.target; // target service name = actor name
         this._stmtUpsertActor.run({
           name: actorName,
@@ -992,6 +992,7 @@ export class QueryEngine {
  */
 export function enrichImpactResult(db, serviceName, results) {
   let summary = `${results.length} connection(s) found`;
+  if (!db) return { results, summary };
   try {
     // 1. Resolve service type
     const svcRow = db
@@ -1036,6 +1037,7 @@ export function enrichImpactResult(db, serviceName, results) {
  * @returns {Array}
  */
 export function enrichSearchResult(db, results) {
+  if (!db) return results.map((row) => ({ ...row, actor_sentences: [] }));
   try {
     const stmt = db.prepare(`
       SELECT a.name AS actor_name, ac.protocol AS actor_protocol, s.name AS service_name

@@ -9,14 +9,22 @@
 import { state } from "./state.js";
 import { render } from "./renderer.js";
 
+// Guard: only wire listeners once across multiple loadProject calls
+let _filterPanelWired = false;
+
 /**
  * Wire all filter controls in the collapsible #filter-panel.
  * Called from setupControls() in interactions.js after DOM is ready.
+ * Idempotent — only wires listeners on first call.
  */
 export function setupFilterPanel() {
-  // 1. Filters button toggle
+  if (_filterPanelWired) return;
+
   const filtersBtn = document.getElementById("filters-btn");
   const filterPanel = document.getElementById("filter-panel");
+  if (!filtersBtn || !filterPanel) return;
+
+  // 1. Filters button toggle
   filtersBtn.addEventListener("click", () => {
     state.filterPanelOpen = !state.filterPanelOpen;
     filterPanel.style.display = state.filterPanelOpen ? "flex" : "none";
@@ -42,39 +50,53 @@ export function setupFilterPanel() {
   });
 
   // 4. Mismatches only
-  document.getElementById("filter-mismatches-only").addEventListener("change", (e) => {
-    state.mismatchesOnly = e.target.checked;
-    render();
-  });
+  const mismatchCb = document.getElementById("filter-mismatches-only");
+  if (mismatchCb) {
+    mismatchCb.addEventListener("change", (e) => {
+      state.mismatchesOnly = e.target.checked;
+      render();
+    });
+  }
 
   // 5. Hide isolated nodes
-  document.getElementById("filter-hide-isolated").addEventListener("change", (e) => {
-    state.hideIsolated = e.target.checked;
-    render();
-  });
+  const isolatedCb = document.getElementById("filter-hide-isolated");
+  if (isolatedCb) {
+    isolatedCb.addEventListener("change", (e) => {
+      state.hideIsolated = e.target.checked;
+      render();
+    });
+  }
 
   // 6. Boundary dropdown
-  document.getElementById("filter-boundary").addEventListener("change", (e) => {
-    state.boundaryFilter = e.target.value || null;
-    render();
-  });
+  const boundarySelect = document.getElementById("filter-boundary");
+  if (boundarySelect) {
+    boundarySelect.addEventListener("change", (e) => {
+      state.boundaryFilter = e.target.value || null;
+      render();
+    });
+  }
 
   // 7. Language dropdown
-  document.getElementById("filter-language").addEventListener("change", (e) => {
-    state.languageFilter = e.target.value || null;
-    render();
-  });
+  const langSelect = document.getElementById("filter-language");
+  if (langSelect) {
+    langSelect.addEventListener("change", (e) => {
+      state.languageFilter = e.target.value || null;
+      render();
+    });
+  }
+
+  _filterPanelWired = true;
 }
 
 /**
  * Populate the boundary and language <select> elements from live graph data.
  * Called after state.graphData.nodes is populated in loadProject().
- *
- * node.boundary is not present in the current data model — it will be added
- * when Phase 34 boundary data lands. The function handles the empty-list case
- * gracefully: selects stay as "All" only when no values are available.
  */
 export function populateFilterDropdowns() {
+  const langSelect = document.getElementById("filter-language");
+  const boundarySelect = document.getElementById("filter-boundary");
+  if (!langSelect || !boundarySelect) return;
+
   // Collect unique, non-empty language values from nodes
   const languages = [...new Set(
     state.graphData.nodes
@@ -89,7 +111,6 @@ export function populateFilterDropdowns() {
       .filter(Boolean),
   )].sort();
 
-  const langSelect = document.getElementById("filter-language");
   // Preserve current selection
   const prevLang = langSelect.value;
   langSelect.innerHTML = '<option value="">All</option>';
@@ -101,7 +122,6 @@ export function populateFilterDropdowns() {
   });
   if (prevLang) langSelect.value = prevLang;
 
-  const boundarySelect = document.getElementById("filter-boundary");
   const prevBoundary = boundarySelect.value;
   boundarySelect.innerHTML = '<option value="">All</option>';
   boundaries.forEach((b) => {
