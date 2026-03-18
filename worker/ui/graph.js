@@ -14,6 +14,7 @@ import { showProjectPicker } from "./modules/project-picker.js";
 import { initLogTerminal } from "./modules/log-terminal.js";
 // Stub — will be implemented in Plan 02
 import { initProjectSwitcher } from "./modules/project-switcher.js";
+import { populateFilterDropdowns } from "./modules/filter-panel.js";
 
 // Guard: detail-close listener is wired once across multiple loadProject calls
 let _detailCloseWired = false;
@@ -80,6 +81,7 @@ export async function loadProject(hash, canvas) {
   }));
 
   state.graphData.mismatches = raw.mismatches || [];
+  populateFilterDropdowns();
 
   // Store raw actors for detail panel
   state.graphData.actors = raw.actors || [];

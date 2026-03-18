@@ -6,6 +6,7 @@ import { state, NODE_RADIUS } from "./state.js";
 import { hitTest, toWorld, fetchImpact, getNodeType, getConnectionCount } from "./utils.js";
 import { render } from "./renderer.js";
 import { showDetailPanel, hideDetailPanel } from "./detail-panel.js";
+import { setupFilterPanel } from "./filter-panel.js";
 
 // Module-scoped refs set by setupInteractions — needed so named handlers
 // can access canvas and tooltip, and so removeEventListener can match refs.
@@ -178,12 +179,5 @@ export function setupControls() {
     state.searchFilter = e.target.value.toLowerCase();
     render();
   });
-
-  document.querySelectorAll("[data-protocol]").forEach((cb) => {
-    cb.addEventListener("change", () => {
-      if (cb.checked) state.activeProtocols.add(cb.dataset.protocol);
-      else state.activeProtocols.delete(cb.dataset.protocol);
-      render();
-    });
-  });
+  setupFilterPanel();
 }
