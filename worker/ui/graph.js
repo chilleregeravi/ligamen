@@ -56,6 +56,14 @@ export async function loadProject(hash, canvas) {
     (raw.mismatches || []).map((m) => m.connection_id),
   );
 
+  // Build service-name → boundary-name reverse map from boundaries config
+  const nameToBoundary = {};
+  for (const b of raw.boundaries || []) {
+    for (const svcName of b.services || []) {
+      nameToBoundary[svcName] = b.name;
+    }
+  }
+
   state.graphData.nodes = (raw.services || []).map((s) => {
     serviceNameToId[s.name] = s.id;
     return {
@@ -65,6 +73,7 @@ export async function loadProject(hash, canvas) {
       type: s.type || "service",
       repo_name: s.repo_name,
       exposes: s.exposes || [],
+      boundary: nameToBoundary[s.name] || null,
     };
   });
 

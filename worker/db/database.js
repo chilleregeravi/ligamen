@@ -206,6 +206,7 @@ export function writeScan(findings, queryEngine, repoId) {
       path: conn.path || null,
       source_file: conn.source_file || null,
       target_file: conn.target_file || null,
+      crossing: conn.crossing || null,
     });
   }
 
