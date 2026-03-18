@@ -8,6 +8,7 @@ import {
   LABEL_MAX_CHARS,
   COLORS,
   PROTOCOL_COLORS,
+  PROTOCOL_LINE_DASH,
 } from "./state.js";
 import {
   truncate,
@@ -105,14 +106,18 @@ export function render() {
     else color = PROTOCOL_COLORS[edge.protocol] || COLORS.edge.default;
 
     const lineWidth = isSelectedEdge || isBlastEdge ? 2 : 1;
-    const isSdkEdge = edge.protocol === "sdk" || edge.protocol === "import";
+
+    // Resolve line dash pattern from protocol (EDGE-01/02/03/04)
+    const dashPattern = PROTOCOL_LINE_DASH[edge.protocol] || [];
+    const scaledDash = dashPattern.map((v) => v / state.transform.scale);
+
+    // Mismatch edges render in red (EDGE-05) — override color before stroke
+    if (edge.mismatch) {
+      color = "#fc8181";
+    }
 
     ctx.beginPath();
-    if (isSdkEdge) {
-      ctx.setLineDash([4 / state.transform.scale, 4 / state.transform.scale]);
-    } else {
-      ctx.setLineDash([]);
-    }
+    ctx.setLineDash(scaledDash);
     ctx.moveTo(srcPos.x, srcPos.y);
     ctx.lineTo(tgtPos.x, tgtPos.y);
     ctx.strokeStyle = color;
