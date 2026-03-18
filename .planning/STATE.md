@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Layered Graph & Intelligence
 status: unknown
-stopped_at: Completed 37-02-PLAN.md
-last_updated: "2026-03-18T20:56:30Z"
+stopped_at: Completed 37-03-PLAN.md
+last_updated: "2026-03-18T20:58:57.051Z"
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -61,6 +61,8 @@ Plan: 2 of 3
 - [Phase 37-01]: Filter panel HTML shell in index.html now, wired by filter-panel.js in plan 02 — avoids JS-create-DOM pattern
 - [Phase 37-02]: Protocol checkbox handling moved into filter-panel.js — setupControls() now only owns search input
 - [Phase 37-02]: populateFilterDropdowns() called after mismatches assignment — services node array complete at that point
+- [Phase 37-controls-filters]: nodeLayer() helper defined at module scope to avoid per-frame re-creation in render()
+- [Phase 37-controls-filters]: hideIsolated post-filter honors mismatchesOnly in its edge-counting pass — consistent with what's drawn
 
 ### Pending Todos
 
@@ -74,6 +76,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T20:56:30Z
-Stopped at: Completed 37-02-PLAN.md
+Last session: 2026-03-18T20:58:57.048Z
+Stopped at: Completed 37-03-PLAN.md
 Resume file: None

@@ -66,7 +66,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 34: Layout Engine & Node Rendering** — deterministic layered layout replacing force simulation, node shapes per type, boundary boxes (completed 2026-03-18)
 - [x] **Phase 35: External Actors** — external actor detection, storage, rendering as hexagons, detail panel (completed 2026-03-18)
 - [x] **Phase 36: Edge Rendering** — protocol-differentiated edge styles (solid, dashed, dotted), mismatch highlighting (completed 2026-03-18)
-- [ ] **Phase 37: Controls & Filters** — minimal top bar, collapsible filter panel with all toggles
+- [x] **Phase 37: Controls & Filters** — minimal top bar, collapsible filter panel with all toggles (completed 2026-03-18)
 - [ ] **Phase 38: Intelligence** — enriched ChromaDB embeddings, boundary-aware and actor-aware MCP responses
 
 ## Phase Details
@@ -136,7 +136,7 @@ Plans:
   4. Enabling "Mismatches only" hides all edges except those with detected mismatches
   5. Enabling "Hide isolated nodes" removes nodes with zero connections from the canvas
   6. Boundary and Language dropdowns filter to nodes in the selected boundary or written in the selected language
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [ ] 37-01-PLAN.md — State extensions + HTML/CSS minimal top bar and filter panel shell
 - [ ] 37-02-PLAN.md — filter-panel.js module: wire all controls to state + render
@@ -168,5 +168,5 @@ Plans:
 | 34. Layout Engine & Node Rendering | 2/2 | Complete    | 2026-03-18 | - |
 | 35. External Actors | 2/2 | Complete    | 2026-03-18 | - |
 | 36. Edge Rendering | 1/1 | Complete   | 2026-03-18 | - |
-| 37. Controls & Filters | 2/3 | In Progress|  | - |
+| 37. Controls & Filters | 3/3 | Complete   | 2026-03-18 | - |
 | 38. Intelligence | v3.0 | 0/2 | Not started | - |
