@@ -150,7 +150,10 @@ Plans:
   1. After a scan, ChromaDB document payloads include boundary name (if configured) and actor relationships alongside existing graph data
   2. `impact_query` MCP responses include type-aware phrasing — e.g., "library used by 3 services in the payments boundary"
   3. `impact_search` MCP responses include actor relationships — e.g., "payments-api connects to external Stripe via REST"
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 38-01-PLAN.md — ChromaDB embedding enrichment: boundary + actor fields in syncFindings
+- [ ] 38-02-PLAN.md — MCP response enrichment: type-aware impact_query and actor-aware impact_search
 
 ## Progress
 
@@ -166,4 +169,4 @@ Plans:
 | 35. External Actors | v3.0 | 0/2 | Not started | - |
 | 36. Edge Rendering | v3.0 | 0/1 | Not started | - |
 | 37. Controls & Filters | v3.0 | 0/3 | Not started | - |
-| 38. Intelligence | v3.0 | 0/? | Not started | - |
+| 38. Intelligence | v3.0 | 0/2 | Not started | - |
