@@ -9,15 +9,15 @@ Requirements for milestone v3.0 Layered Graph & Intelligence. Each maps to roadm
 
 ### Layout
 
-- [ ] **LAYOUT-01**: Graph uses deterministic layered layout with services at top, libraries in middle, infrastructure at bottom
-- [ ] **LAYOUT-02**: Node positions are stable across page reloads (no force simulation randomness)
-- [ ] **LAYOUT-03**: Nodes within each layer are algorithmically spaced (grid-based positioning)
-- [ ] **LAYOUT-04**: Services can be visually grouped into boundary boxes (user-defined in `allclear.config.json`)
+- [x] **LAYOUT-01**: Graph uses deterministic layered layout with services at top, libraries in middle, infrastructure at bottom
+- [x] **LAYOUT-02**: Node positions are stable across page reloads (no force simulation randomness)
+- [x] **LAYOUT-03**: Nodes within each layer are algorithmically spaced (grid-based positioning)
+- [x] **LAYOUT-04**: Services can be visually grouped into boundary boxes (user-defined in `allclear.config.json`)
 - [ ] **LAYOUT-05**: Boundary boxes render as dashed rounded rectangles with semi-transparent fill and label
 
 ### Node Rendering
 
-- [ ] **NODE-01**: Services render as filled circles
+- [x] **NODE-01**: Services render as filled circles
 - [ ] **NODE-02**: Libraries/SDKs render as outline diamonds
 - [ ] **NODE-03**: Infrastructure nodes render as filled diamonds
 - [ ] **NODE-04**: External system actors render as hexagons on the right side, outside the system boundary
@@ -105,12 +105,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-02 | Phase 33 | Complete |
 | DATA-03 | Phase 33 | Complete |
 | DATA-04 | Phase 33 | Complete |
-| LAYOUT-01 | Phase 34 | Pending |
-| LAYOUT-02 | Phase 34 | Pending |
-| LAYOUT-03 | Phase 34 | Pending |
-| LAYOUT-04 | Phase 34 | Pending |
+| LAYOUT-01 | Phase 34 | Complete |
+| LAYOUT-02 | Phase 34 | Complete |
+| LAYOUT-03 | Phase 34 | Complete |
+| LAYOUT-04 | Phase 34 | Complete |
 | LAYOUT-05 | Phase 34 | Pending |
-| NODE-01 | Phase 34 | Pending |
+| NODE-01 | Phase 34 | Complete |
 | NODE-02 | Phase 34 | Pending |
 | NODE-03 | Phase 34 | Pending |
 | NODE-05 | Phase 34 | Pending |

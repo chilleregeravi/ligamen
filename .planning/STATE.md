@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Layered Graph & Intelligence
 status: unknown
-stopped_at: Completed 33-data-model-01 — migration 008 actors/actor_connections/node_metadata
-last_updated: "2026-03-18T19:53:40.463Z"
+stopped_at: Completed 34-layout-engine-01 — deterministic grid layout, force Worker removed
+last_updated: "2026-03-18T19:58:57.811Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 11
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 33 — data-model
+**Current focus:** Phase 34 — layout-engine
 
 ## Current Position
 
-Phase: 33 (data-model) — COMPLETE
-Plan: 1 of 1 — DONE
+Phase: 34 (layout-engine) — EXECUTING
+Plan: 1 of 2
 
 ## Performance Metrics
 
@@ -46,6 +46,9 @@ Plan: 1 of 1 — DONE
 - [v3.0]: Separate actors table over extending services — actors have no repos, languages, or exposes
 - [33-01]: ALTER TABLE idempotency via PRAGMA table_info — SQLite has no ADD COLUMN IF NOT EXISTS
 - [33-01]: Population uses INSERT OR IGNORE so migration re-runs never create duplicate actor rows
+- [Phase 34]: computeLayout() pure function — deterministic positions from node type+sort, no Worker
+- [Phase 34]: 18% right canvas reserved for Phase 35 actors via ACTOR_COLUMN_RESERVE_RATIO constant
+- [Phase 34]: HTTP handler reads boundaries from allclear.config.json directly — avoids QueryEngine change
 
 ### Pending Todos
 
@@ -59,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18
-Stopped at: Completed 33-data-model-01 — migration 008 actors/actor_connections/node_metadata
+Last session: 2026-03-18T19:58:57.807Z
+Stopped at: Completed 34-layout-engine-01 — deterministic grid layout, force Worker removed
 Resume file: None
