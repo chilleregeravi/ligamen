@@ -16,7 +16,8 @@ import { NODE_RADIUS } from "./state.js";
 export const ACTOR_COLUMN_RESERVE_RATIO = 0.18;
 
 const PADDING = 40;
-const BOX_PAD = 28;
+const BOX_PAD = 40;
+const LABEL_HEIGHT = 20;  // space above nodes for boundary label
 
 /**
  * Compute deterministic grid positions for all nodes.
@@ -142,12 +143,13 @@ export function computeLayout(nodes, boundaries, canvasW, canvasH) {
     const maxY = Math.max(...ys);
 
     // Enforce minimum height for single-row boundaries (Research Pitfall 4)
-    const boxH = Math.max(NODE_RADIUS * 2 + BOX_PAD * 2, maxY - minY + BOX_PAD * 2);
+    // Add LABEL_HEIGHT to top so label sits above nodes, not overlapping
+    const boxH = Math.max(NODE_RADIUS * 2 + BOX_PAD * 2 + LABEL_HEIGHT, maxY - minY + BOX_PAD * 2 + LABEL_HEIGHT);
 
     boundaryBoxes.push({
       label: boundary.label || boundary.name,
       x: minX - BOX_PAD,
-      y: minY - BOX_PAD,
+      y: minY - BOX_PAD - LABEL_HEIGHT,
       w: maxX - minX + BOX_PAD * 2,
       h: boxH,
     });

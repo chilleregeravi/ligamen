@@ -110,13 +110,13 @@ export function render() {
     ctx.stroke();
     ctx.setLineDash([]);  // CRITICAL: reset dash pattern
 
-    // Label at top-left
-    ctx.globalAlpha = 0.8;
+    // Label at top-left inside the box (above nodes due to LABEL_HEIGHT offset)
+    ctx.globalAlpha = 0.9;
     ctx.fillStyle = '#63b3ed';
-    ctx.font = `${Math.round(11 / state.transform.scale)}px system-ui, sans-serif`;
+    ctx.font = `bold ${Math.round(12 / state.transform.scale)}px system-ui, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(box.label, box.x + 6, box.y + 4);
+    ctx.fillText(box.label, box.x + 10, box.y + 6);
     ctx.restore();
   }
 
