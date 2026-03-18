@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Layered Graph & Intelligence
-status: in_progress
-stopped_at: "Completed 33-data-model-01 — migration 008 actors/actor_connections/node_metadata"
-last_updated: "2026-03-18T19:50:45Z"
+status: unknown
+stopped_at: Completed 33-data-model-01 — migration 008 actors/actor_connections/node_metadata
+last_updated: "2026-03-18T19:53:40.463Z"
 progress:
   total_phases: 6
   completed_phases: 1
