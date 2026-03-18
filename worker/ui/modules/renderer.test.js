@@ -104,6 +104,85 @@ check(
   "ctx.fill() in infra branch"
 );
 
+// ── CTRL-02/03/04/05/06: New filter logic ─────────────────────────────────
+
+check(
+  src.includes('activeLayers'),
+  "CTRL-03/04 — activeLayers filter referenced in renderer",
+  "activeLayers"
+);
+
+check(
+  src.includes('mismatchesOnly'),
+  "CTRL-05 — mismatchesOnly filter referenced in renderer",
+  "mismatchesOnly"
+);
+
+check(
+  src.includes('hideIsolated'),
+  "CTRL-06 — hideIsolated filter referenced in renderer",
+  "hideIsolated"
+);
+
+check(
+  src.includes('languageFilter'),
+  "CTRL-07 — languageFilter referenced in renderer",
+  "languageFilter"
+);
+
+check(
+  src.includes('boundaryFilter'),
+  "CTRL-02 — boundaryFilter referenced in renderer",
+  "boundaryFilter"
+);
+
+check(
+  src.includes('nodeLayer'),
+  "CTRL-03/04 — nodeLayer helper function defined",
+  "nodeLayer"
+);
+
+check(
+  src.includes('connectedIds'),
+  "CTRL-06 — hide-isolated connectedIds logic present",
+  "connectedIds"
+);
+
+// nodeLayer helper should return correct layer strings
+check(
+  src.includes('"libraries"') && src.includes('"infra"') && src.includes('"external"') && src.includes('"services"'),
+  "CTRL-03/04 — nodeLayer helper returns all 4 layer strings",
+  "all 4 layer string constants"
+);
+
+// Mismatch filter in edge loop (after protocol filter)
+check(
+  src.includes('state.mismatchesOnly && !edge.mismatch'),
+  "CTRL-05 — mismatch edge filter guard in edge loop",
+  "state.mismatchesOnly && !edge.mismatch"
+);
+
+// Layer filter uses activeLayers.has()
+check(
+  src.includes('state.activeLayers.has(nodeLayer(n))') || src.includes('activeLayers.has(nodeLayer('),
+  "CTRL-03/04 — layer filter uses activeLayers.has(nodeLayer(n))",
+  "activeLayers.has(nodeLayer("
+);
+
+// Language filter checks node.language
+check(
+  src.includes('n.language !== state.languageFilter') || src.includes('node.language !== state.languageFilter'),
+  "CTRL-07 — language filter guards node.language",
+  "n.language !== state.languageFilter"
+);
+
+// Boundary filter checks node.boundary
+check(
+  src.includes('n.boundary !== state.boundaryFilter') || src.includes('node.boundary !== state.boundaryFilter'),
+  "CTRL-02 — boundary filter guards node.boundary",
+  "n.boundary !== state.boundaryFilter"
+);
+
 console.log(`\nResults: ${passed} passed, ${failed} failed`);
 if (failed > 0) {
   process.exit(1);
