@@ -99,7 +99,22 @@ async function createHttpServer(queryEngine, options = {}) {
       });
     }
     try {
-      return reply.send(qe.getGraph());
+      const graph = qe.getGraph();
+
+      // Read boundaries from allclear.config.json in the project root.
+      // Always returns boundaries: [] when config is missing or has no boundaries key.
+      let boundaries = [];
+      try {
+        const projectRoot = request.query?.project ||
+          (typeof qe.getProjectRoot === 'function' ? qe.getProjectRoot() : null);
+        if (projectRoot) {
+          const cfgPath = path.join(projectRoot, 'allclear.config.json');
+          const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+          boundaries = Array.isArray(cfg.boundaries) ? cfg.boundaries : [];
+        }
+      } catch { /* no config file or no boundaries key — return empty array */ }
+
+      return reply.send({ ...graph, boundaries });
     } catch (err) {
       httpLog('ERROR', err.message, { route: '/graph' });
       return reply.code(500).send({ error: err.message });
