@@ -155,7 +155,31 @@ export function computeLayout(nodes, boundaries, canvasW, canvasH) {
     });
   }
 
-  return { positions, boundaryBoxes };
+  // ── 8. Compute layer boxes (always shown for non-empty layers) ──────────
+  const LAYER_LABELS = { service: 'Services', library: 'Libraries', infra: 'Infrastructure' };
+  const layerBoxes = [];
+  for (const { name, nodes: layerNodes } of layers) {
+    if (layerNodes.length === 0) continue;
+    const ids = layerNodes.map(n => n.id);
+    const xs = ids.map(id => positions[id]?.x).filter(v => v != null);
+    const ys = ids.map(id => positions[id]?.y).filter(v => v != null);
+    if (xs.length === 0) continue;
+
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    layerBoxes.push({
+      label: LAYER_LABELS[name] || name,
+      x: minX - BOX_PAD,
+      y: minY - BOX_PAD - LABEL_HEIGHT,
+      w: maxX - minX + BOX_PAD * 2,
+      h: Math.max(NODE_RADIUS * 2 + BOX_PAD * 2 + LABEL_HEIGHT, maxY - minY + BOX_PAD * 2 + LABEL_HEIGHT),
+    });
+  }
+
+  return { positions, boundaryBoxes, layerBoxes };
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────────

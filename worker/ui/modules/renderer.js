@@ -92,6 +92,32 @@ export function render() {
   ctx.translate(state.transform.x, state.transform.y);
   ctx.scale(state.transform.scale, state.transform.scale);
 
+  // Draw layer boxes (outermost containers — Services, Libraries, Infrastructure)
+  for (const box of (state.layerBoxes || [])) {
+    ctx.save();
+    // Subtle fill
+    ctx.globalAlpha = 0.04;
+    ctx.fillStyle = '#a0aec0';
+    ctx.beginPath();
+    ctx.roundRect(box.x, box.y, box.w, box.h, 10);
+    ctx.fill();
+
+    // Thin solid border
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = '#a0aec0';
+    ctx.lineWidth = 1 / state.transform.scale;
+    ctx.stroke();
+
+    // Layer label at top-left
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#a0aec0';
+    ctx.font = `bold ${Math.round(13 / state.transform.scale)}px system-ui, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(box.label, box.x + 10, box.y + 5);
+    ctx.restore();
+  }
+
   // Draw boundary boxes (behind edges and nodes)
   for (const box of state.boundaryBoxes) {
     ctx.save();

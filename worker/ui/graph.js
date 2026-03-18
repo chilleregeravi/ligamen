@@ -132,7 +132,7 @@ export async function loadProject(hash, canvas) {
   // Compute deterministic grid positions (replaces random init + force Worker)
   const cssBoundsW = Math.round(canvas.width / (window.devicePixelRatio || 1));
   const cssBoundsH = Math.round(canvas.height / (window.devicePixelRatio || 1));
-  const { positions, boundaryBoxes } = computeLayout(
+  const { positions, boundaryBoxes, layerBoxes } = computeLayout(
     state.graphData.nodes,
     raw.boundaries || [],
     cssBoundsW,
@@ -140,6 +140,7 @@ export async function loadProject(hash, canvas) {
   );
   Object.assign(state.positions, positions);
   state.boundaryBoxes = boundaryBoxes;
+  state.layerBoxes = layerBoxes;
   render();
 
   setupInteractions(canvas);
