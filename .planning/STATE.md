@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Layered Graph & Intelligence
-status: unknown
-stopped_at: Completed 38-01-PLAN.md
-last_updated: "2026-03-18T21:02:53.099Z"
+status: complete
+stopped_at: Completed 38-02-PLAN.md
+last_updated: "2026-03-18T21:07:00.000Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 
 ## Current Position
 
-Phase: 38 (intelligence) — EXECUTING
-Plan: 1 of 2
+Phase: 38 (intelligence) — COMPLETE
+Plan: 2 of 2 (all plans complete)
 
 ## Performance Metrics
 
@@ -65,6 +65,9 @@ Plan: 1 of 2
 - [Phase 37-controls-filters]: hideIsolated post-filter honors mismatchesOnly in its edge-counting pass — consistent with what's drawn
 - [Phase 38-intelligence]: Enrichment maps default to empty Map — calling syncFindings(findings) with no second arg produces boundary='' actors='' with zero crashes
 - [Phase 38-intelligence]: Actors DB query wrapped in try/catch — Phase 38 may execute before Phase 33 migration 008 is deployed on a given DB
+- [38-02]: enrichImpactResult and enrichSearchResult are standalone exports, not QueryEngine methods — simpler to import in server.js without reaching through a QueryEngine instance
+- [38-02]: Both enrichment helpers are best-effort: all errors caught internally, never throw to callers
+- [38-02]: MCP handler enrichment gated on qe._db non-null — raw result returned unchanged when no db available
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T21:02:39.506Z
-Stopped at: Completed 38-01-PLAN.md
+Last session: 2026-03-18T21:07:00.000Z
+Stopped at: Completed 38-02-PLAN.md
 Resume file: None
