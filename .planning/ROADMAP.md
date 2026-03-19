@@ -98,8 +98,8 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   4. Specifying configuration overrides requires a file named `ligamen.config.json` — `allclear.config.json` is not recognized
 **Plans**: 2 plans
 Plans:
-- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
-- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
+- [ ] 39-01-PLAN.md — Rename npm package and plugin manifests (package.json, plugin.json, marketplace.json)
+- [ ] 39-02-PLAN.md — Rename Makefile PLUGIN_NAME and config filename (Makefile, allclear.config.json.example, lib/config.sh)
 
 ### Phase 40: Environment & Paths
 **Goal**: All runtime paths and environment variable names use the ligamen namespace so scripts and the worker resolve to the correct locations at startup
