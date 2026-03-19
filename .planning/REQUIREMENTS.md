@@ -47,8 +47,8 @@ Requirements for the allclear → ligamen rename. Each maps to roadmap phases.
 
 ### UI
 
-- [ ] **UI-01**: Graph UI title/branding updated from "AllClear" to "Ligamen"
-- [ ] **UI-02**: Worker UI HTML and any visible branding strings updated
+- [x] **UI-01**: Graph UI title/branding updated from "AllClear" to "Ligamen"
+- [x] **UI-02**: Worker UI HTML and any visible branding strings updated
 
 ## Future Requirements
 
@@ -89,8 +89,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-01 | Phase 44 | Pending |
 | DOCS-02 | Phase 44 | Pending |
 | DOCS-03 | Phase 44 | Pending |
-| UI-01 | Phase 45 | Pending |
-| UI-02 | Phase 45 | Pending |
+| UI-01 | Phase 45 | Complete |
+| UI-02 | Phase 45 | Complete |
 
 **Coverage:**
 - v4.0 requirements: 22 total
