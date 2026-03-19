@@ -20,7 +20,7 @@ export async function showProjectPicker() {
   if (projects.length === 0) {
     picker.style.display = "block";
     list.innerHTML =
-      '<p class="no-projects">No projects found. Run <code>/allclear:map</code> to scan your repos first.</p>';
+      '<p class="no-projects">No projects found. Run <code>/ligamen:map</code> to scan your repos first.</p>';
     document.getElementById("node-info").textContent = "No projects";
     return null;
   }
