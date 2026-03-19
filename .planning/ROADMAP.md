@@ -109,10 +109,7 @@ Plans:
   1. Exporting `LIGAMEN_*` variables controls plugin behavior; `ALLCLEAR_*` variables have no effect
   2. The worker daemon stores its database at `~/.ligamen/` — no files are written to `~/.allclear/`
   3. Temporary files created during hooks and commands appear under `/tmp/ligamen_*` — no `/tmp/allclear_*` paths are created
-**Plans**: 2 plans
-Plans:
-- [ ] 40-01-PLAN.md — Rename ALLCLEAR_* env vars and paths in lib/ shell scripts
-- [ ] 40-02-PLAN.md — Rename ALLCLEAR_* env vars and paths in worker JS production files
+**Plans**: TBD
 
 ### Phase 41: Commands & MCP
 **Goal**: Every user-facing entry point — slash commands, MCP server name, ChromaDB collection, and skill descriptions — identifies itself as ligamen
@@ -138,8 +135,8 @@ Plans:
   3. The session start hook reports "Ligamen active" when Claude Code starts a new session
 **Plans**: 2 plans
 Plans:
-- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
-- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
+- [ ] 42-01-PLAN.md — Rename AllClear → Ligamen in shell script headers and output messages (scripts/, lib/worker-client.sh, session-start.sh CONTEXT)
+- [ ] 42-02-PLAN.md — Rename AllClear → Ligamen in JS source file headers and agent prompt headings
 
 ### Phase 43: Tests
 **Goal**: The full test suite passes against the renamed codebase with all assertions, fixtures, and env var references updated to ligamen
@@ -193,7 +190,7 @@ Plans:
 | 39. Identity | v4.0 | 0/TBD | Not started | - |
 | 40. Environment & Paths | v4.0 | 0/TBD | Not started | - |
 | 41. Commands & MCP | v4.0 | 0/2 | Not started | - |
-| 42. Source Code | v4.0 | 0/TBD | Not started | - |
+| 42. Source Code | v4.0 | 0/2 | Not started | - |
 | 43. Tests | v4.0 | 0/TBD | Not started | - |
 | 44. Documentation | v4.0 | 0/TBD | Not started | - |
 | 45. UI | v4.0 | 0/1 | Not started | - |
