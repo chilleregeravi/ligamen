@@ -146,7 +146,11 @@ Plans:
   1. Running the bats test suite passes with zero failures — all env var references, config filename assertions, and temp path checks use `LIGAMEN_*` and `/tmp/ligamen_*`
   2. Running `node --test` on the JS test suite passes with zero failures — all path and reference assertions use ligamen names
   3. Test fixture config files are named `ligamen.config.json` and contain no allclear references
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 43-01-PLAN.md — Rename ALLCLEAR_* env vars, /tmp/allclear_* paths, and assertion strings in all 10 bats test files
+- [ ] 43-02-PLAN.md — Rename allclear- temp dir prefixes, allclear.config.json refs, and command strings in all 15 JS test files
+- [ ] 43-03-PLAN.md — Rename test fixture allclear.config.json to ligamen.config.json
 
 ### Phase 44: Documentation
 **Goal**: All user-facing documentation consistently describes the plugin as Ligamen with correct install instructions and command references
@@ -188,6 +192,6 @@ Plans:
 | 40. Environment & Paths | v4.0 | 0/TBD | Not started | - |
 | 41. Commands & MCP | v4.0 | 0/2 | Not started | - |
 | 42. Source Code | v4.0 | 0/2 | Not started | - |
-| 43. Tests | v4.0 | 0/TBD | Not started | - |
+| 43. Tests | v4.0 | 0/3 | Not started | - |
 | 44. Documentation | v4.0 | 0/TBD | Not started | - |
 | 45. UI | v4.0 | 0/1 | Not started | - |
