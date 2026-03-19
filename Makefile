@@ -1,6 +1,6 @@
 .PHONY: test lint check install uninstall dev help
 
-PLUGIN_NAME := allclear
+PLUGIN_NAME := ligamen
 PLUGIN_DIR  := $(shell pwd)
 BATS        := ./tests/bats/bin/bats
 

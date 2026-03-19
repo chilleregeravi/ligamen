@@ -1,7 +1,7 @@
 {
-  "name": "@allclear/cli",
+  "name": "@ligamen/cli",
   "version": "2.0.0",
-  "description": "AllClear — auto-format, auto-lint, and cross-repo quality gates for Claude Code",
+  "description": "Ligamen — auto-format, auto-lint, and cross-repo quality gates for Claude Code",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -9,10 +9,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AetherHQ/allclear"
+    "url": "https://github.com/AetherHQ/ligamen"
   },
   "bin": {
-    "allclear-init": "./bin/allclear-init.js"
+    "ligamen-init": "./bin/ligamen-init.js"
   },
   "keywords": [
     "claude-code",

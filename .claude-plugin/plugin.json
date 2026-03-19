@@ -1,11 +1,11 @@
 {
-  "name": "allclear",
+  "name": "ligamen",
   "version": "2.0.0",
   "description": "Auto-format, auto-lint, and cross-repo quality gates for Claude Code",
   "author": {
-    "name": "AllClear Contributors"
+    "name": "Ligamen Contributors"
   },
-  "repository": "https://github.com/AetherHQ/allclear",
+  "repository": "https://github.com/AetherHQ/ligamen",
   "license": "Apache-2.0",
   "keywords": [
     "quality-gates",
