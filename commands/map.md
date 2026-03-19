@@ -23,7 +23,7 @@ This command scans linked repositories using Claude agents to discover services,
 ```bash
 source ${CLAUDE_PLUGIN_ROOT}/lib/worker-client.sh
 worker_running || bash ${CLAUDE_PLUGIN_ROOT}/scripts/worker-start.sh
-PORT=$(cat ~/.allclear/worker.port)
+PORT=$(cat ~/.ligamen/worker.port)
 open "http://localhost:${PORT}"
 ```
 

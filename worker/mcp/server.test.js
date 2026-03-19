@@ -360,18 +360,18 @@ test("queryGraph: nodes have id, name, language fields", async () => {
 
 import { resolveDb } from "./server.js";
 
-test("resolveDb: no project param falls back to ALLCLEAR_PROJECT_ROOT env", async () => {
-  // resolveDb() with no project calls getQueryEngine with ALLCLEAR_PROJECT_ROOT
+test("resolveDb: no project param falls back to LIGAMEN_PROJECT_ROOT env", async () => {
+  // resolveDb() with no project calls getQueryEngine with LIGAMEN_PROJECT_ROOT
   // We can verify it returns null for a nonexistent project (no DB on disk)
-  const prev = process.env.ALLCLEAR_PROJECT_ROOT;
-  process.env.ALLCLEAR_PROJECT_ROOT = "/nonexistent/project/path/xyz";
+  const prev = process.env.LIGAMEN_PROJECT_ROOT;
+  process.env.LIGAMEN_PROJECT_ROOT = "/nonexistent/project/path/xyz";
   const result = resolveDb(undefined);
   // Should return null (no DB at this path)
   assert.equal(result, null, "should return null for nonexistent project root");
   if (prev === undefined) {
-    delete process.env.ALLCLEAR_PROJECT_ROOT;
+    delete process.env.LIGAMEN_PROJECT_ROOT;
   } else {
-    process.env.ALLCLEAR_PROJECT_ROOT = prev;
+    process.env.LIGAMEN_PROJECT_ROOT = prev;
   }
 });
 

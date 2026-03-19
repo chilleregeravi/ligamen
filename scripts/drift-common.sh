@@ -51,7 +51,7 @@ source "${PLUGIN_ROOT}/lib/linked-repos.sh"
 LINKED_REPOS=$(list_linked_repos "${PLUGIN_ROOT}" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
 
 if [[ -z "${LINKED_REPOS:-}" ]]; then
-  echo "No linked repos found. Configure linked-repos in allclear.config.json or run from a directory with sibling git repos." >&2
+  echo "No linked repos found. Configure linked-repos in ligamen.config.json or run from a directory with sibling git repos." >&2
   exit 0
 fi
 

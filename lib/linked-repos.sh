@@ -4,14 +4,14 @@
 # No set -e here — sourcing context owns error handling.
 # Usage: source lib/linked-repos.sh && list_linked_repos [current_dir]
 # Outputs: one absolute path per line, one per linked repo
-# Reads allclear.config.json "linked-repos" array if present; falls back to parent dir scan.
+# Reads ligamen.config.json "linked-repos" array if present; falls back to parent dir scan.
 # All debug output goes to stderr only (per PLGN-08).
 
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] || { echo "Source this file; do not execute directly." >&2; exit 1; }
 
 # list_linked_repos [current_dir]
 # Discover linked repositories.
-# If current_dir/allclear.config.json exists and has a linked-repos array, use that.
+# If current_dir/ligamen.config.json exists and has a linked-repos array, use that.
 # Otherwise, scan parent_dir/*/ for directories containing .git/.
 # Excludes the current repo itself from results.
 # Uses $(cd ... && pwd) instead of realpath — POSIX-safe, works on macOS without Homebrew.
@@ -20,10 +20,10 @@ list_linked_repos() {
   current_dir="$(cd "$current_dir" && pwd)"
   local parent_dir
   parent_dir="$(dirname "$current_dir")"
-  local config_file="${current_dir}/allclear.config.json"
+  local config_file="${current_dir}/ligamen.config.json"
 
   if [[ -f "$config_file" ]]; then
-    echo "allclear: using linked-repos config from $config_file" >&2
+    echo "ligamen: using linked-repos config from $config_file" >&2
     # PLGN-07: use printf pattern, never bare jq
     printf '%s\n' "$(cat "$config_file")" | \
       jq -r '.["linked-repos"][]? // empty' 2>/dev/null

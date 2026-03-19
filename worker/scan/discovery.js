@@ -2,10 +2,10 @@
  * worker/repo-discovery.js — Repo discovery module for Ligamen v2.0
  *
  * Provides the complete discovery-to-confirmation lifecycle for the linked
- * repo list used by /allclear:map. Pure module — no side effects at load time.
+ * repo list used by /ligamen:map. Pure module — no side effects at load time.
  *
  * Exports:
- *   loadFromConfig(projectRoot)            — load repos from allclear.config.json
+ *   loadFromConfig(projectRoot)            — load repos from ligamen.config.json
  *   discoverNew(projectRoot, existingPaths) — scan parent dir for new repos
  *   deduplicateRepos(repos)                — normalize and deduplicate by path
  *   saveConfirmed(projectRoot, paths)      — persist confirmed list to config
@@ -30,12 +30,12 @@ const MANIFESTS = [
 // ---------------------------------------------------------------------------
 // loadFromConfig(projectRoot)
 //
-// Reads allclear.config.json from projectRoot. Returns [] when the file is
+// Reads ligamen.config.json from projectRoot. Returns [] when the file is
 // absent or does not contain a linked-repos key. Resolves each path in
 // linked-repos relative to projectRoot.
 // ---------------------------------------------------------------------------
 export function loadFromConfig(projectRoot) {
-  const configPath = path.join(projectRoot, "allclear.config.json");
+  const configPath = path.join(projectRoot, "ligamen.config.json");
   let config;
   try {
     config = JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -141,12 +141,12 @@ export function deduplicateRepos(repos) {
 // ---------------------------------------------------------------------------
 // saveConfirmed(projectRoot, confirmedPaths)
 //
-// Writes confirmedPaths (array of strings) to allclear.config.json under the
+// Writes confirmedPaths (array of strings) to ligamen.config.json under the
 // linked-repos key. Merges with the existing config — preserves impact-map and
 // all other keys. Creates the file if absent.
 // ---------------------------------------------------------------------------
 export function saveConfirmed(projectRoot, confirmedPaths) {
-  const configPath = path.join(projectRoot, "allclear.config.json");
+  const configPath = path.join(projectRoot, "ligamen.config.json");
   let config = {};
   try {
     config = JSON.parse(fs.readFileSync(configPath, "utf8"));

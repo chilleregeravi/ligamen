@@ -1000,10 +1000,10 @@ export function enrichImpactResult(db, serviceName, results) {
       .get(serviceName);
     const nodeType = svcRow?.type || "service";
 
-    // 2. Load boundary membership from allclear.config.json
+    // 2. Load boundary membership from ligamen.config.json
     let boundaryLabel = "";
     try {
-      const cfgPath = path.join(process.cwd(), "allclear.config.json");
+      const cfgPath = path.join(process.cwd(), "ligamen.config.json");
       const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
       const boundaries = cfg.boundaries || {};
       for (const [bName, members] of Object.entries(boundaries)) {

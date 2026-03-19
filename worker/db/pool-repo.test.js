@@ -158,7 +158,7 @@ test("getQueryEngineByRepo: returns correct engine for repo-A", async () => {
   createProjectDb(hashDirA, "repo-alpha", rootA);
 
   // Override env so pool.js uses our temp data dir
-  process.env.ALLCLEAR_DATA_DIR = dataDir;
+  process.env.LIGAMEN_DATA_DIR = dataDir;
 
   // Import fresh — use dynamic import to get a clean module state
   // We use a cache-bust trick via URL query param (works in Node ESM)
@@ -171,7 +171,7 @@ test("getQueryEngineByRepo: returns correct engine for repo-A", async () => {
 
   // Cleanup
   fs.rmSync(dataDir, { recursive: true, force: true });
-  delete process.env.ALLCLEAR_DATA_DIR;
+  delete process.env.LIGAMEN_DATA_DIR;
 });
 
 test("getQueryEngineByRepo: returns null for unknown repo name", async () => {
@@ -180,7 +180,7 @@ test("getQueryEngineByRepo: returns null for unknown repo name", async () => {
   const hashDirA = projectHashDir(dataDir, rootA);
   createProjectDb(hashDirA, "repo-beta", rootA);
 
-  process.env.ALLCLEAR_DATA_DIR = dataDir;
+  process.env.LIGAMEN_DATA_DIR = dataDir;
 
   const { getQueryEngineByRepo } = await import(
     `./pool.js?t=${Date.now()}-2`
@@ -190,7 +190,7 @@ test("getQueryEngineByRepo: returns null for unknown repo name", async () => {
   assert.equal(qe, null, "should return null for unknown repo name");
 
   fs.rmSync(dataDir, { recursive: true, force: true });
-  delete process.env.ALLCLEAR_DATA_DIR;
+  delete process.env.LIGAMEN_DATA_DIR;
 });
 
 test("getQueryEngineByRepo: returns correct engine when two projects exist", async () => {
@@ -202,7 +202,7 @@ test("getQueryEngineByRepo: returns correct engine when two projects exist", asy
   createProjectDb(hashDirA, "repo-multi-A", rootA);
   createProjectDb(hashDirB, "repo-multi-B", rootB);
 
-  process.env.ALLCLEAR_DATA_DIR = dataDir;
+  process.env.LIGAMEN_DATA_DIR = dataDir;
 
   const { getQueryEngineByRepo } = await import(
     `./pool.js?t=${Date.now()}-3`
@@ -216,7 +216,7 @@ test("getQueryEngineByRepo: returns correct engine when two projects exist", asy
   assert.notEqual(qeA, qeB, "engines for different repos should be distinct");
 
   fs.rmSync(dataDir, { recursive: true, force: true });
-  delete process.env.ALLCLEAR_DATA_DIR;
+  delete process.env.LIGAMEN_DATA_DIR;
 });
 
 test("getQueryEngineByRepo: case-insensitive lookup finds repo", async () => {
@@ -225,7 +225,7 @@ test("getQueryEngineByRepo: case-insensitive lookup finds repo", async () => {
   const hashDirA = projectHashDir(dataDir, rootA);
   createProjectDb(hashDirA, "Repo-Case", rootA);
 
-  process.env.ALLCLEAR_DATA_DIR = dataDir;
+  process.env.LIGAMEN_DATA_DIR = dataDir;
 
   const { getQueryEngineByRepo } = await import(
     `./pool.js?t=${Date.now()}-4`
@@ -235,5 +235,5 @@ test("getQueryEngineByRepo: case-insensitive lookup finds repo", async () => {
   assert.ok(qe !== null, "case-insensitive lookup should find Repo-Case");
 
   fs.rmSync(dataDir, { recursive: true, force: true });
-  delete process.env.ALLCLEAR_DATA_DIR;
+  delete process.env.LIGAMEN_DATA_DIR;
 });

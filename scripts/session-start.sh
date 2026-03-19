@@ -50,7 +50,7 @@ WORKER_STATUS=""
 if [[ -n "$WORKER_CLIENT_LIB" ]]; then
   # shellcheck source=lib/worker-client.sh
   source "$WORKER_CLIENT_LIB"
-  CONFIG_FILE="${CWD}/allclear.config.json"
+  CONFIG_FILE="${CWD}/ligamen.config.json"
   if [[ -f "$CONFIG_FILE" ]] && jq -e '.["impact-map"]' "$CONFIG_FILE" >/dev/null 2>&1; then
     if ! worker_running 2>/dev/null; then
       worker_start_background 2>/dev/null || true
@@ -89,7 +89,7 @@ CONTEXT="Ligamen active."
 if [[ -n "$PROJECT_TYPES" ]]; then
   CONTEXT="Ligamen active. Detected: ${PROJECT_TYPES}."
 fi
-CONTEXT="${CONTEXT} Commands: /allclear:quality-gate, /allclear:cross-impact, /allclear:drift, /allclear:pulse, /allclear:deploy-verify."
+CONTEXT="${CONTEXT} Commands: /ligamen:quality-gate, /ligamen:cross-impact, /ligamen:drift, /ligamen:pulse, /ligamen:deploy-verify."
 [[ -n "$WORKER_STATUS" ]] && CONTEXT="${CONTEXT} ${WORKER_STATUS}"
 
 # SSTH-01: Output hookSpecificOutput.additionalContext JSON to stdout

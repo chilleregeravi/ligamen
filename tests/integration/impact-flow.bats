@@ -199,8 +199,8 @@ db.close();
 @test "INTG-E2E-02: incremental scan returns only changed files" {
   # Init a real git repo in TEST_DIR
   git -C "$TEST_DIR" init --quiet
-  git -C "$TEST_DIR" config user.email "test@allclear"
-  git -C "$TEST_DIR" config user.name "AllClear Test"
+  git -C "$TEST_DIR" config user.email "test@ligamen"
+  git -C "$TEST_DIR" config user.name "Ligamen Test"
 
   # Create two files and commit them
   echo "content-a" > "$TEST_DIR/service-a.ts"
@@ -241,8 +241,8 @@ console.log('PASS: only service-a.ts in changed files');
 
 @test "INTG-E2E-02: full scan (sinceCommit=null) returns all tracked files" {
   git -C "$TEST_DIR" init --quiet
-  git -C "$TEST_DIR" config user.email "test@allclear"
-  git -C "$TEST_DIR" config user.name "AllClear Test"
+  git -C "$TEST_DIR" config user.email "test@ligamen"
+  git -C "$TEST_DIR" config user.name "Ligamen Test"
 
   echo "a" > "$TEST_DIR/file-a.ts"
   echo "b" > "$TEST_DIR/file-b.ts"

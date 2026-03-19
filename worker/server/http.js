@@ -95,13 +95,13 @@ async function createHttpServer(queryEngine, options = {}) {
     if (!qe) {
       return reply.code(503).send({
         error:
-          "No map data yet. Pass ?project=/path/to/repo or run /allclear:map first.",
+          "No map data yet. Pass ?project=/path/to/repo or run /ligamen:map first.",
       });
     }
     try {
       const graph = qe.getGraph();
 
-      // Read boundaries from allclear.config.json in the project root.
+      // Read boundaries from ligamen.config.json in the project root.
       // Always returns boundaries: [] when config is missing or has no boundaries key.
       let boundaries = [];
       try {
@@ -114,7 +114,7 @@ async function createHttpServer(queryEngine, options = {}) {
           } catch { /* pre-migration DB or no repos */ }
         }
         if (projectRoot) {
-          const cfgPath = path.join(projectRoot, 'allclear.config.json');
+          const cfgPath = path.join(projectRoot, 'ligamen.config.json');
           const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
           boundaries = Array.isArray(cfg.boundaries) ? cfg.boundaries : [];
         }
@@ -173,7 +173,7 @@ async function createHttpServer(queryEngine, options = {}) {
     if (!qe) {
       return reply
         .code(503)
-        .send({ error: "No map data yet — run /allclear:map first" });
+        .send({ error: "No map data yet — run /ligamen:map first" });
     }
     if (!repo_path || !findings) {
       return reply

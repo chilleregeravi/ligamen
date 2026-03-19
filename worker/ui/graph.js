@@ -44,7 +44,7 @@ export async function loadProject(hash, canvas) {
 
   if (!resp.ok) {
     document.getElementById("node-info").textContent =
-      "No map data yet. Run /allclear:map first.";
+      "No map data yet. Run /ligamen:map first.";
     return;
   }
 

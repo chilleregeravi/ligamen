@@ -74,7 +74,7 @@ if [[ "$CHANGED" == true ]]; then
     grep -E '\.(py|rs|ts|js|tsx|jsx|go|java|rb|sh)$' || true)"
 
   # Use a temp file for accumulation (bash 3.2 — no mapfile)
-  TMPFILE="/tmp/allclear_terms_$$"
+  TMPFILE="/tmp/ligamen_terms_$$"
   trap 'rm -f "$TMPFILE"' EXIT
 
   while IFS= read -r file; do

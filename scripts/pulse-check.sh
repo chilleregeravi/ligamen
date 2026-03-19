@@ -9,7 +9,7 @@ set -euo pipefail
 # Returns 0 if found, 1 if not found (with skip message printed to stdout).
 pulse_check_kubectl() {
   if ! command -v kubectl > /dev/null 2>&1; then
-    echo "kubectl not found in PATH. Install kubectl to use /allclear pulse."
+    echo "kubectl not found in PATH. Install kubectl to use /ligamen pulse."
     echo "See: https://kubernetes.io/docs/tasks/tools/"
     return 1
   fi
@@ -130,12 +130,12 @@ pulse_check_health() {
   local path_attempt
   for path_attempt in /health /healthz /actuator/health /ready; do
     http_code=$(curl -s \
-      -o /tmp/allclear_health_body \
+      -o /tmp/ligamen_health_body \
       -w "%{http_code}" \
       --max-time 5 \
       "http://localhost:18080${path_attempt}" 2>/dev/null || true)
     if [ "$http_code" = "200" ]; then
-      body=$(cat /tmp/allclear_health_body 2>/dev/null || true)
+      body=$(cat /tmp/ligamen_health_body 2>/dev/null || true)
       matched_path="$path_attempt"
       break
     fi

@@ -157,14 +157,14 @@ export function runMigrations(db) {
 
 /**
  * Returns the configured snapshot retention limit.
- * Reads from allclear.config.json "impact-map": { "history-limit": N }.
+ * Reads from ligamen.config.json "impact-map": { "history-limit": N }.
  * Falls back to 10 if config is absent or unreadable.
  *
  * @returns {number}
  */
 function getHistoryLimit() {
   try {
-    const configPath = path.join(process.cwd(), "allclear.config.json");
+    const configPath = path.join(process.cwd(), "ligamen.config.json");
     const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
     return cfg["impact-map"]?.["history-limit"] ?? 10;
   } catch (_) {
@@ -210,11 +210,11 @@ export function writeScan(findings, queryEngine, repoId) {
     });
   }
 
-  // Build boundary map from allclear.config.json
+  // Build boundary map from ligamen.config.json
   // Gracefully skip when config is absent or has no boundaries key
   const boundaryMap = new Map();
   try {
-    const configPath = path.join(process.cwd(), "allclear.config.json");
+    const configPath = path.join(process.cwd(), "ligamen.config.json");
     const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
     const boundaries = cfg.boundaries || {};
     for (const [boundaryName, members] of Object.entries(boundaries)) {
