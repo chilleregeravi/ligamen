@@ -1,5 +1,5 @@
 {
-  "description": "AllClear plugin hooks — auto-format, auto-lint, file guard, session start",
+  "description": "Ligamen plugin hooks — auto-format, auto-lint, file guard, session start",
   "hooks": {
     "PostToolUse": [
       {
