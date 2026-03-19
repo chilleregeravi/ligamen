@@ -96,7 +96,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   2. Claude Code marketplace lists the plugin as `ligamen` (plugin.json and marketplace.json show new name)
   3. Running `make install` uses `PLUGIN_NAME=ligamen` with no allclear references in Makefile targets
   4. Specifying configuration overrides requires a file named `ligamen.config.json` — `allclear.config.json` is not recognized
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
+- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
 
 ### Phase 40: Environment & Paths
 **Goal**: All runtime paths and environment variable names use the ligamen namespace so scripts and the worker resolve to the correct locations at startup
@@ -106,7 +109,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   1. Exporting `LIGAMEN_*` variables controls plugin behavior; `ALLCLEAR_*` variables have no effect
   2. The worker daemon stores its database at `~/.ligamen/` — no files are written to `~/.allclear/`
   3. Temporary files created during hooks and commands appear under `/tmp/ligamen_*` — no `/tmp/allclear_*` paths are created
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 40-01-PLAN.md — Rename ALLCLEAR_* env vars and paths in lib/ shell scripts
+- [ ] 40-02-PLAN.md — Rename ALLCLEAR_* env vars and paths in worker JS production files
 
 ### Phase 41: Commands & MCP
 **Goal**: Every user-facing entry point — slash commands, MCP server name, ChromaDB collection, and skill descriptions — identifies itself as ligamen
@@ -117,7 +123,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   2. The MCP server registers as `ligamen-impact` in `.mcp.json` and in server startup output
   3. ChromaDB stores embeddings in a collection named `ligamen-impact`
   4. Skill files reference `ligamen` in their descriptions so agent auto-invocation prompts show the new name
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
+- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
 
 ### Phase 42: Source Code
 **Goal**: All internal implementation files — shell scripts and JavaScript modules — carry ligamen branding in headers, comments, and user-visible output strings
@@ -127,7 +136,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   1. Shell script comment headers and any stdout messages printed to the terminal say "Ligamen" — no "AllClear" strings appear in script output
   2. JavaScript source file headers and internal log messages reference "Ligamen" — no "AllClear" strings appear in worker logs
   3. The session start hook reports "Ligamen active" when Claude Code starts a new session
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
+- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
 
 ### Phase 43: Tests
 **Goal**: The full test suite passes against the renamed codebase with all assertions, fixtures, and env var references updated to ligamen
@@ -137,7 +149,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   1. Running the bats test suite passes with zero failures — all env var references, config filename assertions, and temp path checks use `LIGAMEN_*` and `/tmp/ligamen_*`
   2. Running `node --test` on the JS test suite passes with zero failures — all path and reference assertions use ligamen names
   3. Test fixture config files are named `ligamen.config.json` and contain no allclear references
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
+- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
 
 ### Phase 44: Documentation
 **Goal**: All user-facing documentation consistently describes the plugin as Ligamen with correct install instructions and command references
@@ -147,7 +162,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   1. README.md install instructions reference the `ligamen` repository, `@ligamen/cli` package, and `/ligamen:*` commands throughout — no allclear references remain
   2. All docs/ files (commands.md, configuration.md, hooks.md, architecture.md, service-map.md, development.md) reference ligamen exclusively
   3. Planning docs (PROJECT.md, MILESTONES.md, and others) use "Ligamen" as the product name where the product name appears
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 44-01-PLAN.md — Rename AllClear to Ligamen in README.md (install, commands, config, env vars)
+- [ ] 44-02-PLAN.md — Rename AllClear to Ligamen in all docs/ files and planning docs
 
 ### Phase 45: UI
 **Goal**: The graph UI and worker web interface display "Ligamen" as the product name with no visible allclear branding
