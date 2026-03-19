@@ -1,28 +1,28 @@
-# AllClear
+# Ligamen
 
 Quality gates, cross-repo impact analysis, and service dependency intelligence for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-AllClear is a Claude Code **plugin** that auto-formats, auto-lints, guards sensitive files, and maps service dependencies across your repositories — with an interactive layered graph UI.
+Ligamen is a Claude Code **plugin** that auto-formats, auto-lints, guards sensitive files, and maps service dependencies across your repositories — with an interactive layered graph UI.
 
 ## Installation
 
 ### As a Plugin (recommended)
 
-Install AllClear as a Claude Code plugin from any project directory:
+Install Ligamen as a Claude Code plugin from any project directory:
 
 ```bash
-claude plugin install allclear --repo chilleregeravi/allclear --scope user
+claude plugin install ligamen --repo chilleregeravi/ligamen --scope user
 ```
 
-This registers AllClear globally — all your Claude Code sessions will have access to the hooks and commands.
+This registers Ligamen globally — all your Claude Code sessions will have access to the hooks and commands.
 
 ### From Source (development)
 
 For contributing or local development:
 
 ```bash
-git clone https://github.com/chilleregeravi/allclear.git
-cd allclear
+git clone https://github.com/chilleregeravi/ligamen.git
+cd ligamen
 git submodule update --init --recursive
 npm install
 
@@ -30,7 +30,7 @@ npm install
 make install
 
 # Option B: Quick test without installing (session only)
-claude --plugin-dir /path/to/allclear
+claude --plugin-dir /path/to/ligamen
 ```
 
 See [Development](docs/development.md) for testing and contributing.
@@ -44,12 +44,12 @@ See [Development](docs/development.md) for testing and contributing.
 - Session context with project type detection
 
 **On-demand (commands):**
-- `/allclear:quality-gate` — lint, format, test, typecheck
-- `/allclear:map` — scan repos and build service dependency graph
-- `/allclear:cross-impact` — find what breaks when you change something
-- `/allclear:drift` — check dependency version alignment across repos
-- `/allclear:pulse` — Kubernetes service health check
-- `/allclear:deploy-verify` — compare expected vs actual cluster state
+- `/ligamen:quality-gate` — lint, format, test, typecheck
+- `/ligamen:map` — scan repos and build service dependency graph
+- `/ligamen:cross-impact` — find what breaks when you change something
+- `/ligamen:drift` — check dependency version alignment across repos
+- `/ligamen:pulse` — Kubernetes service health check
+- `/ligamen:deploy-verify` — compare expected vs actual cluster state
 
 **Graph UI (http://localhost:37888):**
 - Deterministic layered layout (services, libraries, infrastructure)
@@ -63,7 +63,7 @@ See [Development](docs/development.md) for testing and contributing.
 
 Zero-config by default. Optional overrides:
 
-### Project Config: `allclear.config.json`
+### Project Config: `ligamen.config.json`
 
 Lives in your project root. Committed to git.
 
@@ -94,20 +94,20 @@ Lives in your project root. Committed to git.
 | `linked-repos` | Explicit list of connected repos. Auto-discovered from parent dir if absent. |
 | `boundaries` | Optional service grouping for the graph UI. Services are enclosed in labeled boxes. |
 
-### Machine Settings: `~/.allclear/settings.json`
+### Machine Settings: `~/.ligamen/settings.json`
 
 Machine-specific settings. Never committed.
 
 ```json
 {
-  "ALLCLEAR_WORKER_PORT": "37888",
-  "ALLCLEAR_LOG_LEVEL": "INFO"
+  "LIGAMEN_WORKER_PORT": "37888",
+  "LIGAMEN_LOG_LEVEL": "INFO"
 }
 ```
 
 ### ChromaDB (optional)
 
-AllClear can sync service graph data to [ChromaDB](https://www.trychroma.com/) for semantic search. This is optional — without it, AllClear falls back to SQLite FTS5 full-text search.
+Ligamen can sync service graph data to [ChromaDB](https://www.trychroma.com/) for semantic search. This is optional — without it, Ligamen falls back to SQLite FTS5 full-text search.
 
 **1. Run ChromaDB locally:**
 
@@ -120,44 +120,60 @@ pip install chromadb
 chroma run --host localhost --port 8000
 ```
 
-**2. Enable in `~/.allclear/settings.json`:**
+**2. Enable in `~/.ligamen/settings.json`:**
 
 ```json
 {
-  "ALLCLEAR_CHROMA_MODE": "local",
-  "ALLCLEAR_CHROMA_HOST": "localhost",
-  "ALLCLEAR_CHROMA_PORT": "8000"
+  "LIGAMEN_CHROMA_MODE": "local",
+  "LIGAMEN_CHROMA_HOST": "localhost",
+  "LIGAMEN_CHROMA_PORT": "8000"
 }
 ```
 
 **3. Re-scan your project:**
 
 ```
-/allclear:map
+/ligamen:map
 ```
 
-Findings are synced to ChromaDB automatically after each scan. MCP tools and `/allclear:cross-impact` will use ChromaDB for semantic search when available.
+Findings are synced to ChromaDB automatically after each scan. MCP tools and `/ligamen:cross-impact` will use ChromaDB for semantic search when available.
 
 **All ChromaDB settings:**
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `ALLCLEAR_CHROMA_MODE` | _(empty)_ | Set to `"local"` to enable ChromaDB sync |
-| `ALLCLEAR_CHROMA_HOST` | `localhost` | ChromaDB server hostname |
-| `ALLCLEAR_CHROMA_PORT` | `8000` | ChromaDB server port |
-| `ALLCLEAR_CHROMA_SSL` | `false` | Enable HTTPS for ChromaDB connection |
-| `ALLCLEAR_CHROMA_API_KEY` | _(empty)_ | API key for authenticated ChromaDB instances |
-| `ALLCLEAR_CHROMA_TENANT` | `default_tenant` | ChromaDB tenant ID |
-| `ALLCLEAR_CHROMA_DATABASE` | `default_database` | ChromaDB database name |
+| `LIGAMEN_CHROMA_MODE` | _(empty)_ | Set to `"local"` to enable ChromaDB sync |
+| `LIGAMEN_CHROMA_HOST` | `localhost` | ChromaDB server hostname |
+| `LIGAMEN_CHROMA_PORT` | `8000` | ChromaDB server port |
+| `LIGAMEN_CHROMA_SSL` | `false` | Enable HTTPS for ChromaDB connection |
+| `LIGAMEN_CHROMA_API_KEY` | _(empty)_ | API key for authenticated ChromaDB instances |
+| `LIGAMEN_CHROMA_TENANT` | `default_tenant` | ChromaDB tenant ID |
+| `LIGAMEN_CHROMA_DATABASE` | `default_database` | ChromaDB database name |
 
 ### Environment Variables
 
 | Variable | Effect |
 |----------|--------|
-| `ALLCLEAR_DISABLE_FORMAT=1` | Skip auto-formatting |
-| `ALLCLEAR_DISABLE_LINT=1` | Skip auto-linting |
-| `ALLCLEAR_DISABLE_GUARD=1` | Skip file guard |
-| `ALLCLEAR_DISABLE_SESSION_START=1` | Skip session context |
+| `LIGAMEN_DISABLE_FORMAT=1` | Skip auto-formatting |
+| `LIGAMEN_DISABLE_LINT=1` | Skip auto-linting |
+| `LIGAMEN_DISABLE_GUARD=1` | Skip file guard |
+| `LIGAMEN_DISABLE_SESSION_START=1` | Skip session context |
+
+## MCP Server
+
+After building your first map, add the Ligamen MCP server so all Claude agents can check impact before making changes:
+
+```json
+{
+  "mcpServers": {
+    "ligamen-impact": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["<path-to-ligamen>/worker/mcp/server.js"]
+    }
+  }
+}
+```
 
 ## Documentation
 
