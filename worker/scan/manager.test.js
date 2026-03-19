@@ -33,7 +33,7 @@ import {
  * and returns the repo path and the initial HEAD commit hash.
  */
 function makeTempRepo() {
-  const dir = mkdtempSync(join(tmpdir(), "allclear-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "ligamen-test-"));
   execSync("git init", { cwd: dir, stdio: "pipe" });
   execSync('git config user.email "test@test.com"', {
     cwd: dir,
@@ -71,7 +71,7 @@ describe("getChangedFiles", () => {
   after(() => cleanupDir(repoDir));
 
   test("returns { error } when repoPath has no .git", () => {
-    const noGitDir = mkdtempSync(join(tmpdir(), "allclear-nogit-"));
+    const noGitDir = mkdtempSync(join(tmpdir(), "ligamen-nogit-"));
     try {
       const result = getChangedFiles(noGitDir, null);
       assert.ok("error" in result, "should return { error }");

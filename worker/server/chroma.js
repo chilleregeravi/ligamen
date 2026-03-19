@@ -21,7 +21,7 @@
 
 import { ChromaClient } from "chromadb";
 
-const COLLECTION_NAME = "allclear-impact";
+const COLLECTION_NAME = "ligamen-impact";
 
 // ---------------------------------------------------------------------------
 // Module-level state

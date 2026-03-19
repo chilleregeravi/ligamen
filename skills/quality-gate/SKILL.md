@@ -8,6 +8,6 @@ version: 1.0.0
 
 Run project quality checks (lint, format, test, typecheck) to verify code is clean.
 
-This skill provides the same functionality as the `/allclear:quality-gate` command. When auto-invoked, run all checks by default unless the context suggests a specific subset.
+This skill provides the same functionality as the `/ligamen:quality-gate` command. When auto-invoked, run all checks by default unless the context suggests a specific subset.
 
-For full execution instructions, invoke the `/allclear:quality-gate` command which contains the complete procedure for detecting project type, selecting tools, running checks, and reporting results.
+For full execution instructions, invoke the `/ligamen:quality-gate` command which contains the complete procedure for detecting project type, selecting tools, running checks, and reporting results.

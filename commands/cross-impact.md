@@ -1,19 +1,19 @@
 ---
-description: Check cross-repo impact of current changes using the service dependency map (when available) or grep-based symbol scanning (fallback). Use when the user invokes /allclear:cross-impact, asks about breaking changes, or wants to know what services are affected before merging.
+description: Check cross-repo impact of current changes using the service dependency map (when available) or grep-based symbol scanning (fallback). Use when the user invokes /ligamen:cross-impact, asks about breaking changes, or wants to know what services are affected before merging.
 allowed-tools: Bash, Read, Write, AskUserQuestion
 argument-hint: "[symbol...] [--changed] [--exclude <repo>]"
 ---
 
 # Cross-Repo Impact Scanner
 
-Checks the impact of current changes across linked services. When a service dependency map is available (built by `/allclear:map`), this command queries the graph for transitive blast radius with CRITICAL/WARN/INFO severity. When no map is available, it falls back to the v1.0 grep-based symbol scan so existing users are never broken.
+Checks the impact of current changes across linked services. When a service dependency map is available (built by `/ligamen:map`), this command queries the graph for transitive blast radius with CRITICAL/WARN/INFO severity. When no map is available, it falls back to the v1.0 grep-based symbol scan so existing users are never broken.
 
 ## Usage
 
-- `/allclear:cross-impact` — auto-detect uncommitted changes and query impact
-- `/allclear:cross-impact <symbol>` — query impact for a specific endpoint or service name
-- `/allclear:cross-impact --changed` — same as no-args (git diff auto-detect)
-- `/allclear:cross-impact --exclude <repo>` — exclude a repo from results
+- `/ligamen:cross-impact` — auto-detect uncommitted changes and query impact
+- `/ligamen:cross-impact <symbol>` — query impact for a specific endpoint or service name
+- `/ligamen:cross-impact --changed` — same as no-args (git diff auto-detect)
+- `/ligamen:cross-impact --exclude <repo>` — exclude a repo from results
 
 ---
 
@@ -40,10 +40,10 @@ Parse the response:
 | State                       | Condition                           | Action                                                                                                                                                                 |
 | --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A — No worker, no map       | `WORKER_UP=no`                      | Jump to **Legacy Fallback**                                                                                                                                            |
-| B — Worker up, no map data  | `WORKER_UP=yes`, `MAP_HAS_DATA=no`  | Print "No scan data found. Run `/allclear:map` to build the dependency map first." — then jump to **Legacy Fallback** (still provide grep results as a partial answer) |
+| B — Worker up, no map data  | `WORKER_UP=yes`, `MAP_HAS_DATA=no`  | Print "No scan data found. Run `/ligamen:map` to build the dependency map first." — then jump to **Legacy Fallback** (still provide grep results as a partial answer) |
 | C — Worker up, map has data | `WORKER_UP=yes`, `MAP_HAS_DATA=yes` | Proceed with **Graph Query Flow**                                                                                                                                      |
 
-> **Important:** Do NOT attempt to start the worker from this command. The map orchestrator (`/allclear:map`) owns the worker lifecycle. Cross-impact is a query-only command.
+> **Important:** Do NOT attempt to start the worker from this command. The map orchestrator (`/ligamen:map`) owns the worker lifecycle. Cross-impact is a query-only command.
 
 ---
 
@@ -159,12 +159,12 @@ If potentially stale, print:
 
 ```
 Note: Your dependency map may not reflect recent code changes.
-Run `/allclear:map` to re-scan and catch any new or removed connections.
+Run `/ligamen:map` to re-scan and catch any new or removed connections.
 ```
 
 Ask: "Re-scan now? (yes/no)"
 
-If yes: print "Run `/allclear:map` to trigger a scan." (Do not trigger scan inline — `/allclear:map` is the orchestrator.)
+If yes: print "Run `/ligamen:map` to trigger a scan." (Do not trigger scan inline — `/ligamen:map` is the orchestrator.)
 
 ---
 
@@ -174,23 +174,23 @@ Print this banner before running the legacy scan:
 
 ```
 [Legacy mode — dependency map not available]
-Using grep-based symbol scan. Run /allclear:map for full dependency intelligence.
+Using grep-based symbol scan. Run /ligamen:map for full dependency intelligence.
 ```
 
 ### Linked Repos Configuration Check
 
-Config file exists: !`test -f allclear.config.json && echo "yes" || echo "no"`
-Config contents: !`test -f allclear.config.json && cat allclear.config.json || echo "{}"`
+Config file exists: !`test -f ligamen.config.json && echo "yes" || echo "no"`
+Config contents: !`test -f ligamen.config.json && cat ligamen.config.json || echo "{}"`
 Auto-discovered repos: !`source ${CLAUDE_PLUGIN_ROOT}/lib/linked-repos.sh && list_linked_repos 2>/dev/null`
 
 **Follow this decision tree before proceeding to the scan:**
 
-#### If `allclear.config.json` exists and has a non-empty `linked-repos` array:
+#### If `ligamen.config.json` exists and has a non-empty `linked-repos` array:
 
-- Show the configured repos to the user: "Using linked repos from allclear.config.json: [list]"
+- Show the configured repos to the user: "Using linked repos from ligamen.config.json: [list]"
 - Proceed to the Legacy Scan step.
 
-#### If `allclear.config.json` does NOT exist or has no `linked-repos`:
+#### If `ligamen.config.json` does NOT exist or has no `linked-repos`:
 
 Ask the user:
 
@@ -212,15 +212,15 @@ Ask the user:
    > - ../ui (from parent directory)
    > - ../shared-types (from memory)
    >
-   > Save these to `allclear.config.json`? (yes/no, or edit the list)
-5. If confirmed, write `allclear.config.json` with the confirmed repos.
+   > Save these to `ligamen.config.json`? (yes/no, or edit the list)
+5. If confirmed, write `ligamen.config.json` with the confirmed repos.
 6. Proceed to the Legacy Scan step using the confirmed repos.
 
 **If the user chooses Manual (option 2):**
 
 1. Ask: "Enter repo paths (relative or absolute), one per line or comma-separated:"
 2. Validate each path exists. Warn about any that don't.
-3. Write `allclear.config.json` with the validated paths.
+3. Write `ligamen.config.json` with the validated paths.
 4. Proceed to the Legacy Scan step.
 
 **If the user chooses Skip (option 3):**

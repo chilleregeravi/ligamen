@@ -1,10 +1,10 @@
 ---
-description: Build or refresh the service dependency map by scanning linked repos with Claude agents. Use when the user runs /allclear:map to build the impact map for the first time or re-scan after changes.
+description: Build or refresh the service dependency map by scanning linked repos with Claude agents. Use when the user runs /ligamen:map to build the impact map for the first time or re-scan after changes.
 allowed-tools: Bash, Read, Write, AskUserQuestion, Agent
 argument-hint: "[view|full]"
 ---
 
-# AllClear Map — Service Dependency Scanner
+# Ligamen Map — Service Dependency Scanner
 
 This command scans linked repositories using Claude agents to discover services, API endpoints, and connections between them. Results are stored in SQLite and visualized in a web UI.
 
@@ -12,9 +12,9 @@ This command scans linked repositories using Claude agents to discover services,
 
 ## Quick Reference
 
-- `/allclear:map` — scan repos and build the dependency graph
-- `/allclear:map view` — just open the graph UI (no scanning)
-- `/allclear:map full` — force full re-scan of all files
+- `/ligamen:map` — scan repos and build the dependency graph
+- `/ligamen:map view` — just open the graph UI (no scanning)
+- `/ligamen:map full` — force full re-scan of all files
 
 ---
 
@@ -38,8 +38,8 @@ Find repos to scan from two sources:
 **From config:**
 
 ```bash
-[ -f allclear.config.json ] && node -e "
-  const c = JSON.parse(require('fs').readFileSync('allclear.config.json', 'utf8'));
+[ -f ligamen.config.json ] && node -e "
+  const c = JSON.parse(require('fs').readFileSync('ligamen.config.json', 'utf8'));
   (c['linked-repos'] || []).forEach(r => console.log(r));
 "
 ```
@@ -62,7 +62,7 @@ Found these repos:
 Confirm? (yes / edit / no)
 ```
 
-Save confirmed list to `allclear.config.json`.
+Save confirmed list to `ligamen.config.json`.
 
 ---
 
@@ -165,7 +165,7 @@ Uncertain: Is user-api calling config-service at GET /config?
 
 ## Step 4: Save to Database
 
-Write the confirmed findings directly to SQLite using the AllClear db module:
+Write the confirmed findings directly to SQLite using the Ligamen db module:
 
 ```bash
 node --input-type=module -e "
@@ -182,9 +182,9 @@ node --input-type=module -e "
 
 Repeat for each repo. Print: "Dependency map saved. N services, M connections."
 
-If this was the **first map build**, add `"impact-map": {"history": true}` to `allclear.config.json` and print:
+If this was the **first map build**, add `"impact-map": {"history": true}` to `ligamen.config.json` and print:
 
 ```
-Map built successfully. View it with /allclear:map view
-To enable agent-based impact checking, add the AllClear MCP server to your .mcp.json.
+Map built successfully. View it with /ligamen:map view
+To enable agent-based impact checking, add the Ligamen MCP server to your .mcp.json.
 ```

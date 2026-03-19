@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# AllClear — lint.bats
+# Ligamen — lint.bats
 # Tests: TEST-02 (per-language linter invocation), TEST-07 (non-blocking guarantee)
 # Covers: LNTH-06 (systemMessage output when issues found), LNTH-08 (silent skip when absent)
 
@@ -125,7 +125,7 @@ STUBEOF
   local testfile="${STUB_DIR}/test.rs"
   touch "$testfile"
   # Clear any throttle file so clippy actually runs
-  rm -f /tmp/allclear_clippy_*
+  rm -f /tmp/ligamen_clippy_*
   local json='{"tool_name":"Write","tool_input":{"file_path":"'"${testfile}"'"}}'
   run bash -c "export PATH='${STUB_DIR}:${PATH}'; printf '%s' '${json}' | bash '${SCRIPT}'"
   assert_success

@@ -87,10 +87,10 @@ load "$TEST_DIR/test_helper/bats-assert/load"
 # ---------------------------------------------------------------------------
 
 @test "report shows CRITICAL for pinned version mismatch across repos" {
-  # Create fake allclear.config.json pointing to fixture repos
+  # Create fake ligamen.config.json pointing to fixture repos
   local tmpdir
   tmpdir=$(mktemp -d)
-  cat > "${tmpdir}/allclear.config.json" <<'EOF'
+  cat > "${tmpdir}/ligamen.config.json" <<'EOF'
 {"linked-repos": []}
 EOF
   # Run drift-versions with SIBLINGS pointing to both fixture repos

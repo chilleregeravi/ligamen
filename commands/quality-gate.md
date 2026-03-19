@@ -1,5 +1,5 @@
 ---
-description: Run quality checks for this project. Use when the user invokes /allclear:quality-gate, asks to verify code quality, or wants to confirm code is clean before committing.
+description: Run quality checks for this project. Use when the user invokes /ligamen:quality-gate, asks to verify code quality, or wants to confirm code is clean before committing.
 allowed-tools: Bash
 argument-hint: "[lint|format|test|typecheck|quick|fix]"
 ---
@@ -14,7 +14,7 @@ Detect the current project environment before selecting commands:
 
 ## Subcommand Dispatch
 
-The user invoked `/allclear:quality-gate` with argument: **$ARGUMENTS**
+The user invoked `/ligamen:quality-gate` with argument: **$ARGUMENTS**
 
 Use the table below to determine which checks to run:
 
@@ -112,7 +112,7 @@ This restriction is non-negotiable. Do not attempt to fix tests or type errors e
 After running all requested checks, report results in this exact format:
 
 ```
-## AllClear Quality Gate Results
+## Ligamen Quality Gate Results
 
 | Check      | Status | Time   | Command                    |
 |------------|--------|--------|----------------------------|
@@ -124,7 +124,7 @@ After running all requested checks, report results in this exact format:
 **Summary: X/Y checks passed.**
 ```
 
-- If any checks failed: append "Run `/allclear:quality-gate fix` to auto-fix lint and format issues."
+- If any checks failed: append "Run `/ligamen:quality-gate fix` to auto-fix lint and format issues."
 - If all checks passed: append "All checks passed. Code is clean."
 - For skipped checks: include a row with status "SKIP" and the skip reason in the Command column.
 
@@ -133,13 +133,13 @@ After running all requested checks, report results in this exact format:
 After applying fixes, report in this format:
 
 ```
-## AllClear Fix Results
+## Ligamen Fix Results
 
 Applied auto-fixes:
 - lint: [command] ([N] issues fixed)
 - format: [command] ([N] files reformatted)
 
-Re-run `/allclear:quality-gate` to verify fixes resolved all issues.
+Re-run `/ligamen:quality-gate` to verify fixes resolved all issues.
 Note: Test and typecheck failures require manual review — auto-fix is not applied to these.
 ```
 

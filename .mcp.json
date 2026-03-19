@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "allclear-impact": {
+    "ligamen-impact": {
       "type": "stdio",
       "command": "./scripts/mcp-wrapper.sh"
     }

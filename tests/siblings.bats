@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# AllClear — siblings.bats
+# Ligamen — siblings.bats
 # Tests: TEST-06 (linked repo discovery library)
 # Covers: list_linked_repos / list_siblings (backward compat) from lib/linked-repos.sh
 
@@ -87,15 +87,15 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# allclear.config.json override (TEST-06 config path)
+# ligamen.config.json override (TEST-06 config path)
 # ---------------------------------------------------------------------------
 
-@test "siblings.sh - uses allclear.config.json linked-repos list when present" {
+@test "siblings.sh - uses ligamen.config.json linked-repos list when present" {
   local PARENT="${FIXTURES_DIR}/workspace"
   mkdir -p "${PARENT}/my-repo/.git"
   mkdir -p "${PARENT}/configured-sibling"
   # Write a config file that specifies a linked repo via explicit path
-  cat > "${PARENT}/my-repo/allclear.config.json" << EOF
+  cat > "${PARENT}/my-repo/ligamen.config.json" << EOF
 {
   "linked-repos": [
     "${PARENT}/configured-sibling"

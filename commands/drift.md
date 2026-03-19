@@ -1,5 +1,5 @@
 ---
-description: Check cross-repo consistency for version alignment, type definitions, and OpenAPI specs. Use when the user invokes /allclear:drift or asks about dependency drift.
+description: Check cross-repo consistency for version alignment, type definitions, and OpenAPI specs. Use when the user invokes /ligamen:drift or asks about dependency drift.
 allowed-tools: Bash
 argument-hint: "[versions|types|openapi|--all]"
 ---

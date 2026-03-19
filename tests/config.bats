@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/config.bats — AllClear configuration layer tests
+# tests/config.bats — Ligamen configuration layer tests
 # Covers: CONF-01 (config loading), CONF-02 (disable toggles),
 #         CONF-03 (throttle override), CONF-04 (extra blocked patterns)
 
@@ -9,9 +9,9 @@ LIB_CONFIG="$REPO_ROOT/lib/config.sh"
 
 setup() {
   # Reset the guard variable before each test so lib/config.sh re-loads
-  unset _ALLCLEAR_CONFIG_LOADED
-  unset ALLCLEAR_CONFIG_FILE
-  unset ALLCLEAR_CONFIG_LINKED_REPOS
+  unset _LIGAMEN_CONFIG_LOADED
+  unset LIGAMEN_CONFIG_FILE
+  unset LIGAMEN_CONFIG_LINKED_REPOS
   # Save original directory
   ORIG_DIR="$PWD"
 }
@@ -20,97 +20,97 @@ teardown() {
   # Restore original directory
   cd "$ORIG_DIR"
   # Reset the guard variable after each test
-  unset _ALLCLEAR_CONFIG_LOADED
-  unset ALLCLEAR_CONFIG_FILE
-  unset ALLCLEAR_CONFIG_LINKED_REPOS
+  unset _LIGAMEN_CONFIG_LOADED
+  unset LIGAMEN_CONFIG_FILE
+  unset LIGAMEN_CONFIG_LINKED_REPOS
 }
 
 # ---------------------------------------------------------------------------
 # CONF-01: lib/config.sh loading behavior
 # ---------------------------------------------------------------------------
 
-@test "config.sh loads siblings from allclear.config.json" {
+@test "config.sh loads siblings from ligamen.config.json" {
   cd "$FIXTURE_DIR"
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 3 ]
-  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[0]}" = "../api" ]
-  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[1]}" = "../ui" ]
-  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[2]}" = "/opt/repos/sdk" ]
+  [ "${#LIGAMEN_CONFIG_LINKED_REPOS[@]}" -eq 3 ]
+  [ "${LIGAMEN_CONFIG_LINKED_REPOS[0]}" = "../api" ]
+  [ "${LIGAMEN_CONFIG_LINKED_REPOS[1]}" = "../ui" ]
+  [ "${LIGAMEN_CONFIG_LINKED_REPOS[2]}" = "/opt/repos/sdk" ]
 }
 
 @test "config.sh returns empty siblings when no config file" {
   cd "$BATS_TEST_TMPDIR"
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 0 ]
+  [ "${#LIGAMEN_CONFIG_LINKED_REPOS[@]}" -eq 0 ]
 }
 
 @test "config.sh warns on malformed JSON" {
   local tmpdir="$BATS_TEST_TMPDIR/malformed"
   mkdir -p "$tmpdir"
-  echo "{ this is not valid json" > "$tmpdir/allclear.config.json"
+  echo "{ this is not valid json" > "$tmpdir/ligamen.config.json"
   cd "$tmpdir"
   output=$(source "$LIB_CONFIG" 2>&1)
   # Warning should be on stderr, captured via redirect
   run bash -c "
-    unset _ALLCLEAR_CONFIG_LOADED
+    unset _LIGAMEN_CONFIG_LOADED
     source '$LIB_CONFIG'
   "
   # Redirect stderr separately to check it
   warning=$(bash -c "
-    unset _ALLCLEAR_CONFIG_LOADED
+    unset _LIGAMEN_CONFIG_LOADED
     cd '$tmpdir'
     source '$LIB_CONFIG' 2>&1 >/dev/null
   ")
   [[ "$warning" == *"malformed"* ]]
   # Also verify siblings is empty
-  unset _ALLCLEAR_CONFIG_LOADED
+  unset _LIGAMEN_CONFIG_LOADED
   cd "$tmpdir"
   source "$LIB_CONFIG" 2>/dev/null
-  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 0 ]
+  [ "${#LIGAMEN_CONFIG_LINKED_REPOS[@]}" -eq 0 ]
 }
 
-@test "config.sh respects ALLCLEAR_CONFIG_FILE override" {
+@test "config.sh respects LIGAMEN_CONFIG_FILE override" {
   # Source from a different dir but point config at fixture
   cd "$BATS_TEST_TMPDIR"
-  export ALLCLEAR_CONFIG_FILE="$FIXTURE_DIR/allclear.config.json"
+  export LIGAMEN_CONFIG_FILE="$FIXTURE_DIR/ligamen.config.json"
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq 3 ]
-  [ "${ALLCLEAR_CONFIG_LINKED_REPOS[0]}" = "../api" ]
+  [ "${#LIGAMEN_CONFIG_LINKED_REPOS[@]}" -eq 3 ]
+  [ "${LIGAMEN_CONFIG_LINKED_REPOS[0]}" = "../api" ]
 }
 
 @test "config.sh guard prevents double loading" {
   cd "$FIXTURE_DIR"
   source "$LIB_CONFIG"
-  local first_count="${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}"
+  local first_count="${#LIGAMEN_CONFIG_LINKED_REPOS[@]}"
   # Source again — should return early, no error
   source "$LIB_CONFIG"
-  [ "${#ALLCLEAR_CONFIG_LINKED_REPOS[@]}" -eq "$first_count" ]
+  [ "${#LIGAMEN_CONFIG_LINKED_REPOS[@]}" -eq "$first_count" ]
 }
 
 # ---------------------------------------------------------------------------
 # CONF-02: Disable env var toggles
 # ---------------------------------------------------------------------------
 
-@test "ALLCLEAR_DISABLE_FORMAT exits 0 without formatting" {
-  run env ALLCLEAR_DISABLE_FORMAT=1 bash "$FIXTURE_DIR/mock-format.sh"
+@test "LIGAMEN_DISABLE_FORMAT exits 0 without formatting" {
+  run env LIGAMEN_DISABLE_FORMAT=1 bash "$FIXTURE_DIR/mock-format.sh"
   [ "$status" -eq 0 ]
   [[ "$output" != *"format-ran"* ]]
 }
 
-@test "format runs when ALLCLEAR_DISABLE_FORMAT unset" {
-  run env -u ALLCLEAR_DISABLE_FORMAT bash "$FIXTURE_DIR/mock-format.sh"
+@test "format runs when LIGAMEN_DISABLE_FORMAT unset" {
+  run env -u LIGAMEN_DISABLE_FORMAT bash "$FIXTURE_DIR/mock-format.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"format-ran"* ]]
 }
 
-@test "ALLCLEAR_DISABLE_LINT exits 0 without linting" {
-  run env ALLCLEAR_DISABLE_LINT=1 bash "$FIXTURE_DIR/mock-lint.sh"
+@test "LIGAMEN_DISABLE_LINT exits 0 without linting" {
+  run env LIGAMEN_DISABLE_LINT=1 bash "$FIXTURE_DIR/mock-lint.sh"
   [ "$status" -eq 0 ]
   [[ "$output" != *"throttle="* ]]
 }
 
-@test "ALLCLEAR_DISABLE_GUARD exits 0 allowing all writes" {
-  run env ALLCLEAR_DISABLE_GUARD=1 bash "$FIXTURE_DIR/mock-guard.sh" ".env"
+@test "LIGAMEN_DISABLE_GUARD exits 0 allowing all writes" {
+  run env LIGAMEN_DISABLE_GUARD=1 bash "$FIXTURE_DIR/mock-guard.sh" ".env"
   [ "$status" -eq 0 ]
 }
 
@@ -118,20 +118,20 @@ teardown() {
 # CONF-03: Lint throttle override
 # ---------------------------------------------------------------------------
 
-@test "ALLCLEAR_LINT_THROTTLE overrides default 30s" {
-  run env ALLCLEAR_LINT_THROTTLE=10 bash "$FIXTURE_DIR/mock-lint.sh"
+@test "LIGAMEN_LINT_THROTTLE overrides default 30s" {
+  run env LIGAMEN_LINT_THROTTLE=10 bash "$FIXTURE_DIR/mock-lint.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"throttle=10"* ]]
 }
 
-@test "invalid ALLCLEAR_LINT_THROTTLE falls back to 30" {
-  run env ALLCLEAR_LINT_THROTTLE=abc bash "$FIXTURE_DIR/mock-lint.sh"
+@test "invalid LIGAMEN_LINT_THROTTLE falls back to 30" {
+  run env LIGAMEN_LINT_THROTTLE=abc bash "$FIXTURE_DIR/mock-lint.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"throttle=30"* ]]
 }
 
-@test "unset ALLCLEAR_LINT_THROTTLE uses default 30" {
-  run env -u ALLCLEAR_LINT_THROTTLE bash "$FIXTURE_DIR/mock-lint.sh"
+@test "unset LIGAMEN_LINT_THROTTLE uses default 30" {
+  run env -u LIGAMEN_LINT_THROTTLE bash "$FIXTURE_DIR/mock-lint.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"throttle=30"* ]]
 }
@@ -140,19 +140,19 @@ teardown() {
 # CONF-04: Extra blocked patterns
 # ---------------------------------------------------------------------------
 
-@test "ALLCLEAR_EXTRA_BLOCKED blocks matching file" {
-  run env ALLCLEAR_EXTRA_BLOCKED="*.bak:*.tmp" bash "$FIXTURE_DIR/mock-guard.sh" "foo.bak"
+@test "LIGAMEN_EXTRA_BLOCKED blocks matching file" {
+  run env LIGAMEN_EXTRA_BLOCKED="*.bak:*.tmp" bash "$FIXTURE_DIR/mock-guard.sh" "foo.bak"
   [ "$status" -eq 2 ]
   [[ "$output" == *"blocked:foo.bak"* ]]
 }
 
-@test "ALLCLEAR_EXTRA_BLOCKED allows non-matching file" {
-  run env ALLCLEAR_EXTRA_BLOCKED="*.bak" bash "$FIXTURE_DIR/mock-guard.sh" "foo.ts"
+@test "LIGAMEN_EXTRA_BLOCKED allows non-matching file" {
+  run env LIGAMEN_EXTRA_BLOCKED="*.bak" bash "$FIXTURE_DIR/mock-guard.sh" "foo.ts"
   [ "$status" -eq 0 ]
   [[ "$output" == *"allowed:foo.ts"* ]]
 }
 
-@test "multiple ALLCLEAR_EXTRA_BLOCKED patterns all checked" {
-  run env ALLCLEAR_EXTRA_BLOCKED="*.bak:*.tmp:*.old" bash "$FIXTURE_DIR/mock-guard.sh" "data.tmp"
+@test "multiple LIGAMEN_EXTRA_BLOCKED patterns all checked" {
+  run env LIGAMEN_EXTRA_BLOCKED="*.bak:*.tmp:*.old" bash "$FIXTURE_DIR/mock-guard.sh" "data.tmp"
   [ "$status" -eq 2 ]
 }

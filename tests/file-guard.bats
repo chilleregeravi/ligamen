@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# AllClear — file-guard.bats
+# Ligamen — file-guard.bats
 # Tests for the PreToolUse sensitive file guard hook.
 # Covers TEST-03 (hard blocks and soft warnings) and TEST-08 (exit 2 + permissionDecision deny JSON).
 #
@@ -151,14 +151,14 @@ setup() {
 
 # ---------------------------------------------------------------------------
 # Block message format (GRDH-08)
-# Human-readable denial message must carry the AllClear prefix.
+# Human-readable denial message must carry the Ligamen prefix.
 # stderr carries the human-readable message; use 2>&1 to capture it.
 # ---------------------------------------------------------------------------
 
-@test "guard hook - block message contains AllClear prefix" {
+@test "guard hook - block message contains Ligamen prefix" {
   local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
   run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
-  assert_output --partial "AllClear"
+  assert_output --partial "Ligamen"
 }
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ setup() {
   local json='{"tool_name":"Write","tool_input":{"file_path":"/project/migrations/001_init.sql"}}'
   run bash -c "printf '%s' '${json}' | bash '${SCRIPT}' 2>&1"
   refute_output ""
-  assert_output --partial "AllClear"
+  assert_output --partial "Ligamen"
 }
 
 @test "guard hook - exits 0 for Python migration file (GRDH-05)" {
@@ -281,17 +281,17 @@ setup() {
 
 # ---------------------------------------------------------------------------
 # Disable guard via env var (CONF-02)
-# ALLCLEAR_DISABLE_GUARD=1 bypasses all blocking.
+# LIGAMEN_DISABLE_GUARD=1 bypasses all blocking.
 # ---------------------------------------------------------------------------
 
-@test "guard hook - ALLCLEAR_DISABLE_GUARD=1 bypasses block on .env" {
+@test "guard hook - LIGAMEN_DISABLE_GUARD=1 bypasses block on .env" {
   local json='{"tool_name":"Write","tool_input":{"file_path":"/project/.env"}}'
-  run bash -c "ALLCLEAR_DISABLE_GUARD=1 bash '${SCRIPT}' <<< '${json}'"
+  run bash -c "LIGAMEN_DISABLE_GUARD=1 bash '${SCRIPT}' <<< '${json}'"
   assert_success
 }
 
-@test "guard hook - ALLCLEAR_DISABLE_GUARD=1 bypasses block on Cargo.lock" {
+@test "guard hook - LIGAMEN_DISABLE_GUARD=1 bypasses block on Cargo.lock" {
   local json='{"tool_name":"Write","tool_input":{"file_path":"/project/Cargo.lock"}}'
-  run bash -c "ALLCLEAR_DISABLE_GUARD=1 bash '${SCRIPT}' <<< '${json}'"
+  run bash -c "LIGAMEN_DISABLE_GUARD=1 bash '${SCRIPT}' <<< '${json}'"
   assert_success
 }

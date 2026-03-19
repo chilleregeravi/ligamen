@@ -4,7 +4,7 @@ allowed-tools: Bash
 argument-hint: "[environment] [service-name]"
 ---
 
-# AllClear Pulse
+# Ligamen Pulse
 
 ## Overview
 
@@ -26,7 +26,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/pulse-check.sh"
 
 Then call `pulse_check_kubectl`. If it returns a non-zero exit code, display the skip message that the function already printed and stop. Do not proceed with any further steps. The function will have already printed:
 
-> kubectl not found in PATH. Install kubectl to use /allclear:pulse.
+> kubectl not found in PATH. Install kubectl to use /ligamen:pulse.
 > See: https://kubernetes.io/docs/tasks/tools/
 
 ---

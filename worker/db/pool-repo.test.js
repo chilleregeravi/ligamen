@@ -152,7 +152,7 @@ function projectHashDir(dataDir, projectRoot) {
 
 test("getQueryEngineByRepo: returns correct engine for repo-A", async () => {
   // Create isolated data dir
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "allclear-test-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ligamen-test-"));
   const rootA = "/fake/project-alpha";
   const hashDirA = projectHashDir(dataDir, rootA);
   createProjectDb(hashDirA, "repo-alpha", rootA);
@@ -175,7 +175,7 @@ test("getQueryEngineByRepo: returns correct engine for repo-A", async () => {
 });
 
 test("getQueryEngineByRepo: returns null for unknown repo name", async () => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "allclear-test-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ligamen-test-"));
   const rootA = "/fake/project-beta";
   const hashDirA = projectHashDir(dataDir, rootA);
   createProjectDb(hashDirA, "repo-beta", rootA);
@@ -194,7 +194,7 @@ test("getQueryEngineByRepo: returns null for unknown repo name", async () => {
 });
 
 test("getQueryEngineByRepo: returns correct engine when two projects exist", async () => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "allclear-test-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ligamen-test-"));
   const rootA = "/fake/multi-project-A";
   const rootB = "/fake/multi-project-B";
   const hashDirA = projectHashDir(dataDir, rootA);
@@ -220,7 +220,7 @@ test("getQueryEngineByRepo: returns correct engine when two projects exist", asy
 });
 
 test("getQueryEngineByRepo: case-insensitive lookup finds repo", async () => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "allclear-test-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ligamen-test-"));
   const rootA = "/fake/case-project";
   const hashDirA = projectHashDir(dataDir, rootA);
   createProjectDb(hashDirA, "Repo-Case", rootA);

@@ -463,7 +463,7 @@ export async function queryScan({ repo, full = false } = {}) {
       return {
         status: "unavailable",
         message:
-          "Worker not running. Run /allclear:map to build the dependency map.",
+          "Worker not running. Run /ligamen:map to build the dependency map.",
       };
     }
 
@@ -471,7 +471,7 @@ export async function queryScan({ repo, full = false } = {}) {
       return {
         status: "unavailable",
         message:
-          "Worker not running. Run /allclear:map to build the dependency map.",
+          "Worker not running. Run /ligamen:map to build the dependency map.",
       };
     }
 
@@ -520,7 +520,7 @@ export async function queryScan({ repo, full = false } = {}) {
 // MCP Server setup
 // ─────────────────────────────────────────────────────────────
 
-const server = new McpServer({ name: "allclear-impact", version: "2.0.0" });
+const server = new McpServer({ name: "ligamen-impact", version: "2.0.0" });
 
 // ── impact_query ─────────────────────────────────────────────
 server.tool(
@@ -554,7 +554,7 @@ server.tool(
   async (params) => {
     const qe = resolveDb(params.project);
     if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /allclear:map first in that project" }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
     }
     const raw = await queryImpact(qe?._db ?? null, params);
     // Enrich with type-aware summary when db is available
@@ -590,7 +590,7 @@ server.tool(
   async (params) => {
     const qe = resolveDb(params.project);
     if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /allclear:map first in that project" }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
     }
     const result = await queryChanged(qe?._db ?? null, params);
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
@@ -626,7 +626,7 @@ server.tool(
   async (params) => {
     const qe = resolveDb(params.project);
     if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /allclear:map first in that project" }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
     }
     const result = await queryGraph(qe?._db ?? null, params);
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
@@ -660,7 +660,7 @@ server.tool(
   async (params) => {
     const qe = resolveDb(params.project);
     if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /allclear:map first in that project" }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
     }
     const raw = await querySearch(qe?._db ?? null, params);
     // Enrich results with actor relationship sentences

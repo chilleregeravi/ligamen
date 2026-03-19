@@ -1,17 +1,17 @@
 ---
-description: This command should be used when the user asks to "check deploy", "verify deployment", "compare expected state", or wants to know if the cluster matches the expected configuration. Compare expected Kubernetes state from kustomize overlays or helm charts against actual cluster state, reporting mismatches for image tags, configmaps, and other resources.
+description: This command should be used when the user invokes /ligamen:deploy-verify, asks to "check deploy", "verify deployment", "compare expected state", or wants to know if the cluster matches the expected configuration. Compare expected Kubernetes state from kustomize overlays or helm charts against actual cluster state, reporting mismatches for image tags, configmaps, and other resources.
 allowed-tools: Bash
 argument-hint: "[environment] [--diff]"
 ---
 
-# AllClear Deploy Verification
+# Ligamen Deploy Verification
 
 kubectl available: !`command -v kubectl >/dev/null 2>&1 && echo "yes" || echo "no"`
 
 ## Steps
 
 1. **Check prerequisites.** If kubectl is "no" above, print exactly:
-   `AllClear deploy: kubectl not available — skipping deploy verification`
+   `Ligamen deploy: kubectl not available — skipping deploy verification`
    Then stop. Do not proceed. Do not execute any further steps.
 
 2. **Check cluster permissions.** Run:
@@ -21,7 +21,7 @@ kubectl available: !`command -v kubectl >/dev/null 2>&1 && echo "yes" || echo "n
    ```
 
    If `AUTH_EXIT` is non-zero, print exactly:
-   `AllClear deploy: insufficient cluster permissions — check kubeconfig context`
+   `Ligamen deploy: insufficient cluster permissions — check kubeconfig context`
    Then stop. Do not proceed.
 
 3. **Parse arguments.** Read the user's invocation for:
