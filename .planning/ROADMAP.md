@@ -96,11 +96,11 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
   3. `scripts/pulse-check.sh` no longer exists in the repository
   4. README and docs no longer mention pulse or deploy-verify in any capability list or usage section
   5. The validated requirements list in PROJECT.md no longer includes pulse or deploy-verify entries
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 46-01: Remove pulse command, deploy-verify command, and pulse-check script
-- [ ] 46-02: Update README and docs to remove pulse/deploy-verify references
+- [ ] 46-01-PLAN.md — Delete pulse.md, deploy-verify.md, and pulse-check.sh
+- [ ] 46-02-PLAN.md — Remove pulse/deploy-verify references from README.md, docs/commands.md, and .planning/PROJECT.md
 
 ### Phase 47: Test and Doc Cleanup
 **Goal**: No test fixtures or documentation references to the removed commands remain
