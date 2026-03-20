@@ -143,4 +143,4 @@ Plans:
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46. Command Removal | 2/2 | Complete   | 2026-03-20 | - |
 | 47. Test and Doc Cleanup | 1/1 | Complete   | 2026-03-20 | - |
-| 48. MCP Drift Tools | 1/3 | In Progress|  | - |
+| 48. MCP Drift Tools | 2/3 | In Progress|  | - |

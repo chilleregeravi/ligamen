@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Command Cleanup
 status: unknown
-stopped_at: Completed 47-01-PLAN.md
-last_updated: "2026-03-20T19:28:34.719Z"
+stopped_at: Completed 48-03-PLAN.md
+last_updated: "2026-03-20T19:46:25.819Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -44,6 +44,7 @@ Plan: 1 of 1
 | Phase 46-command-removal P02 | 5 | 2 tasks | 3 files |
 | Phase 48-mcp-drift-tools P01 | 12 | 2 tasks | 2 files |
 | Phase 47-test-doc-cleanup P01 | 5 | 2 tasks | 3 files |
+| Phase 48-mcp-drift-tools P03 | 17 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -56,6 +57,9 @@ Plan: 1 of 1
 - [Phase 48-mcp-drift-tools]: Port normalize_version and has_range_specifier from drift-versions.sh to JS helpers in server.js
 - [Phase 48-mcp-drift-tools]: drift_versions severity default=WARN mirrors shell script behavior (shows WARN+CRITICAL, suppresses INFO)
 - [Phase 47-test-doc-cleanup]: docs/commands.md and README.md required no changes — pulse and deploy-verify references were already removed in Phase 46
+- [Phase 48-mcp-drift-tools]: Use hub-and-spoke for N>5 repos with OpenAPI specs — prevents O(N^2) oasdiff calls
+- [Phase 48-mcp-drift-tools]: drift_openapi: 5-second timeout on oasdiff execSync prevents MCP server hangs per research Pitfall 3
+- [Phase 48-mcp-drift-tools]: drift_openapi: tool_available boolean field enables agents to distinguish no-specs vs no-oasdiff scenarios
 
 ### Pending Todos
 
@@ -67,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T19:28:34.715Z
-Stopped at: Completed 47-01-PLAN.md
+Last session: 2026-03-20T19:46:25.815Z
+Stopped at: Completed 48-03-PLAN.md
 Resume file: None
