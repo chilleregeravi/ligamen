@@ -104,7 +104,10 @@ Full details: `.planning/milestones/v4.1-ROADMAP.md`
   1. `plugins/ligamen/` exists and contains commands/, hooks/, scripts/, worker/, lib/, skills/, .claude-plugin/, package.json, package-lock.json, and ligamen.config.json.example
   2. Root of the repo contains only README.md, LICENSE, Makefile, docs/, tests/, .planning/, and .mcp.json — no plugin source directories
   3. Git history is preserved for moved files (moved, not deleted and recreated)
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 49-01-PLAN.md — Move all plugin source into plugins/ligamen/ via git mv, verify history preserved
 
 ### Phase 50: Path and Install Updates
 **Goal**: All internal references, import paths, hooks.json entries, README install instructions, and Makefile targets are correct for the new `plugins/ligamen/` layout
@@ -139,6 +142,6 @@ Full details: `.planning/milestones/v4.1-ROADMAP.md`
 | 33-38 | v3.0 | 11/11 | Complete | 2026-03-18 |
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
-| 49. Directory Restructure | v5.0 | 0/TBD | Not started | - |
+| 49. Directory Restructure | v5.0 | 0/1 | Not started | - |
 | 50. Path and Install Updates | v5.0 | 0/TBD | Not started | - |
 | 51. Verification | v5.0 | 0/TBD | Not started | - |
