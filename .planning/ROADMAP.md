@@ -119,7 +119,11 @@ Plans:
   3. `hooks.json` entries point to `plugins/ligamen/` script paths and Claude Code loads them without missing-file errors
   4. README installation section shows `claude plugin marketplace add` + `claude plugin install` as the primary install method
   5. `make install` and `make uninstall` run without errors using the new directory layout
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 50-01-PLAN.md — Fix drift-common.sh fallback path; verify hooks.json and worker JS need no changes (PTH-01, PTH-02, PTH-03)
+- [ ] 50-02-PLAN.md — Update README MCP server path example and Makefile targets for plugins/ligamen/ layout (INS-01, INS-02)
 
 ### Phase 51: Verification
 **Goal**: The restructured plugin passes all automated tests and installs cleanly via the marketplace flow from a fresh clone
@@ -128,7 +132,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `make test` (bats suite) runs to completion with zero failures using the new layout
   2. A fresh clone of the repo followed by `claude plugin marketplace add` + `claude plugin install` produces a working plugin installation with all commands and hooks active
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 51-01-PLAN.md — Update all bats test path variables and Makefile lint/check targets for plugins/ligamen/ layout
+- [ ] 51-02-PLAN.md — Run full test suite (make test) and execute marketplace install flow end-to-end
 
 ## Progress
 
@@ -143,5 +151,5 @@ Plans:
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
 | 49. Directory Restructure | v5.0 | 0/1 | Not started | - |
-| 50. Path and Install Updates | v5.0 | 0/TBD | Not started | - |
-| 51. Verification | v5.0 | 0/TBD | Not started | - |
+| 50. Path and Install Updates | v5.0 | 0/2 | Not started | - |
+| 51. Verification | v5.0 | 0/2 | Not started | - |
