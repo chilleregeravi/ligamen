@@ -10,8 +10,6 @@ ligamen/
     quality-gate.md
     cross-impact.md
     drift.md
-    pulse.md
-    deploy-verify.md
     map.md
   skills/                    # auto-invoked contextual knowledge
     quality-gate/SKILL.md    # auto-invocable quality gate
