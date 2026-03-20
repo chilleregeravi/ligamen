@@ -81,7 +81,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 **Milestone Goal:** Remove Kubernetes-specific commands (pulse, deploy-verify) that don't fit the plugin's core focus, and add MCP drift query tools for cross-repo version/type/API mismatch intelligence.
 
 - [x] **Phase 46: Command Removal** - Delete pulse and deploy-verify commands, scripts, and primary documentation (completed 2026-03-20)
-- [ ] **Phase 47: Test and Doc Cleanup** - Remove pulse/deploy-verify test fixtures and sweep remaining doc references
+- [x] **Phase 47: Test and Doc Cleanup** - Remove pulse/deploy-verify test fixtures and sweep remaining doc references (completed 2026-03-20)
 - [ ] **Phase 48: MCP Drift Tools** - Add drift_versions, drift_types, and drift_openapi MCP query tools
 
 ## Phase Details
@@ -142,5 +142,5 @@ Plans:
 | 33-38 | v3.0 | 11/11 | Complete | 2026-03-18 |
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46. Command Removal | 2/2 | Complete   | 2026-03-20 | - |
-| 47. Test and Doc Cleanup | v4.1 | 0/1 | Not started | - |
+| 47. Test and Doc Cleanup | 1/1 | Complete   | 2026-03-20 | - |
 | 48. MCP Drift Tools | 1/3 | In Progress|  | - |

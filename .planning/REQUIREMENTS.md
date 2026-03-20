@@ -21,8 +21,8 @@ Requirements for v4.1 Command Cleanup. Each maps to roadmap phases.
 
 ### Cleanup
 
-- [ ] **CLN-01**: Remove any tests specific to pulse or deploy-verify
-- [ ] **CLN-02**: Update remaining docs references
+- [x] **CLN-01**: Remove any tests specific to pulse or deploy-verify
+- [x] **CLN-02**: Update remaining docs references
 
 ## Future Requirements
 
@@ -45,8 +45,8 @@ None deferred.
 | MCP-01 | Phase 48 | Complete |
 | MCP-02 | Phase 48 | Pending |
 | MCP-03 | Phase 48 | Pending |
-| CLN-01 | Phase 47 | Pending |
-| CLN-02 | Phase 47 | Pending |
+| CLN-01 | Phase 47 | Complete |
+| CLN-02 | Phase 47 | Complete |
 
 **Coverage:**
 - v4.1 requirements: 8 total
