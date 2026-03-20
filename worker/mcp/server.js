@@ -646,6 +646,477 @@ export async function queryDriftVersions(db, { severity = "WARN" } = {}) {
 }
 
 /**
+ * Detect repo language from manifest files. Port of detect_repo_language() in drift-types.sh.
+ * @param {string} repoPath
+ * @returns {'ts'|'go'|'py'|'rs'|'unknown'}
+ */
+function detectRepoLanguage(repoPath) {
+  if (fs.existsSync(path.join(repoPath, 'package.json'))) return 'ts';
+  if (fs.existsSync(path.join(repoPath, 'go.mod'))) return 'go';
+  if (fs.existsSync(path.join(repoPath, 'pyproject.toml')) || fs.existsSync(path.join(repoPath, 'setup.py'))) return 'py';
+  if (fs.existsSync(path.join(repoPath, 'Cargo.toml'))) return 'rs';
+  return 'unknown';
+}
+
+/**
+ * Recursively collect files matching an extension within a directory, up to maxDepth hops.
+ * @param {string} dir - Start directory
+ * @param {string} ext - File extension including dot (e.g. '.ts')
+ * @param {number} maxDepth
+ * @returns {string[]}
+ */
+function collectFiles(dir, ext, maxDepth = 4) {
+  const results = [];
+  function walk(current, depth) {
+    if (depth > maxDepth) return;
+    let entries;
+    try { entries = fs.readdirSync(current, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+        walk(full, depth + 1);
+      } else if (entry.isFile() && entry.name.endsWith(ext)) {
+        results.push(full);
+      }
+    }
+  }
+  walk(dir, 0);
+  return results;
+}
+
+/**
+ * Extract exported type/interface/struct names from a repo.
+ * Port of extract_type_names() dispatch logic in drift-types.sh.
+ * Capped at 50 names per repo (research Pitfall 5).
+ * @param {string} repoPath
+ * @param {'ts'|'go'|'py'|'rs'} lang
+ * @returns {string[]}
+ */
+function extractTypeNames(repoPath, lang) {
+  const names = new Set();
+  const cap = 50;
+
+  if (lang === 'ts') {
+    const srcDir = path.join(repoPath, 'src');
+    const searchDir = fs.existsSync(srcDir) ? srcDir : repoPath;
+    for (const file of collectFiles(searchDir, '.ts')) {
+      if (names.size >= cap) break;
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const m of content.matchAll(/export\s+(?:interface|type)\s+([A-Z][A-Za-z0-9_]+)/g)) {
+          names.add(m[1]);
+          if (names.size >= cap) break;
+        }
+      } catch { /* skip unreadable file */ }
+    }
+  } else if (lang === 'go') {
+    for (const file of collectFiles(repoPath, '.go')) {
+      if (names.size >= cap) break;
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const m of content.matchAll(/^type\s+([A-Z][A-Za-z0-9_]+)\s+struct/gm)) {
+          names.add(m[1]);
+          if (names.size >= cap) break;
+        }
+      } catch { /* skip */ }
+    }
+  } else if (lang === 'py') {
+    const srcDir = path.join(repoPath, 'src');
+    const searchDir = fs.existsSync(srcDir) ? srcDir : repoPath;
+    for (const file of collectFiles(searchDir, '.py')) {
+      if (names.size >= cap) break;
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const m of content.matchAll(/^class\s+([A-Z][A-Za-z0-9_]+)/gm)) {
+          names.add(m[1]);
+          if (names.size >= cap) break;
+        }
+      } catch { /* skip */ }
+    }
+  } else if (lang === 'rs') {
+    const srcDir = path.join(repoPath, 'src');
+    const searchDir = fs.existsSync(srcDir) ? srcDir : repoPath;
+    for (const file of collectFiles(searchDir, '.rs')) {
+      if (names.size >= cap) break;
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const m of content.matchAll(/^pub\s+struct\s+([A-Z][A-Za-z0-9_]+)/gm)) {
+          names.add(m[1]);
+          if (names.size >= cap) break;
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  return Array.from(names);
+}
+
+/**
+ * Extract the body of a named type definition from a repo.
+ * Returns sorted lines of the type body for comparison.
+ * Port of extract_type_body() from drift-types.sh.
+ * @param {string} repoPath
+ * @param {string} typeName
+ * @param {'ts'|'go'|'py'|'rs'} lang
+ * @returns {string}
+ */
+function extractTypeBody(repoPath, typeName, lang) {
+  let searchDir = repoPath;
+  let ext = '.ts';
+  if (lang === 'ts') {
+    ext = '.ts';
+    const src = path.join(repoPath, 'src');
+    if (fs.existsSync(src)) searchDir = src;
+  } else if (lang === 'go') {
+    ext = '.go';
+  } else if (lang === 'py') {
+    ext = '.py';
+    const src = path.join(repoPath, 'src');
+    if (fs.existsSync(src)) searchDir = src;
+  } else if (lang === 'rs') {
+    ext = '.rs';
+    const src = path.join(repoPath, 'src');
+    if (fs.existsSync(src)) searchDir = src;
+  }
+
+  for (const file of collectFiles(searchDir, ext)) {
+    try {
+      const content = fs.readFileSync(file, 'utf8');
+      const lines = content.split('\n');
+      let found = false;
+      let depth = 0;
+      const body = [];
+
+      for (const line of lines) {
+        if (!found) {
+          if (lang === 'ts' && new RegExp(`(interface|type)\\s+${typeName}[^A-Za-z0-9_]`).test(line)) {
+            found = true;
+          } else if (lang === 'go' && new RegExp(`^type\\s+${typeName}\\s+struct`).test(line)) {
+            found = true;
+          } else if (lang === 'py' && new RegExp(`^class\\s+${typeName}[:(]`).test(line)) {
+            found = true;
+          } else if (lang === 'rs' && new RegExp(`pub\\s+struct\\s+${typeName}[^A-Za-z0-9_]`).test(line)) {
+            found = true;
+          }
+          if (found) {
+            // Handle inline single-line declarations: extract body from declaration line itself.
+            // e.g. "export interface Foo { a: string; b: number; }"
+            if (lang !== 'py') {
+              const openIdx = line.indexOf('{');
+              if (openIdx !== -1) {
+                // Count braces on this declaration line to track depth
+                depth += (line.match(/{/g) || []).length;
+                depth -= (line.match(/}/g) || []).length;
+                if (depth <= 0) {
+                  // Single-line definition — extract the content between the braces
+                  const inlineBody = line.slice(openIdx + 1, line.lastIndexOf('}')).trim();
+                  if (inlineBody) {
+                    // Split on ';' or ',' to get individual fields
+                    const fields = inlineBody.split(/[;,]/).map(s => s.trim()).filter(Boolean);
+                    if (fields.length > 0) {
+                      body.push(...fields);
+                      break; // done — single-line definition fully parsed
+                    }
+                  }
+                  // Empty braces or nothing useful — stop
+                  break;
+                }
+                // Opening brace found but not closed on same line — continue collecting next lines
+              }
+            }
+            continue;
+          }
+        } else {
+          // For ts/go/rs: track braces; for py: track indentation
+          if (lang === 'py') {
+            if (/^[^ \t]/.test(line) && line.trim()) break;
+            body.push(line.trim());
+          } else {
+            depth += (line.match(/{/g) || []).length;
+            depth -= (line.match(/}/g) || []).length;
+            if (depth < 0) break;
+            body.push(line.trim());
+          }
+        }
+      }
+      if (body.length > 0) return body.filter(Boolean).sort().join('\n');
+    } catch { /* skip */ }
+  }
+  return '';
+}
+
+/**
+ * Query shared type/struct/interface mismatches across repos of the same language.
+ * Port of the main comparison loop in scripts/drift-types.sh.
+ * @param {import('better-sqlite3').Database|null} db
+ * @param {{ severity?: string }} params
+ * @returns {{ findings: Array, repos_scanned: number }}
+ */
+export async function queryDriftTypes(db, { severity = "WARN" } = {}) {
+  const repos = getDriftRepos(db);
+  if (repos.length === 0) return { findings: [], repos_scanned: 0 };
+
+  // Group repos by language (only valid paths)
+  const langGroups = new Map(); // lang → [{ path, name }]
+  let reposScanned = 0;
+
+  for (const repo of repos) {
+    if (!fs.existsSync(repo.path)) continue;
+    reposScanned++;
+    const lang = detectRepoLanguage(repo.path);
+    if (lang === 'unknown') continue;
+    if (!langGroups.has(lang)) langGroups.set(lang, []);
+    langGroups.get(lang).push(repo);
+  }
+
+  const findings = [];
+  const severityOrder = { CRITICAL: 3, WARN: 2, INFO: 1, all: 0 };
+  const minSeverity = severityOrder[severity] ?? severityOrder.WARN;
+
+  for (const [lang, langRepos] of langGroups) {
+    if (langRepos.length < 2) continue; // need 2+ repos of same language
+
+    // Collect type names per repo (capped at 50)
+    const typeRepoMap = new Map(); // typeName → [repo, ...]
+
+    for (const repo of langRepos) {
+      const names = extractTypeNames(repo.path, lang);
+      for (const name of names) {
+        if (!typeRepoMap.has(name)) typeRepoMap.set(name, []);
+        typeRepoMap.get(name).push(repo);
+      }
+    }
+
+    // Find shared types (in 2+ repos) and compare bodies
+    for (const [typeName, reposWithType] of typeRepoMap) {
+      if (reposWithType.length < 2) continue;
+
+      const bodyA = extractTypeBody(reposWithType[0].path, typeName, lang);
+      let hasDiff = false;
+      const diffDetails = [];
+
+      for (let i = 1; i < reposWithType.length; i++) {
+        const bodyB = extractTypeBody(reposWithType[i].path, typeName, lang);
+        if (bodyA !== bodyB) {
+          hasDiff = true;
+          diffDetails.push(`${reposWithType[0].name} vs ${reposWithType[i].name}: bodies differ`);
+        }
+      }
+
+      const level = hasDiff ? "CRITICAL" : "INFO";
+      const detail = hasDiff
+        ? "Field differences: " + diffDetails.join("; ")
+        : "Fields match across all repos";
+      const levelOrder = severityOrder[level] ?? 0;
+
+      if (severity === "all" || levelOrder >= minSeverity) {
+        findings.push({
+          level,
+          item: `${typeName} (${lang})`,
+          repos: reposWithType.map(r => r.name),
+          detail,
+        });
+      }
+    }
+  }
+
+  return { findings, repos_scanned: reposScanned };
+}
+
+/**
+ * Well-known OpenAPI spec file locations in order of convention frequency.
+ * Port of OPENAPI_CANDIDATES from scripts/drift-openapi.sh.
+ */
+const OPENAPI_CANDIDATES = [
+  'openapi.yaml', 'openapi.yml', 'openapi.json',
+  'swagger.yaml', 'swagger.yml', 'swagger.json',
+  'api/openapi.yaml', 'api/openapi.yml', 'api/openapi.json',
+  'api/swagger.yaml', 'docs/openapi.yaml', 'spec/openapi.yaml',
+];
+
+/**
+ * Find an OpenAPI spec file in a repo directory.
+ * Checks well-known paths first, then falls back to a recursive scan (maxdepth 3).
+ * Port of find_openapi_spec() from scripts/drift-openapi.sh.
+ * @param {string} repoPath
+ * @returns {string|null} Absolute path to spec file, or null if not found
+ */
+function findOpenApiSpec(repoPath) {
+  for (const candidate of OPENAPI_CANDIDATES) {
+    const full = path.join(repoPath, candidate);
+    if (fs.existsSync(full)) return full;
+  }
+  // Fallback: recursive scan limited to maxdepth 3
+  for (const file of collectFiles(repoPath, '.yaml', 3).concat(collectFiles(repoPath, '.json', 3))) {
+    const base = path.basename(file);
+    if (base === 'openapi.yaml' || base === 'openapi.json' || base === 'openapi.yml') return file;
+  }
+  return null;
+}
+
+/**
+ * Compare two OpenAPI spec files using oasdiff (with graceful degradation).
+ * Port of compare_openapi() from scripts/drift-openapi.sh.
+ * Uses 5-second timeout on execSync calls (research Pitfall 3).
+ * @param {string} specA - Absolute path to first spec
+ * @param {string} specB - Absolute path to second spec
+ * @param {string} repoA - Repo name for first spec
+ * @param {string} repoB - Repo name for second spec
+ * @returns {{ findings: Array, tool_used: string }}
+ */
+function compareOpenApiSpecs(specA, specB, repoA, repoB) {
+  const findings = [];
+  let toolUsed = 'none';
+
+  try {
+    execSync('which oasdiff', { stdio: 'ignore', timeout: 2000 });
+    toolUsed = 'oasdiff';
+
+    // Breaking changes
+    let breaking = '';
+    try {
+      breaking = execSync(`oasdiff breaking "${specA}" "${specB}"`, {
+        encoding: 'utf8',
+        timeout: 5000,
+      }).trim();
+    } catch (err) {
+      if (err.code === 'ETIMEDOUT') {
+        findings.push({
+          level: 'INFO',
+          item: 'openapi-spec',
+          repos: [repoA, repoB],
+          detail: 'oasdiff comparison timed out (5s). Spec may be too large.',
+        });
+        return { findings, tool_used: toolUsed };
+      }
+      // Non-zero exit = oasdiff found breaking changes in stderr/stdout
+      breaking = (err.stdout || '').trim();
+    }
+    if (breaking) {
+      const preview = breaking.split('\n').slice(0, 10).join(' ');
+      findings.push({
+        level: 'CRITICAL',
+        item: 'openapi-spec',
+        repos: [repoA, repoB],
+        detail: `Breaking changes: ${preview}`,
+      });
+    }
+
+    // Non-breaking diffs
+    let diffOut = '';
+    try {
+      diffOut = execSync(`oasdiff diff "${specA}" "${specB}" --format text`, {
+        encoding: 'utf8',
+        timeout: 5000,
+      }).trim();
+    } catch (err) {
+      diffOut = (err.stdout || '').trim();
+    }
+    if (diffOut) {
+      const preview = diffOut.split('\n').slice(0, 20).join(' ');
+      findings.push({
+        level: 'WARN',
+        item: 'openapi-spec',
+        repos: [repoA, repoB],
+        detail: `Non-breaking diffs: ${preview}`,
+      });
+    }
+
+    if (!breaking && !diffOut) {
+      findings.push({
+        level: 'INFO',
+        item: 'openapi-spec',
+        repos: [repoA, repoB],
+        detail: 'OpenAPI specs are identical',
+      });
+    }
+  } catch {
+    // oasdiff not available
+    findings.push({
+      level: 'INFO',
+      item: 'openapi-spec',
+      repos: [repoA, repoB],
+      detail: 'Install oasdiff for full OpenAPI comparison',
+    });
+  }
+
+  return { findings, tool_used: toolUsed };
+}
+
+/**
+ * Query OpenAPI spec breaking changes across all scanned repos.
+ * Port of the main comparison loop in scripts/drift-openapi.sh.
+ * Uses pairwise comparison for N <= 5 repos; hub-and-spoke for N > 5.
+ * @param {import('better-sqlite3').Database|null} db
+ * @param {{ severity?: string }} params
+ * @returns {{ findings: Array, repos_scanned: number, tool_available: boolean }}
+ */
+export async function queryDriftOpenapi(db, { severity = "WARN" } = {}) {
+  const repos = getDriftRepos(db);
+  if (repos.length === 0) return { findings: [], repos_scanned: 0, tool_available: false };
+
+  // Collect repos with OpenAPI specs (valid paths only)
+  const reposWithSpecs = [];
+  let reposScanned = 0;
+
+  for (const repo of repos) {
+    if (!fs.existsSync(repo.path)) continue;
+    reposScanned++;
+    const specPath = findOpenApiSpec(repo.path);
+    if (specPath) {
+      reposWithSpecs.push({ ...repo, specPath });
+    }
+  }
+
+  // Check oasdiff availability once
+  let oasdiffAvailable = false;
+  try {
+    execSync('which oasdiff', { stdio: 'ignore', timeout: 2000 });
+    oasdiffAvailable = true;
+  } catch { /* not available */ }
+
+  if (reposWithSpecs.length < 2) {
+    return { findings: [], repos_scanned: reposScanned, tool_available: oasdiffAvailable };
+  }
+
+  const allFindings = [];
+  const severityOrder = { CRITICAL: 3, WARN: 2, INFO: 1, all: 0 };
+  const minSeverity = severityOrder[severity] ?? severityOrder.WARN;
+
+  /**
+   * Helper: compare a pair and add findings after severity filtering.
+   */
+  function addPairFindings(repoA, repoB) {
+    const { findings } = compareOpenApiSpecs(
+      repoA.specPath, repoB.specPath,
+      repoA.name, repoB.name,
+    );
+    for (const f of findings) {
+      const levelOrder = severityOrder[f.level] ?? 0;
+      if (severity === "all" || levelOrder >= minSeverity) {
+        allFindings.push(f);
+      }
+    }
+  }
+
+  if (reposWithSpecs.length <= 5) {
+    // Full pairwise comparison (N*(N-1)/2 pairs)
+    for (let i = 0; i < reposWithSpecs.length - 1; i++) {
+      for (let j = i + 1; j < reposWithSpecs.length; j++) {
+        addPairFindings(reposWithSpecs[i], reposWithSpecs[j]);
+      }
+    }
+  } else {
+    // Hub-and-spoke: compare each against first repo only
+    for (let i = 1; i < reposWithSpecs.length; i++) {
+      addPairFindings(reposWithSpecs[0], reposWithSpecs[i]);
+    }
+  }
+
+  return { findings: allFindings, repos_scanned: reposScanned, tool_available: oasdiffAvailable };
+}
+
+/**
  * Trigger a scan via the HTTP worker, or return unavailable if worker is not running.
  * @param {{ repo?: string, full?: boolean }} params
  * @returns {{ status: string, message: string }}
@@ -907,6 +1378,46 @@ server.tool(
       return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
     }
     const result = await queryDriftVersions(qe?._db ?? null, params);
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
+);
+
+// ── drift_types ───────────────────────────────────────────────
+server.tool(
+  "drift_types",
+  "Query shared type, interface, and struct definition mismatches across repos of the same language. Only compares repos within the same language group (TypeScript vs TypeScript, Go vs Go, etc).",
+  {
+    severity: z.enum(["CRITICAL", "WARN", "INFO", "all"]).default("WARN")
+      .describe("Minimum finding severity. CRITICAL = shared type has different fields; INFO = fields match."),
+    project: z.string().optional()
+      .describe("Absolute path to project root, 12-char project hash, or repo name. Defaults to LIGAMEN_PROJECT_ROOT or cwd."),
+  },
+  async (params) => {
+    const qe = resolveDb(params.project);
+    if (!qe && params.project) {
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    }
+    const result = await queryDriftTypes(qe?._db ?? null, params);
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
+);
+
+// ── drift_openapi ─────────────────────────────────────────────
+server.tool(
+  "drift_openapi",
+  "Query OpenAPI spec breaking changes across scanned repos. Uses oasdiff when installed for full structural comparison with $ref resolution; returns an informational message when oasdiff is unavailable. For N > 5 repos with specs, uses hub-and-spoke comparison strategy.",
+  {
+    severity: z.enum(["CRITICAL", "WARN", "INFO", "all"]).default("WARN")
+      .describe("Minimum finding severity. CRITICAL = breaking API changes; WARN = non-breaking diffs; INFO = identical or tool unavailable."),
+    project: z.string().optional()
+      .describe("Absolute path to project root, 12-char project hash, or repo name. Defaults to LIGAMEN_PROJECT_ROOT or cwd."),
+  },
+  async (params) => {
+    const qe = resolveDb(params.project);
+    if (!qe && params.project) {
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    }
+    const result = await queryDriftOpenapi(qe?._db ?? null, params);
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
