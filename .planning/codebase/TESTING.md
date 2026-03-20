@@ -1,287 +1,272 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-03-18
+**Analysis Date:** 2026-03-20
 
 ## Test Framework
 
 **Runner:**
-- Node.js built-in test runner (`node:test`), available in Node 18+
-- No external test framework (Jest, Vitest) — uses only Node's native capabilities
-- Config: No test config file needed; tests run via `node --test <file.js>` or `node --input-type=module < file.js`
+- Node.js built-in `node:test` module (no external test runner like Jest or Vitest)
+- Available since Node 18+; documented in `tests/storage/query-engine.test.js` comments
+- Required Node version: >= 20.0.0 (from `package.json`)
 
 **Assertion Library:**
-- `node:assert/strict` — Node's strict assertion module
-- Import: `import assert from "node:assert/strict"`
+- `node:assert/strict` — Node.js built-in strict assertion module
+- Imported as: `import assert from "node:assert/strict"`
 
 **Run Commands:**
 ```bash
-npm test                                                    # Run all tests (limited set)
-npm run test:storage                                        # Run storage layer tests
-node --test tests/storage/query-engine.test.js             # Run specific test file
-node --test 'worker/**/*.test.js'                           # Run tests matching glob (if supported)
-node --input-type=module < worker/db/database.test.js      # Alternative: stdin mode for scripts
+node --test tests/storage/query-engine.test.js      # Run single test file
+npm test                                              # Run test suite (script in package.json)
+npm run test:storage                                  # Storage-specific tests (from package.json)
 ```
+
+**Configuration:**
+- No test config file (no `jest.config.js`, `vitest.config.js`, etc.)
+- Tests run directly with Node.js
+- No coverage tool integration detected
 
 ## Test File Organization
 
 **Location:**
-- Co-located with source code: `worker/db/database.test.js` sits next to `worker/db/database.js`
-- Some tests in separate `tests/` directory: `tests/storage/`, `tests/ui/`, `tests/worker/`
-- Pattern: Test and source file share same directory structure, `.test.js` suffix
+- **Colocated pattern (preferred):** Test files in same directory as source
+  - Example: `worker/ui/modules/layout.js` has `worker/ui/modules/layout.test.js`
+  - Example: `worker/ui/modules/renderer.js` has `worker/ui/modules/renderer.test.js`
+
+- **Separate directory pattern (also used):** Tests in `tests/` tree with parallel structure
+  - Example: `tests/storage/query-engine.test.js` tests `worker/db/query-engine.js`
+  - Example: `tests/ui/graph-fit-to-screen.test.js` tests `worker/ui/graph.js`
+  - Example: `tests/worker/logger.test.js` tests `worker/lib/logger.js`
 
 **Naming:**
-- `*.test.js` suffix for all test files (not `.spec.js`)
-- Test file names mirror source: `query-engine.js` → `query-engine.test.js`, `manager.js` → `manager.test.js`
+- Pattern: `[module-name].test.js` for unit tests
+- Pattern: `[module-name].spec.js` not used (only `.test.js` observed)
+- Bash integration tests: `tests/bats/[name].bats`
 
 **Structure:**
 ```
-worker/
-├── db/
-│   ├── database.js
-│   ├── database.test.js
-│   ├── query-engine.js
-│   └── query-engine.test.js
-├── scan/
-│   ├── manager.js
-│   └── manager.test.js
-└── server/
-    ├── http.js
-    └── http.test.js
+tests/
+├── bats/              # Bash integration tests (13 .bats files)
+├── fixtures/          # Test fixtures and sample data
+├── helpers/           # Test helper functions
+├── integration/       # Integration tests
+├── storage/           # Database/storage tests (9 .test.js files)
+├── ui/                # UI verification tests (4 .test.js files)
+├── worker/            # Worker/server tests (2 .test.js files)
+└── test_helper/       # Vendored testing utilities (bats-support, bats-assert)
 ```
 
 ## Test Structure
 
 **Suite Organization:**
-
 ```javascript
-import { describe, it, test, before, after, beforeEach } from "node:test";
+// Pattern from tests/storage/query-engine.test.js
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-describe("feature name", () => {
-  test("specific case description", () => {
-    // arrange
-    const input = ...;
-
-    // act
-    const result = someFunction(input);
-
-    // assert
-    assert.strictEqual(result, expected);
-  });
-
-  test("error case", () => {
-    const result = someFunction(badInput);
-    assert.ok("error" in result, "should return { error }");
-    assert.equal(result.error, "expected message");
+describe("database setup", () => {
+  it("makeQE creates a WAL database", () => {
+    const { db, qe } = makeQE();
+    const mode = db.pragma("journal_mode", { simple: true });
+    assert.strictEqual(mode, "wal");
+    db.close();
   });
 });
 ```
 
 **Patterns:**
+- **Grouping:** Logical test suites with `describe("category", () => {...})`
+- **Individual tests:** Each test is a single `it("description", () => {...})` block
+- **Setup:** Helper functions like `makeQE()` or `makeTmpDir()` create test fixtures
+- **Teardown:** Cleanup done in `finally` blocks or at end of test function
 
-1. **Describe blocks organize related tests:**
-   ```javascript
-   describe("database setup", () => { /* tests */ });
-   describe("schema", () => { /* tests */ });
-   describe("getChangedFiles", () => { /* tests */ });
-   ```
-
-2. **Setup/teardown with before/after:**
-   ```javascript
-   before(() => {
-     const { dir, head } = makeTempRepo();
-     repoDir = dir;
-     initialHead = head;
-   });
-
-   after(() => cleanupDir(repoDir));
-   ```
-
-3. **Assertion style:**
-   - `assert.strictEqual(actual, expected)` — equality check
-   - `assert.ok(condition, message)` — truthy check with optional message
-   - `assert.deepEqual(obj1, obj2)` — recursive object equality
-   - `assert.throws(() => fn(), expectedError)` — exception testing
-   - `assert.equal(result.error, "specific message")` — error message verification
-
-## Mocking
-
-**Framework:**
-- No mocking library used — manual mocks created as plain JavaScript objects
-- Mocks are test-local and simple
-
-**Patterns:**
-
+**Setup Pattern:**
 ```javascript
-// Inline mock object for QueryEngine
-const mockQE = {
-  getGraph: () => ({ nodes: [{ id: 1, name: "svc-a" }], edges: [] }),
-  getImpact: (ep) => ({ affected: [{ id: 1, name: "svc-b" }] }),
-  getService: (name) =>
-    name === "svc-a"
-      ? { service: { id: 1, name: "svc-a" }, upstream: [], downstream: [] }
-      : null,
-  getVersions: () => [{ id: 1, created_at: "2026-01-01", label: "v1" }],
-};
-
-// Use in test
-const server = await createHttpServer(mockQE, { port: 0 });
-```
-
-**Dependency injection for testing:**
-- Functions accept optional dependencies: `createHttpServer(queryEngine, options)`
-- Tests pass mocks instead of real implementations
-- Modules export setter functions for test injection:
-  - `setScanLogger(logger)` — inject logger for test silence/capture
-  - `setSearchDb(db)` — inject isolated in-memory DB for search tests
-  - `setAgentRunner(fn)` — inject custom agent invoker for scan tests
-
-**What to Mock:**
-- HTTP/network layer (replace with in-memory server: `.inject()` calls)
-- External dependencies (ChromaDB, agent runners)
-- Heavy resources (real filesystem when temp dirs possible)
-
-**What NOT to Mock:**
-- Database (use real better-sqlite3 with `:memory:` or temp file)
-- Git (use real git commands with temp repo)
-- File I/O (use real `fs` with temp directories)
-- Core business logic (test actual implementation)
-
-## Fixtures and Factories
-
-**Test Data:**
-
-```javascript
-// Factory function to create isolated test DB
-function makeQE() {
-  const dir = path.join(os.tmpdir(), "allclear-test-" + crypto.randomUUID());
-  fs.mkdirSync(dir, { recursive: true });
-  const dbPath = path.join(dir, "test.db");
-
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-
-  // Bootstrap schema_versions and run all migrations in order
-  db.exec(`CREATE TABLE IF NOT EXISTS schema_versions (...)`);
-  for (const m of [migration001, migration002, /* ... */]) {
-    db.transaction(() => {
-      m.up(db);
-      db.prepare("INSERT INTO schema_versions (version) VALUES (?)").run(m.version);
-    })();
-  }
-
-  const qe = new QueryEngine(db);
-  return { db, qe };
+// Helper function approach (no beforeEach/afterEach)
+function makeTmpDir() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actest-"));
+  fs.mkdirSync(path.join(tmp, "logs"));
+  return tmp;
 }
 
-// Use in test
-test("test case", () => {
-  const { db, qe } = makeQE();
-  // test...
-  db.close(); // cleanup
+test("my test", () => {
+  const tmp = makeTmpDir();
+  try {
+    // Test logic here
+  } finally {
+    fs.rmSync(tmp, { recursive: true });
+  }
 });
 ```
 
-**Location:**
-- Helper functions defined at top of test file (after imports)
-- Patterns include: `makeTempRepo()`, `makeQE()`, `makeTempDataDir()`, `createTestDb()`
-- Each test is responsible for cleanup (call `rmSync()`, `db.close()`)
+**Teardown Pattern:**
+- `finally` blocks for cleanup: `db.close()`, `fs.rmSync(tmp, { recursive: true })`
+- No test lifecycle hooks (no `beforeEach`, `afterEach`, etc.)
 
-## Coverage
-
-**Requirements:**
-- No coverage threshold enforced (no coverage tools configured)
-- Tests focus on critical paths: database schema, query correctness, file I/O error cases
-
-**View Coverage:**
-- Not configured — no coverage tools in codebase
+**Assertion Pattern:**
+```javascript
+// Strict equality checks preferred
+assert.strictEqual(actual, expected, "message");
+assert.ok(condition, "message");
+assert.deepStrictEqual(obj1, obj2, "message");
+assert.equal(typeof value, "string");
+assert.ok(!condition, "negation check");
+```
 
 ## Test Types
 
 **Unit Tests:**
-- Scope: Single function or class method in isolation
-- Approach: Use test doubles for dependencies; test input→output
-- Examples: `query-engine.test.js` (QueryEngine methods), `findings.test.js` (validation)
-- Files: `worker/db/*.test.js`, `worker/scan/*.test.js`
+- **Scope:** Individual functions or classes in isolation
+- **Approach:** Create minimal fixtures (e.g., isolated DB instances) and test single responsibility
+- **Example:** `tests/storage/query-engine.test.js` — tests QueryEngine methods with fresh DBs per test
+- **Coverage:** Database operations, business logic, impact traversal algorithms
+
+**Source Verification Tests (Static Analysis):**
+- **Scope:** Verify implementation structure without runtime execution
+- **Approach:** Read source file as string, check for required patterns with `src.includes()`
+- **Example:** `tests/ui/graph-fit-to-screen.test.js` — verifies `fitToScreen()` function exists and calls `render()`
+- **Example:** `worker/ui/modules/detail-panel.test.js` — checks for "infra routing branch", "escapeHtml helper", etc.
+- **Pattern:** `const src = readFileSync(join(__dirname, '../source.js'), 'utf8')`
+
+```javascript
+// Source verification example
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const src = readFileSync(join(__dirname, '../../worker/ui/graph.js'), 'utf8');
+
+test('fitToScreen() function is defined', () => {
+  assert.ok(
+    src.includes('function fitToScreen()'),
+    'MISSING: fitToScreen function not defined in graph.js'
+  );
+});
+```
 
 **Integration Tests:**
-- Scope: Multiple modules working together (DB + QueryEngine + HTTP server)
-- Approach: Use real databases (`:memory:` or temp file), real network stubs (Fastify `.inject()`)
-- Examples: `http.test.js` (server + DB), `server.test.js` (MCP + QueryEngine)
-- Files: `worker/server/*.test.js`, `worker/mcp/*.test.js`
+- **Scope:** Test multiple components together (e.g., Fastify server, query engine, database)
+- **Example:** `tests/worker/scan-bracket.test.js` — tests worker scanning with fixtures
+- **Pattern:** Create full mock data, run operations, verify results
 
-**E2E Tests:**
-- Framework: Not used (no Playwright, Cypress, etc.)
-- UI testing done via inspection scripts: `worker/ui/modules/*.test.js` inspect source code for patterns
-- Git repo tests use real git and temp directories: `manager.test.js` uses `makeTempRepo()`
+**Bash Integration Tests:**
+- **Framework:** BATS (Bash Automated Testing System) with submodules `bats-support` and `bats-assert`
+- **Example:** `tests/bats/session-start.bats` (17.4K) — tests CLI session initialization
+- **Example:** `tests/bats/format.bats`, `tests/bats/lint.bats` — test quality gates
+- **Pattern:** Run shell commands, assert on exit codes and output
+
+## Fixtures and Test Data
+
+**Test Data:**
+- **Factory pattern (not factories):** Helper functions create test data on demand
+- **Example from `query-engine.test.js`:**
+  ```javascript
+  function seedChain(qe) {
+    const rId = qe.upsertRepo({ path: "/r", name: "r", type: "single" }).id;
+    const [A, B, C, D] = ["svc-a", "svc-b", "svc-c", "svc-d"].map((n) =>
+      qe.upsertService({
+        repo_id: rId,
+        name: n,
+        root_path: "/r/" + n,
+        language: "node",
+      }),
+    );
+    // ... create connections
+    return { A, B, C, D };
+  }
+  ```
+- **Isolation:** Each test creates fresh data; no shared state between tests
+- **Isolation pattern:** `makeQE()` creates independent database instances with UUID-based temp directories
+
+**Location:**
+- Test fixtures live in test files themselves (inline helper functions) or `tests/fixtures/`
+- Example: `tests/fixtures/config/` contains sample configuration files
+- Example: `tests/fixtures/drift/repo-a/` and `tests/fixtures/drift/repo-b/` contain sample repositories
+
+## Coverage
+
+**Requirements:**
+- No coverage target enforced (no `.nyc_reporter.json` or similar)
+- No coverage thresholds in config
+
+**Coverage tracking:**
+- No coverage tool integrated (would use `nyc` with Node.js test runner)
+- Coverage not visible in test output
 
 ## Common Patterns
 
 **Async Testing:**
-```javascript
-import { test } from "node:test";
-
-test("async operation", async () => {
-  const result = await someAsyncFunction();
-  assert.ok(result.ok);
-});
-
-// Or with before/after
-before(async () => {
-  data = await loadAsync();
-});
-```
+- Async tests use `async` keyword and `await` directly
+- Example from UI tests:
+  ```javascript
+  test("my async test", async () => {
+    const result = await fetchData();
+    assert.ok(result);
+  });
+  ```
+- Promise-based assertions work naturally with strict assert
 
 **Error Testing:**
-```javascript
-test("returns error when repo has no .git", () => {
-  const noGitDir = mkdtempSync(join(tmpdir(), "allclear-nogit-"));
-  try {
-    const result = getChangedFiles(noGitDir, null);
-    assert.ok("error" in result, "should return { error }");
-    assert.equal(result.error, "not a git repo");
-  } finally {
-    cleanupDir(noGitDir);
-  }
-});
-```
+- Errors tested indirectly via return values (e.g., empty Set on error)
+- No explicit error assertion library
+- Example from `query-engine.test.js`:
+  ```javascript
+  test("returns empty array for unknown query (not an error)", () => {
+    const { db, qe } = makeQE();
+    const results = qe.search("nonexistent-xyz-query-abc-999");
+    assert.ok(Array.isArray(results), "should return array");
+    assert.strictEqual(results.length, 0);
+    db.close();
+  });
+  ```
 
 **Database Testing:**
-```javascript
-// Create isolated in-memory DB per test
-before(async () => {
-  db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
-  db.exec(`CREATE TABLE...`);
-});
+- SQLite in-memory with WAL mode for isolation
+- Fresh database per test with all migrations applied
+- Pragmas set consistently: `journal_mode = WAL`, `foreign_keys = ON`
+- Example setup:
+  ```javascript
+  function makeQE() {
+    const dir = path.join(os.tmpdir(), "ligamen-test-" + crypto.randomUUID());
+    fs.mkdirSync(dir, { recursive: true });
+    const dbPath = path.join(dir, "test.db");
 
-test("query returns results", () => {
-  db.prepare("INSERT INTO services (name) VALUES (?)").run("svc-1");
-  const rows = db.prepare("SELECT * FROM services").all();
-  assert.equal(rows.length, 1);
-});
-```
-
-**Cleanup Pattern:**
-```javascript
-test("something", () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "allclear-test-"));
-  try {
-    // test code
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    const db = new Database(dbPath);
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+    // Apply migrations...
+    return { db, qe: new QueryEngine(db) };
   }
-});
+  ```
 
-// Or with after hook
-after(() => {
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  } catch (_) {}
-});
-```
+**Verification Tests (Custom Pattern):**
+- No framework required — manual `passed++`/`failed++` counters
+- Example from `detail-panel.test.js`:
+  ```javascript
+  let passed = 0;
+  let failed = 0;
+
+  function check(condition, description, pattern) {
+    if (condition) {
+      console.log(`OK: ${description}`);
+      passed++;
+    } else {
+      console.error(`FAIL: ${description}${pattern ? ` (missing: ${pattern})` : ''}`);
+      failed++;
+    }
+  }
+
+  check(
+    src.includes("nodeType === 'infra'"),
+    "PANEL-02: infra routing branch exists",
+    "nodeType === 'infra'"
+  );
+
+  if (failed > 0) {
+    process.exit(1);
+  }
+  ```
 
 ---
 
-*Testing analysis: 2026-03-18*
+*Testing analysis: 2026-03-20*

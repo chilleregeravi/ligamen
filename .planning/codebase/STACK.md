@@ -1,81 +1,103 @@
 # Technology Stack
 
-**Analysis Date:** 2026-03-18
+**Analysis Date:** 2026-03-20
 
 ## Languages
 
 **Primary:**
-- JavaScript (Node.js) - Worker daemon, MCP server, HTTP API, CLI tools
-- Bash (POSIX shell) - Hook implementations, scripts, version detection
-
-**Secondary:**
-- HTML5 - Graph visualization UI (zero build step)
-- JSON - Configuration and data interchange
+- JavaScript/Node.js 20.0+ - Runtime, CLI, worker, MCP server, all entry points
+- JavaScript (Browser) - UI visualization in `worker/ui/`
 
 ## Runtime
 
 **Environment:**
-- Node.js 20.0.0 or higher (specified in `package.json` engines)
+- Node.js >=20.0.0 (required)
+- ES modules (native import/export syntax throughout)
 
 **Package Manager:**
-- npm - Manages dependencies and lockfile
-- Lockfile: `package-lock.json` (present, committed)
+- npm - lockfile: `package-lock.json` (present)
 
 ## Frameworks
 
 **Core:**
-- Fastify 5.8.2 - HTTP server for REST API and static file serving
-- @modelcontextprotocol/sdk 1.27.1 - MCP (Model Context Protocol) server for Claude agent integration
-- better-sqlite3 12.8.0 - SQLite driver for impact-map database (Native C++ bindings for performance)
+- Fastify 5.8.2 - HTTP server framework in `worker/server/http.js`
+- @modelcontextprotocol/sdk 1.27.1 - MCP server in `worker/mcp/server.js` for Claude Code integration
+
+**Database:**
+- better-sqlite3 12.8.0 - SQLite3 client in `worker/db/pool.js`, `worker/db/database.js`
+  - WAL mode enabled via `db.pragma("journal_mode = WAL")`
+  - Migrations system in `worker/db/migrations/`
+
+**Vector Search (Optional):**
+- chromadb 3.3.3 - Vector database integration in `worker/server/chroma.js`
+- @chroma-core/default-embed 1.0.0 - Optional embedding provider (optional dependency)
+
+**Validation:**
+- zod 3.25.0 - Schema validation in `worker/mcp/server.js` for tool inputs
+
+**Middleware:**
+- @fastify/cors 10.0.0 - CORS support in `worker/server/http.js`
+- @fastify/static 8.0.0 - Static file serving in `worker/server/http.js`
 
 **Testing:**
-- Node.js built-in `node --test` - Native test runner (used in `tests/storage/query-engine.test.js`)
+- Node.js built-in test runner (node:test module)
+- node:assert/strict - Assertions in test files like `worker/db/query-engine.test.js`
+- BATS framework - Shell/integration testing in `tests/bats/`
 
 **Build/Dev:**
-- None detected - Project is zero-build: Bash scripts, Node.js as-is ESM, HTML served directly
+- D3.js (d3-force@3) - Force-directed graph layout in `worker/ui/force-worker.js` (loaded from CDN: https://cdn.jsdelivr.net/npm/d3-force@3/+esm)
 
 ## Key Dependencies
 
 **Critical:**
-- `better-sqlite3` 12.8.0 - SQLite database access with WAL mode support. Powers all impact-map queries and persistence.
-- `@modelcontextprotocol/sdk` 1.27.1 - Enables MCP protocol for Claude agent communication. Provides stdio server transport for structured tool calling.
-- `fastify` 5.8.2 - HTTP server framework. Handles graph queries, UI serving, project resolution per-request.
-- `chromadb` 3.3.3 - Optional vector search database for semantic graph queries. Fire-and-forget sync with FTS5 fallback.
+- better-sqlite3 12.8.0 - Persistent data storage for impact maps (SQLite DB at `~/.ligamen/projects/<hash>/impact-map.db`)
+- @modelcontextprotocol/sdk 1.27.1 - Communication with Claude Code (stdio-based MCP protocol)
+- Fastify 5.8.2 - HTTP REST API server for graph visualization and scan operations
 
 **Infrastructure:**
-- `@fastify/cors` 10.0.0 - CORS middleware for localhost dev (enables http://localhost:5173, http://127.0.0.1:*)
-- `@fastify/static` 8.0.0 - Static file serving for worker UI (`worker/ui/` directory)
-- `zod` 3.25.0 - Schema validation for MCP tool schemas and configuration parsing
-- `@chroma-core/default-embed` 1.0.0 (optional) - Default embedding model for ChromaDB vector storage
+- chromadb 3.3.3 - Optional semantic search backend (non-blocking, falls back to SQLite FTS5 if unavailable)
 
 ## Configuration
 
-**Environment:**
-- Machine-level: `~/.allclear/settings.json` - Log level, port, ChromaDB connection params, data directory
-- Project-level: `allclear.config.json` - Linked repos, impact-map history flag
-- Environment variables: `ALLCLEAR_DISABLE_FORMAT`, `ALLCLEAR_DISABLE_LINT`, `ALLCLEAR_DISABLE_GUARD`, `ALLCLEAR_LOG_LEVEL`, `ALLCLEAR_CHROMA_MODE`, `ALLCLEAR_DATA_DIR`
+**Environment Variables:**
+- `LIGAMEN_DATA_DIR` - Default: `~/.ligamen` (user home directory)
+- `LIGAMEN_LOG_LEVEL` - Log verbosity (INFO default, read from `settings.json`)
+- `LIGAMEN_WORKER_PORT` - HTTP server port override (37888 default, read from `settings.json`)
+- `LIGAMEN_PROJECT_ROOT` - Project path for MCP server context (cwd default)
+- `LIGAMEN_DB_PATH` - Direct SQLite DB path (computed from project hash if not set)
+- `LIGAMEN_CHROMA_MODE` - Enable ChromaDB: "local" or empty (default)
+- `LIGAMEN_CHROMA_HOST` - ChromaDB hostname (localhost default)
+- `LIGAMEN_CHROMA_PORT` - ChromaDB port (8000 default)
+- `LIGAMEN_CHROMA_SSL` - Use HTTPS for ChromaDB (true/false)
+- `LIGAMEN_CHROMA_API_KEY` - ChromaDB API key if required
+- `LIGAMEN_CHROMA_TENANT` - ChromaDB tenant name (default_tenant default)
+- `LIGAMEN_CHROMA_DATABASE` - ChromaDB database name (default_database default)
 
-**Build:**
-- No build configuration required
-- Entry points:
-  - `worker/index.js` - Main worker process (Node.js background daemon)
-  - `worker/mcp/server.js` - MCP stdio server
-  - Script wrappers in `scripts/` directory are shell wrappers that invoke worker or external tools
+**Configuration Files:**
+- `settings.json` - Loaded from `$LIGAMEN_DATA_DIR/settings.json` at worker startup
+- `ligamen.config.json` - Example provided in `ligamen.config.json.example` (linked-repos configuration)
+- `.mcp.json` - MCP server configuration (currently empty in `/.mcp.json`)
+
+**Build Configuration:**
+- No build step required - pure ES modules, no compilation
 
 ## Platform Requirements
 
 **Development:**
-- Node.js >= 20.0.0
-- Bash (POSIX-compatible shell)
-- jq (for configuration parsing in shell scripts)
-- SQLite3 (native library bundled with better-sqlite3)
+- Node.js 20.0+
+- SQLite3 system library (for better-sqlite3 native binding compilation)
+- POSIX shell (bash/zsh) for scripts in `scripts/`
 
 **Production:**
-- Deployment target: Any system with Node.js 20+ (macOS, Linux, Windows via WSL)
-- Worker runs as background daemon at port 37888 (configurable)
-- Data persisted to `~/.allclear/` directory
-- No external cloud dependency required (ChromaDB is optional)
+- Node.js 20.0+ runtime
+- ~100MB disk for `.ligamen/` data directory (per project DB + logs)
+- Optional: ChromaDB instance (separate process, non-blocking if unavailable)
+
+**Data Storage:**
+- SQLite database at `~/.ligamen/projects/<sha256(projectRoot).slice(0,12)>/impact-map.db`
+- Logs written to `~/.ligamen/logs/`
+- Worker PID/PORT files at `~/.ligamen/worker.pid`, `~/.ligamen/worker.port`
 
 ---
 
-*Stack analysis: 2026-03-18*
+*Stack analysis: 2026-03-20*

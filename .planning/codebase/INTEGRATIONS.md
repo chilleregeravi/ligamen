@@ -1,146 +1,139 @@
 # External Integrations
 
-**Analysis Date:** 2026-03-18
+**Analysis Date:** 2026-03-20
 
 ## APIs & External Services
 
-**Claude Code Plugin:**
-- Claude Code IDE - Primary consumer of AllClear functionality
-  - SDK: Custom hook protocol (PostToolUse, PreToolUse, SessionStart, UserPromptSubmit)
-  - Integration: Hooks defined in `hooks/hooks.json`, invoked by Claude Code when file ops trigger
-
 **Model Context Protocol (MCP):**
-- Claude AI agents - Can invoke AllClear tools via MCP interface
-  - SDK: `@modelcontextprotocol/sdk` 1.27.1
-  - Transport: Stdio (process communication)
-  - Server: `worker/mcp/server.js`
-  - Tools exposed: Graph queries, impact analysis, configuration (5+ tools via MCP)
+- Claude Code IDE - MCP server for integration as a quality-gate plugin
+  - SDK: `@modelcontextprotocol/sdk` v1.27.1
+  - Transport: Stdio (stdin/stdout) in `worker/mcp/server.js`
+  - Tools exposed: impact query, service graph, search, scan
+  - Auth: Direct IDE integration (no separate auth)
+
+**D3.js Force Simulation:**
+- CDN: https://cdn.jsdelivr.net/npm/d3-force@3/+esm
+  - Used in `worker/ui/force-worker.js` for graph layout calculation
+  - Loaded dynamically in browser via ES module import
 
 ## Data Storage
 
-**Databases:**
-- SQLite 3 (better-sqlite3 driver)
-  - Connection: `~/.allclear/projects/<project-hash>/impact-map.db`
-  - Client: `better-sqlite3` 12.8.0 (native bindings)
-  - Features: WAL mode, FTS5 full-text search, 7+ migrations
-  - Schema: Service graph (nodes, edges), findings, external endpoints, deduplication tracking
+**Primary Database:**
+- SQLite 3 (embedded)
+  - Location: `~/.ligamen/projects/<project-hash>/impact-map.db`
+  - Client: `better-sqlite3` v12.8.0
+  - WAL mode enabled for concurrent access
+  - Migrations: `worker/db/migrations/` (001-008 versioned)
+  - Schema: services, connections, fields, schemas, actors, scan_versions, dedup
 
-**Vector Database (Optional):**
-- ChromaDB 3.3.3
-  - Connection: `localhost:8000` (configurable via `ALLCLEAR_CHROMA_HOST`, `ALLCLEAR_CHROMA_PORT`)
-  - Auth: Optional API key (`ALLCLEAR_CHROMA_API_KEY`)
-  - Purpose: Semantic search over findings (non-blocking fallback to FTS5)
-  - Mode: Configurable via `ALLCLEAR_CHROMA_MODE` setting
+**Vector Search (Optional, Non-blocking):**
+- ChromaDB - Optional semantic search enhancement
+  - Connection: `worker/server/chroma.js`
+  - Config vars: `LIGAMEN_CHROMA_MODE`, `LIGAMEN_CHROMA_HOST`, `LIGAMEN_CHROMA_PORT`, `LIGAMEN_CHROMA_SSL`, `LIGAMEN_CHROMA_API_KEY`, `LIGAMEN_CHROMA_TENANT`, `LIGAMEN_CHROMA_DATABASE`
+  - Default: localhost:8000 (if `LIGAMEN_CHROMA_MODE` is set)
+  - Fallback: SQLite FTS5 full-text search when unavailable
+  - Fire-and-forget sync: `syncFindings()` never blocks or rejects
 
 **File Storage:**
-- Local filesystem only - No cloud storage
-  - Data directory: `~/.allclear/` (configurable via `ALLCLEAR_DATA_DIR`)
-  - Per-project structure: `projects/<sha256-hash>/`
-  - Snapshots: Version history stored in same directory
+- Local filesystem only
+  - Project data: `~/.ligamen/projects/<hash>/`
+  - Logs: `~/.ligamen/logs/`
+  - Settings: `~/.ligamen/settings.json`
 
 **Caching:**
-- In-memory pool in `worker/db/pool.js`
-  - Per-project database handles cached in worker memory
-  - No external cache system
+- In-memory query engine pool in `worker/db/pool.js`
+- Per-project QueryEngine cached on first access
+  - Cache key: absolute project root path
+  - Lifetime: worker process lifetime
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- No external auth required
-- Plugin runs as authenticated Claude Code user (implicit)
-- MCP stdio authentication: Implicit via process lifecycle
-- Optional ChromaDB API key: `ALLCLEAR_CHROMA_API_KEY` (passed via settings)
+- None - Ligamen is local-only without remote auth
+- Claude Code integration: Direct IDE authentication (handled by Claude Code itself)
+- MCP tools: Accessed via Claude Code plugin loader, no separate credentials
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None (no external error service)
+- None - No external error tracking service configured
+- stderr logging in `worker/db/pool.js` for DB errors
+- Structured logging via `worker/lib/logger.js`
 
 **Logs:**
-- Local file logging to `~/.allclear/logs/` directory
-  - Format: Structured JSON logs with timestamps
-  - Components: worker, http, mcp, scan
-  - Log level configurable via `ALLCLEAR_LOG_LEVEL` in settings
-  - Files: `worker.log` created via `nohup` in `worker-start.sh`
-
-**Health Checks:**
-- Internal: GET `/api/readiness` (always returns 200)
-- Version check: GET `/api/version` (for auto-restart on mismatch)
+- File-based structured JSON logs in `~/.ligamen/logs/`
+- Levels: INFO, DEBUG, ERROR (controlled by `LIGAMEN_LOG_LEVEL`)
+- Components: 'worker', 'mcp', 'http', 'scan'
+- Exposed via REST endpoint: `GET /api/logs?component=<name>&since=<timestamp>`
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Plugin distribution: GitHub releases (https://github.com/AetherHQ/allclear)
-- Installation: npm global or local to Claude Code plugin directory
-- Worker deployment: Managed by plugin (auto-starts on demand)
+- Local execution only (no remote deployment)
+- Runs as background worker process (daemonized via scripts)
+- HTTP server: localhost:37888 (configurable via `LIGAMEN_WORKER_PORT`)
 
 **CI Pipeline:**
-- None detected in codebase (no GitHub Actions, Jenkins, CircleCI config)
-- Testing: Manual via `npm run test:storage` or shell tests
+- None configured - Local workflow only
+- No GitHub Actions or external CI integration
+- Shell scripts in `scripts/` for start/stop/integration
 
 ## Environment Configuration
 
-**Required env vars:**
-- None (all defaults functional)
+**Required Environment Variables:**
+- `LIGAMEN_DATA_DIR` - Workspace directory (defaults to ~/.ligamen)
+- Optional ChromaDB config if using vector search
 
-**Optional env vars (machine-wide settings preferred):**
-- `ALLCLEAR_DATA_DIR` - Override default `~/.allclear` location
-- `ALLCLEAR_WORKER_PORT` - Override default 37888
-- `ALLCLEAR_LOG_LEVEL` - Set verbosity (INFO, DEBUG)
-- `ALLCLEAR_CHROMA_MODE` - Enable ChromaDB ("local" or empty)
-- `ALLCLEAR_CHROMA_HOST` - ChromaDB server hostname (default: localhost)
-- `ALLCLEAR_CHROMA_PORT` - ChromaDB server port (default: 8000)
-- `ALLCLEAR_CHROMA_SSL` - Enable HTTPS for ChromaDB (default: false)
-- `ALLCLEAR_CHROMA_API_KEY` - API key for ChromaDB authentication
-- `ALLCLEAR_CHROMA_TENANT` - ChromaDB tenant ID (default: default_tenant)
-- `ALLCLEAR_CHROMA_DATABASE` - ChromaDB database name (default: default_database)
-
-**Hook control env vars:**
-- `ALLCLEAR_DISABLE_FORMAT=1` - Skip auto-format hook
-- `ALLCLEAR_DISABLE_LINT=1` - Skip auto-lint hook
-- `ALLCLEAR_DISABLE_GUARD=1` - Skip file guard hook
-- `ALLCLEAR_DISABLE_SESSION_START=1` - Skip session context hook
-- `ALLCLEAR_LINT_THROTTLE=<seconds>` - Delay before re-running Rust linter (default: 30)
-- `ALLCLEAR_EXTRA_BLOCKED=<patterns>` - Colon-separated glob patterns to block (file guard)
-
-**Secrets location:**
-- Environment variables (process.env)
-- `~/.allclear/settings.json` (machine-local, never committed)
-- Env file not used (no .env pattern in codebase)
+**Secrets Location:**
+- No external secrets required
+- Optional: `LIGAMEN_CHROMA_API_KEY` if ChromaDB requires authentication
+- Settings stored in plaintext JSON: `~/.ligamen/settings.json` (user-controlled, local)
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None (this is a pull-based system)
+- `POST /scan` - Accept findings from Claude Code agent
+  - Body: JSON with project root, service info, connections, schemas
+  - No authentication required (local only)
 
 **Outgoing:**
-- None detected
+- None - Ligamen is query-only, does not push to external services
 
-## Integration Points
+## HTTP Endpoints
 
-**Claude Code Hook Events:**
-- `PostToolUse` (Write/Edit/MultiEdit) → format.sh → lint.sh
-- `PreToolUse` (Write/Edit/MultiEdit) → file-guard.sh
-- `SessionStart` → session-start.sh (project detection)
-- `UserPromptSubmit` → session-start.sh (context reload)
+**Server:** Fastify on `localhost:37888` (configurable)
 
-**Worker HTTP API Routes:**
-- GET `/api/readiness` - Health check
-- GET `/api/version` - Worker version
-- GET `/graph?hash=<project-hash>` - Graph visualization data
-- GET `/api/search?q=<query>&limit=<n>` - Impact search (FTS5 or ChromaDB)
-- GET `/api/logs?component=<filter>` - Streaming logs
-- GET `/projects` - List available projects
-- Other internal routes per Fastify registration
+**Public Endpoints:**
+- `GET /api/readiness` - Health check (always 200)
+- `GET /api/version` - Worker version number
+- `GET /projects` - List all indexed projects
+- `GET /graph?project=<path>` - Full service graph JSON
+- `GET /impact?project=<path>&change=<change>` - Impact analysis for code change
+- `GET /service/:name?project=<path>` - Service details
+- `GET /versions?project=<path>` - Schema versions
+- `GET /api/logs?component=<name>&since=<timestamp>` - Structured logs
+- `POST /scan` - Ingest findings from agent
+- `GET /` - Static UI (index.html, assets from `worker/ui/`)
 
-**External Tool Invocations:**
-- `prettier` - Auto-format (if installed)
-- `eslint` / `biome` - Linting (if installed)
-- `cargo clippy` - Rust linting (if in Rust project)
-- `git` - Version control queries
-- `jq` - JSON parsing in shell scripts
-- Language-specific formatters/linters detected per-project type
+**CORS Configuration:**
+- Allowed origins: `http://localhost:5173`, `http://127.0.0.1:5173`, `http://127.0.0.1:*` (dev Vite server)
+
+## MCP Tools (Claude Code Integration)
+
+**Server:** `worker/mcp/server.js` (stdio transport)
+
+**Tools Exposed:**
+- `query-impact` - Impact analysis for service/endpoint
+- `query-service-graph` - Full or filtered graph query
+- `search-services` - Full-text search across services
+- `scan-and-ingest` - Scan project and ingest findings
+- `list-projects` - List indexed projects
+- `get-project-details` - Project metadata
+
+**Input Validation:**
+- All tools use zod schema validation
+- Project parameter accepts: absolute path, 12-char hash, or repo name
 
 ---
 
-*Integration audit: 2026-03-18*
+*Integration audit: 2026-03-20*
