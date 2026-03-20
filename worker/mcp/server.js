@@ -448,6 +448,203 @@ export async function querySearch(db, { query, limit = 20 }) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Drift helpers (shared across drift_versions, drift_types, drift_openapi)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Get all scanned repo paths from DB, or empty array if db is null.
+ * @param {import('better-sqlite3').Database|null} db
+ * @returns {{ path: string, name: string }[]}
+ */
+function getDriftRepos(db) {
+  if (!db) return [];
+  try {
+    return db.prepare("SELECT path, name FROM repos").all();
+  } catch { return []; }
+}
+
+/**
+ * Strip leading semver range specifiers (^, ~, >=, <=, >, <, ==) for comparison.
+ * Port of normalize_version() from scripts/drift-versions.sh.
+ * @param {string} v
+ * @returns {string}
+ */
+function normalizeVersion(v) {
+  return v.replace(/^[^0-9a-zA-Z]*/, '').replace(/^[^0-9]*/, '');
+}
+
+/**
+ * Returns true if version string starts with a range specifier character.
+ * Port of has_range_specifier() from scripts/drift-versions.sh.
+ * @param {string} v
+ * @returns {boolean}
+ */
+function hasRangeSpecifier(v) {
+  return /^[\^~>=<]/.test(v);
+}
+
+/**
+ * Extract dependency name→version map from package.json.
+ * Port of extract_versions() package.json section from scripts/drift-versions.sh.
+ * @param {string} repoPath
+ * @returns {Record<string, string>}
+ */
+function extractPackageJsonVersions(repoPath) {
+  const pkgPath = path.join(repoPath, 'package.json');
+  if (!fs.existsSync(pkgPath)) return {};
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    return { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  } catch { return {}; }
+}
+
+/**
+ * Extract dependency name→version map from go.mod.
+ * Port of extract_versions() go.mod section from scripts/drift-versions.sh.
+ * @param {string} repoPath
+ * @returns {Record<string, string>}
+ */
+function extractGoModVersions(repoPath) {
+  const modPath = path.join(repoPath, 'go.mod');
+  if (!fs.existsSync(modPath)) return {};
+  const versions = {};
+  try {
+    const lines = fs.readFileSync(modPath, 'utf8').split('\n');
+    let inBlock = false;
+    for (const line of lines) {
+      if (/^require \(/.test(line)) { inBlock = true; continue; }
+      if (/^\)/.test(line)) { inBlock = false; continue; }
+      if (inBlock && /^\t/.test(line)) {
+        const parts = line.trim().split(/\s+/);
+        if (parts[0] && parts[1]) versions[parts[0]] = parts[1];
+      }
+      const m = line.match(/^require (\S+) (\S+)/);
+      if (m) versions[m[1]] = m[2];
+    }
+  } catch { /* ignore */ }
+  return versions;
+}
+
+/**
+ * Extract dependency name→version map from Cargo.toml [dependencies] section.
+ * Uses line-by-line regex (no yq required) — port of awk fallback in scripts/drift-versions.sh.
+ * @param {string} repoPath
+ * @returns {Record<string, string>}
+ */
+function extractCargoVersions(repoPath) {
+  const tomlPath = path.join(repoPath, 'Cargo.toml');
+  if (!fs.existsSync(tomlPath)) return {};
+  const versions = {};
+  try {
+    const lines = fs.readFileSync(tomlPath, 'utf8').split('\n');
+    let inDeps = false;
+    for (const line of lines) {
+      if (/^\[dependencies\]/.test(line)) { inDeps = true; continue; }
+      if (/^\[/.test(line) && !/^\[dependencies\]/.test(line)) { inDeps = false; continue; }
+      if (!inDeps) continue;
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const name = trimmed.split(/\s*=/)[0].trim();
+      if (!name) continue;
+      // Simple form: name = "1.2.3"
+      const simpleMatch = trimmed.match(/=\s*"([0-9][^"]*)"$/);
+      if (simpleMatch) { versions[name] = simpleMatch[1]; continue; }
+      // Inline table: name = { version = "1.2.3", ... }
+      const tableMatch = trimmed.match(/version\s*=\s*"([^"]+)"/);
+      if (tableMatch) { versions[name] = tableMatch[1]; }
+    }
+  } catch { /* ignore */ }
+  return versions;
+}
+
+/**
+ * Extract all dependency versions from a repo path (all manifest types).
+ * @param {string} repoPath
+ * @returns {Record<string, string>}
+ */
+function extractAllVersions(repoPath) {
+  return {
+    ...extractPackageJsonVersions(repoPath),
+    ...extractGoModVersions(repoPath),
+    ...extractCargoVersions(repoPath),
+  };
+}
+
+/**
+ * Query dependency version mismatches across all scanned repos.
+ * Port of the main comparison loop in scripts/drift-versions.sh.
+ * @param {import('better-sqlite3').Database|null} db
+ * @param {{ severity?: string }} params
+ * @returns {{ findings: Array, repos_scanned: number }}
+ */
+export async function queryDriftVersions(db, { severity = "WARN" } = {}) {
+  const repos = getDriftRepos(db);
+  if (repos.length === 0) return { findings: [], repos_scanned: 0 };
+
+  // Build package→{repoName: version} map.
+  // Only include repos whose paths exist on disk.
+  const pkgMap = new Map(); // pkg name → Map<repoName, rawVersion>
+  let reposScanned = 0;
+
+  for (const repo of repos) {
+    if (!fs.existsSync(repo.path)) continue;
+    reposScanned++;
+    const versions = extractAllVersions(repo.path);
+    for (const [pkg, ver] of Object.entries(versions)) {
+      if (!pkgMap.has(pkg)) pkgMap.set(pkg, new Map());
+      pkgMap.get(pkg).set(repo.name, ver);
+    }
+  }
+
+  const findings = [];
+  const severityOrder = { CRITICAL: 3, WARN: 2, INFO: 1, all: 0 };
+  const minSeverity = severityOrder[severity] ?? severityOrder.WARN;
+
+  for (const [pkg, repoVersions] of pkgMap) {
+    if (repoVersions.size < 2) continue; // only in one repo — not drift
+
+    const entries = Array.from(repoVersions.entries()); // [[repoName, rawVersion], ...]
+    const normalizedVersions = entries.map(([, v]) => normalizeVersion(v));
+    const uniqueNormalized = new Set(normalizedVersions);
+
+    let level, detail;
+    if (uniqueNormalized.size > 1) {
+      // Exact version mismatch
+      const hasAnyRange = entries.some(([, v]) => hasRangeSpecifier(v));
+      if (hasAnyRange) {
+        level = "WARN";
+        detail = "Different locking strategies: " + entries.map(([r, v]) => `${r}=${v}`).join(" ");
+      } else {
+        level = "CRITICAL";
+        detail = "Version mismatch: " + entries.map(([r, v]) => `${r}=${v}`).join(" ");
+      }
+    } else {
+      // Normalized versions match — check raw strings differ (range specifier mismatch)
+      const rawVersions = new Set(entries.map(([, v]) => v));
+      if (rawVersions.size > 1) {
+        level = "WARN";
+        detail = "Different range specifiers: " + entries.map(([r, v]) => `${r}=${v}`).join(" ");
+      } else {
+        level = "INFO";
+        detail = `All at same version (${normalizedVersions[0]})`;
+      }
+    }
+
+    const levelOrder = severityOrder[level] ?? 0;
+    if (severity === "all" || levelOrder >= minSeverity) {
+      findings.push({
+        level,
+        item: pkg,
+        repos: entries.map(([r]) => r),
+        detail,
+      });
+    }
+  }
+
+  return { findings, repos_scanned: reposScanned };
+}
+
 /**
  * Trigger a scan via the HTTP worker, or return unavailable if worker is not running.
  * @param {{ repo?: string, full?: boolean }} params
@@ -690,6 +887,26 @@ server.tool(
   },
   async (params) => {
     const result = await queryScan(params);
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
+);
+
+// ── drift_versions ────────────────────────────────────────────
+server.tool(
+  "drift_versions",
+  "Query dependency version mismatches across scanned repos. Returns CRITICAL when exact versions differ across repos, WARN when range specifiers differ.",
+  {
+    severity: z.enum(["CRITICAL", "WARN", "INFO", "all"]).default("WARN")
+      .describe("Minimum finding severity to include in results. CRITICAL = exact version mismatch; WARN = range specifier mismatch; INFO = all match; all = include everything."),
+    project: z.string().optional()
+      .describe("Absolute path to project root, 12-char project hash, or repo name. Defaults to LIGAMEN_PROJECT_ROOT or cwd."),
+  },
+  async (params) => {
+    const qe = resolveDb(params.project);
+    if (!qe && params.project) {
+      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    }
+    const result = await queryDriftVersions(qe?._db ?? null, params);
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
