@@ -17,7 +17,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 // Named imports from server.js — will fail (RED) until Task 2 adds the export.
-import { queryDriftVersions, queryDriftTypes } from "./server.js";
+import { queryDriftVersions, queryDriftTypes, queryDriftOpenapi } from "./server.js";
 
 // ─────────────────────────────────────────────────────────────
 // Test DB helpers
@@ -401,4 +401,115 @@ test("queryDriftTypes: severity=CRITICAL suppresses INFO findings", async (t) =>
   const levels = result.findings.map((f) => f.level);
   assert.ok(levels.includes("CRITICAL"), "should include CRITICAL finding");
   assert.ok(!levels.includes("INFO"), "should suppress INFO findings when severity=CRITICAL");
+});
+
+// ─────────────────────────────────────────────────────────────
+// queryDriftOpenapi — Plan 03 tests
+// ─────────────────────────────────────────────────────────────
+
+const MINIMAL_OPENAPI_SPEC = `openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0.0"
+paths:
+  /users:
+    get:
+      summary: Get users
+      responses:
+        "200":
+          description: OK
+`;
+
+test("queryDriftOpenapi: null db returns empty findings, repos_scanned=0, tool_available=false", async () => {
+  const result = await queryDriftOpenapi(null, {});
+  assert.deepEqual(result, { findings: [], repos_scanned: 0, tool_available: false });
+});
+
+test("queryDriftOpenapi: fewer than 2 repos with specs returns empty findings", async (t) => {
+  const db = createDriftTestDb();
+  const { repoPath, cleanup } = createTempRepo("oapi-single", {
+    "openapi.yaml": MINIMAL_OPENAPI_SPEC,
+    "package.json": { name: "svc-single" },
+  });
+  t.after(() => { cleanup(); db.close(); });
+
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(1, repoPath, "svc-single", null, null, null);
+
+  const result = await queryDriftOpenapi(db, {});
+  assert.ok(Array.isArray(result.findings), "findings must be array");
+  assert.equal(result.findings.length, 0, "should have no findings with only 1 repo having spec");
+  assert.equal(typeof result.tool_available, "boolean", "tool_available must be boolean");
+});
+
+test("queryDriftOpenapi: two repos with no openapi specs returns empty findings", async (t) => {
+  const db = createDriftTestDb();
+  const repoA = createTempRepo("no-spec-a", { "package.json": { name: "svc-a" } });
+  const repoB = createTempRepo("no-spec-b", { "package.json": { name: "svc-b" } });
+  t.after(() => { repoA.cleanup(); repoB.cleanup(); db.close(); });
+
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(1, repoA.repoPath, "svc-a", null, null, null);
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(2, repoB.repoPath, "svc-b", null, null, null);
+
+  const result = await queryDriftOpenapi(db, {});
+  assert.ok(Array.isArray(result.findings), "findings must be array");
+  assert.equal(result.findings.length, 0, "should have no findings when no repos have OpenAPI specs");
+  assert.equal(typeof result.tool_available, "boolean", "tool_available must be boolean");
+});
+
+test("queryDriftOpenapi: two repos with specs returns findings array (tool_available is boolean)", async (t) => {
+  const { repoPath: rA, cleanup: cA } = createTempRepo("oapi-a", {
+    "openapi.yaml": MINIMAL_OPENAPI_SPEC,
+    "package.json": { name: "svc-a" },
+  });
+  const { repoPath: rB, cleanup: cB } = createTempRepo("oapi-b", {
+    "openapi.yaml": MINIMAL_OPENAPI_SPEC,
+    "package.json": { name: "svc-b" },
+  });
+  t.after(() => { cA(); cB(); });
+
+  const db = createDriftTestDb();
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(1, rA, "svc-a", null, null, null);
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(2, rB, "svc-b", null, null, null);
+  t.after(() => db.close());
+
+  const result = await queryDriftOpenapi(db, {});
+  assert.ok(Array.isArray(result.findings), "findings must be array");
+  assert.equal(typeof result.tool_available, "boolean", "tool_available must be boolean");
+  // Result depends on whether oasdiff is installed — just verify shape is correct
+  assert.ok(typeof result.repos_scanned === "number", "repos_scanned must be number");
+});
+
+test("queryDriftOpenapi: repos_scanned equals count of repos whose paths exist on disk", async (t) => {
+  const db = createDriftTestDb();
+  const { repoPath, cleanup } = createTempRepo("oapi-scan", {
+    "openapi.yaml": MINIMAL_OPENAPI_SPEC,
+    "package.json": { name: "svc-scan" },
+  });
+  t.after(() => { cleanup(); db.close(); });
+
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(1, repoPath, "svc-scan", null, null, null);
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(2, "/nonexistent/ghost-oapi-repo", "ghost-oapi", null, null, null);
+
+  const result = await queryDriftOpenapi(db, {});
+  assert.equal(result.repos_scanned, 1, `expected repos_scanned=1, got ${result.repos_scanned}`);
+});
+
+test("queryDriftOpenapi: tool_available field is present as boolean in result", async (t) => {
+  const db = createDriftTestDb();
+  const { repoPath: rA, cleanup: cA } = createTempRepo("oapi-bool-a", {
+    "openapi.yaml": MINIMAL_OPENAPI_SPEC,
+    "package.json": { name: "bool-svc-a" },
+  });
+  const { repoPath: rB, cleanup: cB } = createTempRepo("oapi-bool-b", {
+    "openapi.yaml": MINIMAL_OPENAPI_SPEC,
+    "package.json": { name: "bool-svc-b" },
+  });
+  t.after(() => { cA(); cB(); db.close(); });
+
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(1, rA, "bool-svc-a", null, null, null);
+  db.prepare("INSERT INTO repos VALUES (?, ?, ?, ?, ?, ?)").run(2, rB, "bool-svc-b", null, null, null);
+
+  const result = await queryDriftOpenapi(db, {});
+  assert.ok("tool_available" in result, "result must have tool_available field");
+  assert.equal(typeof result.tool_available, "boolean", "tool_available must be a boolean");
 });
