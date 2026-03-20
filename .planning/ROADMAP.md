@@ -9,7 +9,8 @@
 - ✅ **v2.3 Type-Specific Detail Panels** — Phases 30-32 (shipped 2026-03-18)
 - ✅ **v3.0 Layered Graph & Intelligence** — Phases 33-38 (shipped 2026-03-18)
 - ✅ **v4.0 Ligamen Rebrand** — Phases 39-45 (shipped 2026-03-20)
-- 🚧 **v4.1 Command Cleanup** — Phases 46-48 (in progress)
+- ✅ **v4.1 Command Cleanup** — Phases 46-48 (shipped 2026-03-20)
+- 🚧 **v5.0 Marketplace Restructure** — Phases 49-51 (in progress)
 
 ## Phases
 
@@ -76,59 +77,55 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 
 </details>
 
-### 🚧 v4.1 Command Cleanup (In Progress)
+<details>
+<summary>✅ v4.1 Command Cleanup (Phases 46-48) — SHIPPED 2026-03-20</summary>
 
-**Milestone Goal:** Remove Kubernetes-specific commands (pulse, deploy-verify) that don't fit the plugin's core focus, and add MCP drift query tools for cross-repo version/type/API mismatch intelligence.
+- [x] Phase 46-48: 3 phases, 6 plans — K8s commands removed, MCP expanded to 8 drift tools
 
-- [x] **Phase 46: Command Removal** - Delete pulse and deploy-verify commands, scripts, and primary documentation (completed 2026-03-20)
-- [x] **Phase 47: Test and Doc Cleanup** - Remove pulse/deploy-verify test fixtures and sweep remaining doc references (completed 2026-03-20)
-- [x] **Phase 48: MCP Drift Tools** - Add drift_versions, drift_types, and drift_openapi MCP query tools (completed 2026-03-20)
+Full details: `.planning/milestones/v4.1-ROADMAP.md`
+
+</details>
+
+### 🚧 v5.0 Marketplace Restructure (In Progress)
+
+**Milestone Goal:** Restructure the repo as a proper Claude Code marketplace plugin so end users can install via `claude plugin marketplace add` + `claude plugin install` without cloning.
+
+- [ ] **Phase 49: Directory Restructure** - Move all plugin files into `plugins/ligamen/`, leaving only repo-level files at root
+- [ ] **Phase 50: Path and Install Updates** - Update all internal paths, imports, hooks references, README install instructions, and Makefile targets
+- [ ] **Phase 51: Verification** - Confirm bats tests pass and marketplace install flow works end-to-end
 
 ## Phase Details
 
-### Phase 46: Command Removal
-**Goal**: The pulse and deploy-verify commands no longer exist in the plugin
-**Depends on**: Phase 45 (v4.0 complete)
-**Requirements**: REM-01, REM-02, REM-03
+### Phase 49: Directory Restructure
+**Goal**: All plugin files live under `plugins/ligamen/` and only repo-level files remain at root
+**Depends on**: Phase 48 (v4.1 complete)
+**Requirements**: STR-01, STR-02
 **Success Criteria** (what must be TRUE):
-  1. Running `/ligamen:pulse` in Claude Code produces a "command not found" error — the command file is gone
-  2. Running `/ligamen:deploy-verify` in Claude Code produces a "command not found" error — the command file is gone
-  3. `scripts/pulse-check.sh` no longer exists in the repository
-  4. README and docs no longer mention pulse or deploy-verify in any capability list or usage section
-  5. The validated requirements list in PROJECT.md no longer includes pulse or deploy-verify entries
-**Plans:** 2/2 plans complete
+  1. `plugins/ligamen/` exists and contains commands/, hooks/, scripts/, worker/, lib/, skills/, .claude-plugin/, package.json, package-lock.json, and ligamen.config.json.example
+  2. Root of the repo contains only README.md, LICENSE, Makefile, docs/, tests/, .planning/, and .mcp.json — no plugin source directories
+  3. Git history is preserved for moved files (moved, not deleted and recreated)
+**Plans**: TBD
 
-Plans:
-- [ ] 46-01-PLAN.md — Delete pulse.md, deploy-verify.md, and pulse-check.sh
-- [ ] 46-02-PLAN.md — Remove pulse/deploy-verify references from README.md, docs/commands.md, and .planning/PROJECT.md
-
-### Phase 47: Test and Doc Cleanup
-**Goal**: No test fixtures or documentation references to the removed commands remain
-**Depends on**: Phase 46
-**Requirements**: CLN-01, CLN-02
+### Phase 50: Path and Install Updates
+**Goal**: All internal references, import paths, hooks.json entries, README install instructions, and Makefile targets are correct for the new `plugins/ligamen/` layout
+**Depends on**: Phase 49
+**Requirements**: PTH-01, PTH-02, PTH-03, INS-01, INS-02
 **Success Criteria** (what must be TRUE):
-  1. The bats test suite runs with zero failures and contains no test files or test cases referencing pulse or deploy-verify
-  2. A full-text search across the repository for "pulse" and "deploy-verify" returns zero results outside of git history
-**Plans**: 1 plan
+  1. Shell scripts in `plugins/ligamen/scripts/` and `plugins/ligamen/lib/` resolve their internal `source` and relative path references without errors
+  2. Worker JS files in `plugins/ligamen/worker/` resolve all `require`/`import` paths correctly from their new location
+  3. `hooks.json` entries point to `plugins/ligamen/` script paths and Claude Code loads them without missing-file errors
+  4. README installation section shows `claude plugin marketplace add` + `claude plugin install` as the primary install method
+  5. `make install` and `make uninstall` run without errors using the new directory layout
+**Plans**: TBD
 
-Plans:
-- [ ] 47-01-PLAN.md — Remove pulse/deploy-verify from structure.bats, docs/architecture.md, docs/commands.md, scripts/session-start.sh, README.md
-
-### Phase 48: MCP Drift Tools
-**Goal**: Agents can query cross-repo dependency version, shared type, and OpenAPI spec mismatches via MCP
-**Depends on**: Phase 46
-**Requirements**: MCP-01, MCP-02, MCP-03
+### Phase 51: Verification
+**Goal**: The restructured plugin passes all automated tests and installs cleanly via the marketplace flow from a fresh clone
+**Depends on**: Phase 50
+**Requirements**: VER-01, VER-02
 **Success Criteria** (what must be TRUE):
-  1. An agent calling `drift_versions` via MCP receives a structured list of dependency version mismatches across scanned repos
-  2. An agent calling `drift_types` via MCP receives a structured list of shared type/struct/interface mismatches across repos
-  3. An agent calling `drift_openapi` via MCP receives a structured list of OpenAPI spec breaking changes across repos
-  4. All three tools are registered in the MCP server manifest and appear in `impact_tools` alongside existing tools
-**Plans**: 3 plans
-
-Plans:
-- [ ] 48-01-PLAN.md — Test scaffold + queryDriftVersions + drift_versions tool registration
-- [ ] 48-02-PLAN.md — queryDriftTypes + drift_types tool registration
-- [ ] 48-03-PLAN.md — queryDriftOpenapi + drift_openapi tool registration
+  1. `make test` (bats suite) runs to completion with zero failures using the new layout
+  2. A fresh clone of the repo followed by `claude plugin marketplace add` + `claude plugin install` produces a working plugin installation with all commands and hooks active
+**Plans**: TBD
 
 ## Progress
 
@@ -141,6 +138,7 @@ Plans:
 | 30-32 | v2.3 | 5/5 | Complete | 2026-03-18 |
 | 33-38 | v3.0 | 11/11 | Complete | 2026-03-18 |
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
-| 46. Command Removal | 2/2 | Complete    | 2026-03-20 | - |
-| 47. Test and Doc Cleanup | 1/1 | Complete    | 2026-03-20 | - |
-| 48. MCP Drift Tools | 3/3 | Complete    | 2026-03-20 | - |
+| 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
+| 49. Directory Restructure | v5.0 | 0/TBD | Not started | - |
+| 50. Path and Install Updates | v5.0 | 0/TBD | Not started | - |
+| 51. Verification | v5.0 | 0/TBD | Not started | - |

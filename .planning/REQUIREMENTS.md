@@ -43,21 +43,21 @@ None deferred.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STR-01 | — | Pending |
-| STR-02 | — | Pending |
-| PTH-01 | — | Pending |
-| PTH-02 | — | Pending |
-| PTH-03 | — | Pending |
-| INS-01 | — | Pending |
-| INS-02 | — | Pending |
-| VER-01 | — | Pending |
-| VER-02 | — | Pending |
+| STR-01 | Phase 49 | Pending |
+| STR-02 | Phase 49 | Pending |
+| PTH-01 | Phase 50 | Pending |
+| PTH-02 | Phase 50 | Pending |
+| PTH-03 | Phase 50 | Pending |
+| INS-01 | Phase 50 | Pending |
+| INS-02 | Phase 50 | Pending |
+| VER-01 | Phase 51 | Pending |
+| VER-02 | Phase 51 | Pending |
 
 **Coverage:**
 - v5.0 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-20*
-*Last updated: 2026-03-20 after initial definition*
+*Last updated: 2026-03-20 after roadmap creation*
