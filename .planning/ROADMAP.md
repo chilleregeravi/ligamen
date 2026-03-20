@@ -109,10 +109,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. The bats test suite runs with zero failures and contains no test files or test cases referencing pulse or deploy-verify
   2. A full-text search across the repository for "pulse" and "deploy-verify" returns zero results outside of git history
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 47-01: Remove pulse/deploy-verify test fixtures and sweep all remaining doc references
+- [ ] 47-01-PLAN.md — Remove pulse/deploy-verify from structure.bats, docs/architecture.md, docs/commands.md, scripts/session-start.sh, README.md
 
 ### Phase 48: MCP Drift Tools
 **Goal**: Agents can query cross-repo dependency version, shared type, and OpenAPI spec mismatches via MCP
