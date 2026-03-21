@@ -29,9 +29,39 @@ function onKeyDown(e) {
       break;
     }
     case 'Escape': {
-      if (state.selectedNodeId !== null) {
+      if (state.selectedNodeId !== null || state.isolatedNodeId !== null) {
         state.selectedNodeId = null;
+        state.isolatedNodeId = null;
+        state.isolationDepth = 1;
         hideDetailPanel();
+        render();
+      }
+      break;
+    }
+    case 'i':
+    case 'I': {
+      if (state.isolatedNodeId !== null) {
+        // Exit isolation — pressing I again while isolated
+        state.isolatedNodeId = null;
+        state.isolationDepth = 1;
+      } else if (state.selectedNodeId !== null) {
+        // Enter isolation for the currently selected node
+        state.isolatedNodeId = state.selectedNodeId;
+        state.isolationDepth = 1;
+      }
+      render();
+      break;
+    }
+    case '2': {
+      if (state.isolatedNodeId !== null) {
+        state.isolationDepth = 2;
+        render();
+      }
+      break;
+    }
+    case '3': {
+      if (state.isolatedNodeId !== null) {
+        state.isolationDepth = 3;
         render();
       }
       break;
