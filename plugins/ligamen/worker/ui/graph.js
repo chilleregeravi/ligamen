@@ -16,6 +16,7 @@ import { initLogTerminal } from "./modules/log-terminal.js";
 import { initProjectSwitcher } from "./modules/project-switcher.js";
 import { populateFilterDropdowns } from "./modules/filter-panel.js";
 import { initKeyboard } from "./modules/keyboard.js";
+import { initExport } from "./modules/export.js";
 
 // Guard: detail-close listener is wired once across multiple loadProject calls
 let _detailCloseWired = false;
@@ -148,6 +149,7 @@ export async function loadProject(hash, canvas) {
   setupInteractions(canvas);
   setupControls();
   initKeyboard();
+  initExport();
 
   // fitToScreen — self-contained, always wired (works after project switch too)
   const fitBtn = document.getElementById("fit-btn");
