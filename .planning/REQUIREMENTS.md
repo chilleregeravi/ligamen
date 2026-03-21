@@ -64,25 +64,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| NAV-01 | Pending | Pending |
-| NAV-02 | Pending | Pending |
-| NAV-03 | Pending | Pending |
-| NAV-04 | Pending | Pending |
-| NAV-05 | Pending | Pending |
-| NAV-06 | Pending | Pending |
-| GRAPH-01 | Pending | Pending |
-| GRAPH-02 | Pending | Pending |
-| GRAPH-03 | Pending | Pending |
-| GRAPH-04 | Pending | Pending |
-| EXP-01 | Pending | Pending |
-| DOC-01 | Pending | Pending |
-| DOC-02 | Pending | Pending |
+| NAV-01 | Phase 52 | Pending |
+| NAV-02 | Phase 52 | Pending |
+| NAV-03 | Phase 52 | Pending |
+| NAV-04 | Phase 53 | Pending |
+| NAV-05 | Phase 54 | Pending |
+| NAV-06 | Phase 54 | Pending |
+| GRAPH-01 | Phase 57 | Pending |
+| GRAPH-02 | Phase 57 | Pending |
+| GRAPH-03 | Phase 56 | Pending |
+| GRAPH-04 | Phase 55 | Pending |
+| EXP-01 | Phase 52 | Pending |
+| DOC-01 | Phase 58 | Pending |
+| DOC-02 | Phase 58 | Pending |
 
 **Coverage:**
 - v5.1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-21*
-*Last updated: 2026-03-21 after initial definition*
+*Last updated: 2026-03-21 after roadmap creation (phases 52-58)*

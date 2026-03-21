@@ -10,7 +10,8 @@
 - ✅ **v3.0 Layered Graph & Intelligence** — Phases 33-38 (shipped 2026-03-18)
 - ✅ **v4.0 Ligamen Rebrand** — Phases 39-45 (shipped 2026-03-20)
 - ✅ **v4.1 Command Cleanup** — Phases 46-48 (shipped 2026-03-20)
-- 🚧 **v5.0 Marketplace Restructure** — Phases 49-51 (in progress)
+- ✅ **v5.0 Marketplace Restructure** — Phases 49-51 (shipped 2026-03-21)
+- 🚧 **v5.1 Graph Interactivity** — Phases 52-58 (in progress)
 
 ## Phases
 
@@ -86,59 +87,107 @@ Full details: `.planning/milestones/v4.1-ROADMAP.md`
 
 </details>
 
-### 🚧 v5.0 Marketplace Restructure (In Progress)
+<details>
+<summary>✅ v5.0 Marketplace Restructure (Phases 49-51) — SHIPPED 2026-03-21</summary>
 
-**Milestone Goal:** Restructure the repo as a proper Claude Code marketplace plugin so end users can install via `claude plugin marketplace add` + `claude plugin install` without cloning.
+- [x] Phase 49-51: 3 phases, 5 plans — repo restructured as Claude Code marketplace, 173/173 bats tests passing
 
-- [x] **Phase 49: Directory Restructure** - Move all plugin files into `plugins/ligamen/`, leaving only repo-level files at root (completed 2026-03-21)
-- [x] **Phase 50: Path and Install Updates** - Update all internal paths, imports, hooks references, README install instructions, and Makefile targets (completed 2026-03-21)
-- [x] **Phase 51: Verification** - Confirm bats tests pass and marketplace install flow works end-to-end (completed 2026-03-21)
+Full details: `.planning/milestones/v5.0-ROADMAP.md`
+
+</details>
+
+### 🚧 v5.1 Graph Interactivity (In Progress)
+
+**Milestone Goal:** Make the graph visualization useful for daily debugging with keyboard-driven navigation, subgraph isolation, change detection, and edge bundling.
+
+- [ ] **Phase 52: Keyboard Shortcuts & PNG Export** - F/Esc/slash keyboard shortcuts and one-click canvas export
+- [ ] **Phase 53: Clickable Detail Panel Targets** - Service names in connections list navigate to that node on click
+- [ ] **Phase 54: Subgraph Isolation** - I key isolates selected node's N-hop neighborhood; 2/3 keys expand depth
+- [ ] **Phase 55: Scan Version API** - /graph API exposes scan_version_id per service and connection
+- [ ] **Phase 56: What-Changed Overlay** - New/modified nodes and edges from the latest scan are visually highlighted
+- [ ] **Phase 57: Edge Bundling** - Parallel edges between same node pair collapse into single weighted edge with expand-in-panel
+- [ ] **Phase 58: Documentation** - README and docs/commands.md updated with all v5.1 features
 
 ## Phase Details
 
-### Phase 49: Directory Restructure
-**Goal**: All plugin files live under `plugins/ligamen/` and only repo-level files remain at root
-**Depends on**: Phase 48 (v4.1 complete)
-**Requirements**: STR-01, STR-02
+### Phase 52: Keyboard Shortcuts & PNG Export
+**Goal**: Users can navigate the graph and export diagrams without touching the mouse
+**Depends on**: Phase 51 (v5.0 complete)
+**Requirements**: NAV-01, NAV-02, NAV-03, EXP-01
 **Success Criteria** (what must be TRUE):
-  1. `plugins/ligamen/` exists and contains commands/, hooks/, scripts/, worker/, lib/, skills/, .claude-plugin/, package.json, package-lock.json, and ligamen.config.json.example
-  2. Root of the repo contains only README.md, LICENSE, Makefile, docs/, tests/, .planning/, and .mcp.json — no plugin source directories
-  3. Git history is preserved for moved files (moved, not deleted and recreated)
-**Plans**: 1 plan
+  1. Pressing F with the graph focused fits all nodes to the visible canvas area (same effect as the fit button)
+  2. Pressing Esc closes the detail panel and deselects any selected node
+  3. Pressing / moves keyboard focus to the search input field immediately
+  4. Clicking the export button downloads a PNG file of the current canvas view including all visible nodes and edges
+**Plans**: TBD
 
-Plans:
-- [ ] 49-01-PLAN.md — Move all plugin source into plugins/ligamen/ via git mv, verify history preserved
-
-### Phase 50: Path and Install Updates
-**Goal**: All internal references, import paths, hooks.json entries, README install instructions, and Makefile targets are correct for the new `plugins/ligamen/` layout
-**Depends on**: Phase 49
-**Requirements**: PTH-01, PTH-02, PTH-03, INS-01, INS-02
+### Phase 53: Clickable Detail Panel Targets
+**Goal**: Users can navigate directly to a connected node from the detail panel without manually finding it
+**Depends on**: Phase 52
+**Requirements**: NAV-04
 **Success Criteria** (what must be TRUE):
-  1. Shell scripts in `plugins/ligamen/scripts/` and `plugins/ligamen/lib/` resolve their internal `source` and relative path references without errors
-  2. Worker JS files in `plugins/ligamen/worker/` resolve all `require`/`import` paths correctly from their new location
-  3. `hooks.json` entries point to `plugins/ligamen/` script paths and Claude Code loads them without missing-file errors
-  4. README installation section shows `claude plugin marketplace add` + `claude plugin install` as the primary install method
-  5. `make install` and `make uninstall` run without errors using the new directory layout
-**Plans**: 2 plans
+  1. Clicking a service name in the detail panel's connections list selects that node and pans the canvas to center it
+  2. The clicked node's detail panel opens, replacing the previous panel
+  3. Clicking a target that is hidden by the current filter shows no broken behavior (click is a no-op or filter is surfaced)
+**Plans**: TBD
 
-Plans:
-- [ ] 50-01-PLAN.md — Fix drift-common.sh fallback path; verify hooks.json and worker JS need no changes (PTH-01, PTH-02, PTH-03)
-- [ ] 50-02-PLAN.md — Update README MCP server path example and Makefile targets for plugins/ligamen/ layout (INS-01, INS-02)
-
-### Phase 51: Verification
-**Goal**: The restructured plugin passes all automated tests and installs cleanly via the marketplace flow from a fresh clone
-**Depends on**: Phase 50
-**Requirements**: VER-01, VER-02
+### Phase 54: Subgraph Isolation
+**Goal**: Users can focus on a selected node's immediate neighborhood, hiding the rest of the graph
+**Depends on**: Phase 53
+**Requirements**: NAV-05, NAV-06
 **Success Criteria** (what must be TRUE):
-  1. `make test` (bats suite) runs to completion with zero failures using the new layout
-  2. A fresh clone of the repo followed by `claude plugin marketplace add` + `claude plugin install` produces a working plugin installation with all commands and hooks active
-**Plans**: 2 plans
+  1. Pressing I on a selected node hides all nodes and edges not within 1 hop of that node
+  2. Pressing 2 expands isolation to show all nodes and edges within 2 hops of the originally selected node
+  3. Pressing 3 expands isolation to show all nodes and edges within 3 hops of the originally selected node
+  4. Pressing Esc (or I again) exits isolation mode and restores the full graph view
+**Plans**: TBD
 
-Plans:
-- [ ] 51-01-PLAN.md — Update all bats test path variables and Makefile lint/check targets for plugins/ligamen/ layout
-- [ ] 51-02-PLAN.md — Run full test suite (make test) and execute marketplace install flow end-to-end
+### Phase 55: Scan Version API
+**Goal**: The /graph API response carries scan_version_id on every service and connection so the frontend can compare recency
+**Depends on**: Phase 51 (v5.0 complete — can be developed in parallel with Phases 52-54 but listed here before Phase 56)
+**Requirements**: GRAPH-04
+**Success Criteria** (what must be TRUE):
+  1. Each service object in the /graph response includes a `scan_version_id` field with the ID of the scan that last updated it
+  2. Each connection object in the /graph response includes a `scan_version_id` field with the ID of the scan that created it
+  3. The maximum scan_version_id across all services represents the latest scan and is included in the response metadata
+**Plans**: TBD
+
+### Phase 56: What-Changed Overlay
+**Goal**: Nodes and edges introduced or modified in the latest scan are visually distinct so users can spot recent changes at a glance
+**Depends on**: Phase 55
+**Requirements**: GRAPH-03
+**Success Criteria** (what must be TRUE):
+  1. Nodes that were created or updated in the most recent scan are visually distinguished from unchanged nodes (glow effect or "NEW" badge)
+  2. Edges that were created in the most recent scan are visually distinguished from unchanged edges
+  3. The visual distinction is visible without selecting the node — it appears in the default graph view
+  4. Unchanged nodes and edges render identically to how they did before this feature (no visual regression)
+**Plans**: TBD
+
+### Phase 57: Edge Bundling
+**Goal**: Multiple parallel connections between the same source-target pair collapse into one weighted edge, reducing visual clutter
+**Depends on**: Phase 56
+**Requirements**: GRAPH-01, GRAPH-02
+**Success Criteria** (what must be TRUE):
+  1. When two or more edges share the same source and target nodes, they are rendered as a single thicker edge with a numeric badge showing the count
+  2. The bundled edge color/style reflects the dominant or most severe protocol type among the bundled connections
+  3. Clicking a bundled edge opens the detail panel listing all individual connections within the bundle (protocol, kind, endpoint)
+  4. Unbundled (unique) edges render and behave identically to pre-bundling behavior
+**Plans**: TBD
+
+### Phase 58: Documentation
+**Goal**: README and commands reference are updated to accurately describe all v5.1 graph capabilities
+**Depends on**: Phase 57
+**Requirements**: DOC-01, DOC-02
+**Success Criteria** (what must be TRUE):
+  1. README contains a keyboard shortcut reference table listing F, Esc, /, I, 2, 3 with their actions
+  2. README describes the PNG export button, subgraph isolation, what-changed overlay, and edge bundling in the graph UI section
+  3. docs/commands.md graph UI section reflects all new interactive capabilities introduced in v5.1
+**Plans**: TBD
 
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 52 → 53 → 54 → 55 → 56 → 57 → 58
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -150,6 +199,11 @@ Plans:
 | 33-38 | v3.0 | 11/11 | Complete | 2026-03-18 |
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
-| 49. Directory Restructure | 1/1 | Complete    | 2026-03-21 | - |
-| 50. Path and Install Updates | 2/2 | Complete    | 2026-03-21 | - |
-| 51. Verification | 1/2 | Complete    | 2026-03-21 | - |
+| 49-51 | v5.0 | 5/5 | Complete | 2026-03-21 |
+| 52. Keyboard Shortcuts & PNG Export | v5.1 | 0/TBD | Not started | - |
+| 53. Clickable Detail Panel Targets | v5.1 | 0/TBD | Not started | - |
+| 54. Subgraph Isolation | v5.1 | 0/TBD | Not started | - |
+| 55. Scan Version API | v5.1 | 0/TBD | Not started | - |
+| 56. What-Changed Overlay | v5.1 | 0/TBD | Not started | - |
+| 57. Edge Bundling | v5.1 | 0/TBD | Not started | - |
+| 58. Documentation | v5.1 | 0/TBD | Not started | - |
