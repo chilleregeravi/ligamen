@@ -11,7 +11,8 @@
 - ✅ **v4.0 Ligamen Rebrand** — Phases 39-45 (shipped 2026-03-20)
 - ✅ **v4.1 Command Cleanup** — Phases 46-48 (shipped 2026-03-20)
 - ✅ **v5.0 Marketplace Restructure** — Phases 49-51 (shipped 2026-03-21)
-- 🚧 **v5.1 Graph Interactivity** — Phases 52-58 (in progress)
+- ✅ **v5.1 Graph Interactivity** — Phases 52-58 (shipped 2026-03-21)
+- 🚧 **v5.2.0 Plugin Distribution Fix** — Phases 59-61 (in progress)
 
 ## Phases
 
@@ -96,19 +97,27 @@ Full details: `.planning/milestones/v5.0-ROADMAP.md`
 
 </details>
 
-### 🚧 v5.1 Graph Interactivity (In Progress)
+<details>
+<summary>✅ v5.1 Graph Interactivity (Phases 52-58) — SHIPPED 2026-03-21</summary>
 
-**Milestone Goal:** Make the graph visualization useful for daily debugging with keyboard-driven navigation, subgraph isolation, change detection, and edge bundling.
+- [x] Phase 52-58: 7 phases, 11 plans — keyboard shortcuts, subgraph isolation, what-changed overlay, edge bundling, PNG export
 
-- [x] **Phase 52: Keyboard Shortcuts & PNG Export** - F/Esc/slash keyboard shortcuts and one-click canvas export (completed 2026-03-21)
-- [x] **Phase 53: Clickable Detail Panel Targets** - Service names in connections list navigate to that node on click (completed 2026-03-21)
-- [x] **Phase 54: Subgraph Isolation** - I key isolates selected node's N-hop neighborhood; 2/3 keys expand depth (completed 2026-03-21)
-- [x] **Phase 55: Scan Version API** - /graph API exposes scan_version_id per service and connection (completed 2026-03-21)
-- [x] **Phase 56: What-Changed Overlay** - New/modified nodes and edges from the latest scan are visually highlighted (completed 2026-03-21)
-- [x] **Phase 57: Edge Bundling** - Parallel edges between same node pair collapse into single weighted edge with expand-in-panel (completed 2026-03-21)
-- [x] **Phase 58: Documentation** - README and docs/commands.md updated with all v5.1 features (completed 2026-03-21)
+Full details: see Phase Details below (archived)
+
+</details>
+
+### 🚧 v5.2.0 Plugin Distribution Fix (In Progress)
+
+**Milestone Goal:** Make the MCP server work when the plugin is installed from the marketplace by implementing runtime dependency installation and confirming correct ESM module resolution.
+
+- [ ] **Phase 59: Runtime Dependency Installation** - SessionStart hook installs MCP runtime deps into ${CLAUDE_PLUGIN_ROOT} with idempotency guard and self-healing MCP wrapper
+- [ ] **Phase 60: MCP Server Launch Verification** - Confirm end-to-end MCP server startup from a marketplace-simulated install with ESM resolution working correctly
+- [ ] **Phase 61: Version Sync** - All five manifest files bumped to 5.2.0 with automated bump script and root .mcp.json cleaned up
 
 ## Phase Details
+
+<details>
+<summary>✅ v5.1 Graph Interactivity (Phases 52-58) — SHIPPED 2026-03-21</summary>
 
 ### Phase 52: Keyboard Shortcuts & PNG Export
 **Goal**: Users can navigate the graph and export diagrams without touching the mouse
@@ -121,8 +130,8 @@ Full details: `.planning/milestones/v5.0-ROADMAP.md`
   4. Clicking the export button downloads a PNG file of the current canvas view including all visible nodes and edges
 **Plans**: 2 plans
 Plans:
-- [ ] 52-01-PLAN.md — keyboard.js: F/Esc/slash shortcut handler wired into graph.js
-- [ ] 52-02-PLAN.md — export.js + Export PNG button in toolbar wired into graph.js
+- [x] 52-01-PLAN.md — keyboard.js: F/Esc/slash shortcut handler wired into graph.js
+- [x] 52-02-PLAN.md — export.js + Export PNG button in toolbar wired into graph.js
 
 ### Phase 53: Clickable Detail Panel Targets
 **Goal**: Users can navigate directly to a connected node from the detail panel without manually finding it
@@ -134,7 +143,7 @@ Plans:
   3. Clicking a target that is hidden by the current filter shows no broken behavior (click is a no-op or filter is surfaced)
 **Plans**: 1 plan
 Plans:
-- [ ] 53-01-PLAN.md — Add selectAndPanToNode helper and .conn-target click wiring
+- [x] 53-01-PLAN.md — Add selectAndPanToNode helper and .conn-target click wiring
 
 ### Phase 54: Subgraph Isolation
 **Goal**: Users can focus on a selected node's immediate neighborhood, hiding the rest of the graph
@@ -147,8 +156,8 @@ Plans:
   4. Pressing Esc (or I again) exits isolation mode and restores the full graph view
 **Plans**: 2 plans
 Plans:
-- [ ] 54-01-PLAN.md — Add isolation state fields and getNeighborIdsNHop BFS utility
-- [ ] 54-02-PLAN.md — Wire isolation filter into renderer and add I/2/3/Esc keyboard handlers
+- [x] 54-01-PLAN.md — Add isolation state fields and getNeighborIdsNHop BFS utility
+- [x] 54-02-PLAN.md — Wire isolation filter into renderer and add I/2/3/Esc keyboard handlers
 
 ### Phase 55: Scan Version API
 **Goal**: The /graph API response carries scan_version_id on every service and connection so the frontend can compare recency
@@ -160,7 +169,7 @@ Plans:
   3. The maximum scan_version_id across all services represents the latest scan and is included in the response metadata
 **Plans**: 1 plan
 Plans:
-- [ ] 55-01-PLAN.md — Add scan_version_id to getGraph() SQL and /graph response, with tests
+- [x] 55-01-PLAN.md — Add scan_version_id to getGraph() SQL and /graph response, with tests
 
 ### Phase 56: What-Changed Overlay
 **Goal**: Nodes and edges introduced or modified in the latest scan are visually distinct so users can spot recent changes at a glance
@@ -174,8 +183,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 56-01-PLAN.md — State layer: extract scan_version_id from /graph response, add latestScanVersionId + showChanges to state
-- [ ] 56-02-PLAN.md — Render layer: glow ring for new nodes, bright edge for new edges, Changes toggle button
+- [x] 56-01-PLAN.md — State layer: extract scan_version_id from /graph response, add latestScanVersionId + showChanges to state
+- [x] 56-02-PLAN.md — Render layer: glow ring for new nodes, bright edge for new edges, Changes toggle button
 
 ### Phase 57: Edge Bundling
 **Goal**: Multiple parallel connections between the same source-target pair collapse into one weighted edge, reducing visual clutter
@@ -188,8 +197,8 @@ Plans:
   4. Unbundled (unique) edges render and behave identically to pre-bundling behavior
 **Plans**: 2 plans
 Plans:
-- [ ] 57-01-PLAN.md — computeEdgeBundles + bundle rendering in renderer.js (thick line, count badge, mismatch cross)
-- [ ] 57-02-PLAN.md — edgeHitTest + showBundlePanel (click bundle to see all connections)
+- [x] 57-01-PLAN.md — computeEdgeBundles + bundle rendering in renderer.js (thick line, count badge, mismatch cross)
+- [x] 57-02-PLAN.md — edgeHitTest + showBundlePanel (click bundle to see all connections)
 
 ### Phase 58: Documentation
 **Goal**: README and commands reference are updated to accurately describe all v5.1 graph capabilities
@@ -199,12 +208,48 @@ Plans:
   1. README contains a keyboard shortcut reference table listing F, Esc, /, I, 2, 3 with their actions
   2. README describes the PNG export button, subgraph isolation, what-changed overlay, and edge bundling in the graph UI section
   3. docs/commands.md graph UI section reflects all new interactive capabilities introduced in v5.1
+**Plans**: 1 plan
+
+</details>
+
+### Phase 59: Runtime Dependency Installation
+**Goal**: The MCP server's runtime npm dependencies are installed into ${CLAUDE_PLUGIN_ROOT} on every session start, with idempotency to skip unchanged installs and a self-healing wrapper for the first-session race condition
+**Depends on**: Phase 58 (v5.1 complete)
+**Requirements**: DEPS-01, DEPS-02, DEPS-03, DEPS-04, MCP-02
+**Success Criteria** (what must be TRUE):
+  1. On the second session after marketplace install, all 8 MCP tools are visible to Claude (deps installed by SessionStart on first session)
+  2. Running `/ligamen:map` twice does not trigger a second npm install (idempotency guard skips if runtime-deps.json is unchanged)
+  3. If npm install fails mid-way, the next session retries from scratch rather than using a partial node_modules
+  4. The existing session-start.sh session dedup logic is unaffected — dep install runs before SESSION_ID check
+  5. The MCP wrapper script attempts self-healing dep install before exec'ing server.js, covering the first-session race
+**Plans**: TBD
+
+### Phase 60: MCP Server Launch Verification
+**Goal**: The MCP server starts correctly from a marketplace-simulated install environment, with ESM resolution working without NODE_PATH and ChromaDB degrading gracefully when absent
+**Depends on**: Phase 59
+**Requirements**: MCP-01, MCP-03
+**Success Criteria** (what must be TRUE):
+  1. Starting the MCP server via the .mcp.json command after deps are installed at ${CLAUDE_PLUGIN_ROOT} produces no ERR_MODULE_NOT_FOUND errors
+  2. All 8 MCP tools (5 impact + 3 drift) are listed and callable after server startup
+  3. Removing @chroma-core/default-embed from node_modules and restarting the server does not crash it — the 3-tier search fallback activates instead
+  4. The root dev-repo .mcp.json is confirmed as {"mcpServers": {}} and does not interfere with the plugin's .mcp.json
+**Plans**: TBD
+
+### Phase 61: Version Sync
+**Goal**: All five manifest files are at version 5.2.0 and a bump script prevents future version drift
+**Depends on**: Phase 59 (runtime-deps.json version must be set correctly before install hook reads it; can run in parallel with Phase 60)
+**Requirements**: VER-01, VER-02
+**Success Criteria** (what must be TRUE):
+  1. Running `claude plugin marketplace add` offers version 5.2.0 of the plugin (root marketplace.json is current)
+  2. All five files (root marketplace.json, plugin marketplace.json, plugin.json, package.json, runtime-deps.json) contain the same version string
+  3. Running `make check` passes when all versions match and fails when any file is out of sync
+  4. Running `make bump VERSION=5.3.0` updates all five files atomically in one command
 **Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 52 → 53 → 54 → 55 → 56 → 57 → 58
+Phases execute in numeric order: 59 → 60 → 61
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -217,10 +262,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56 → 57 → 58
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
 | 49-51 | v5.0 | 5/5 | Complete | 2026-03-21 |
-| 52. Keyboard Shortcuts & PNG Export | 2/2 | Complete   | 2026-03-21 | - |
-| 53. Clickable Detail Panel Targets | 1/1 | Complete   | 2026-03-21 | - |
-| 54. Subgraph Isolation | 2/2 | Complete   | 2026-03-21 | - |
-| 55. Scan Version API | 1/1 | Complete   | 2026-03-21 | - |
-| 56. What-Changed Overlay | 2/2 | Complete   | 2026-03-21 | - |
-| 57. Edge Bundling | 2/2 | Complete   | 2026-03-21 | - |
-| 58. Documentation | 1/1 | Complete   | 2026-03-21 | - |
+| 52-58 | v5.1 | 11/11 | Complete | 2026-03-21 |
+| 59. Runtime Dependency Installation | v5.2.0 | 0/TBD | Not started | - |
+| 60. MCP Server Launch Verification | v5.2.0 | 0/TBD | Not started | - |
+| 61. Version Sync | v5.2.0 | 0/TBD | Not started | - |

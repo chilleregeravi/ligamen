@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v5.2.0
 milestone_name: Plugin Distribution Fix
-status: defining_requirements
+status: ready_to_plan
 stopped_at: null
 last_updated: "2026-03-21"
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,14 +19,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Defining requirements for v5.2.0
+**Current focus:** Phase 59 — Runtime Dependency Installation
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-21 — Milestone v5.2.0 started
+Phase: 59 of 61 (Runtime Dependency Installation)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-03-21 — Roadmap created for v5.2.0
+
+Progress: [░░░░░░░░░░] 0% (v5.2.0)
 
 ## Performance Metrics
 
@@ -39,11 +41,11 @@ Last activity: 2026-03-21 — Milestone v5.2.0 started
 
 ### Decisions
 
-- v5.2.0: MCP server fails when installed from marketplace because node_modules aren't copied during plugin install
-- v5.2.0: Officially documented fix is SessionStart hook + CLAUDE_PLUGIN_DATA for runtime deps
-- v5.2.0: .mcp.json belongs at plugin root (plugins/ligamen/.mcp.json), not in plugin.json
-- v5.2.0: CLAUDE_PLUGIN_ROOT is expanded in .mcp.json args and set as env var in MCP subprocess
-- v5.2.0: Root .mcp.json and root marketplace.json were stale — version stuck at 0.2.0
+- v5.2.0: Install deps into ${CLAUDE_PLUGIN_ROOT} via `npm install --prefix` — ESM walks up and finds node_modules automatically; no NODE_PATH needed
+- v5.2.0: NODE_PATH silently ignored by ESM (Node.js v25 docs confirm); do NOT add NODE_PATH to .mcp.json
+- v5.2.0: Separate hooks.json entry with timeout: 300 for install hook; existing session-start.sh entry stays at timeout: 10
+- v5.2.0: Diff-based idempotency — compare runtime-deps.json to sentinel in ${CLAUDE_PLUGIN_DATA}; sentinel deleted on failed install so next session retries
+- v5.2.0: Self-healing MCP wrapper covers first-session race (MCP server starts before SessionStart hook finishes)
 
 ### Pending Todos
 
@@ -51,10 +53,12 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- Phase 59: Empirically confirm ${CLAUDE_PLUGIN_ROOT} is writable during a live SessionStart hook (dev-time confirmed user-owned; runtime not yet tested)
+- Phase 59: Identify which Node binary Claude Code uses for MCP servers — ABI must match the binary that compiles better-sqlite3
+- Phase 59: GitHub issue #10997 — SessionStart hooks may not fire on first marketplace install; test empirically and treat self-healing MCP wrapper as mandatory if confirmed
 
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: null
+Stopped at: Roadmap written; ready to plan Phase 59
 Resume file: None

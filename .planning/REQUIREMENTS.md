@@ -63,21 +63,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEPS-01 | — | Pending |
-| DEPS-02 | — | Pending |
-| DEPS-03 | — | Pending |
-| DEPS-04 | — | Pending |
-| MCP-01 | — | Pending |
-| MCP-02 | — | Pending |
-| MCP-03 | — | Pending |
-| VER-01 | — | Pending |
-| VER-02 | — | Pending |
+| DEPS-01 | Phase 59 | Pending |
+| DEPS-02 | Phase 59 | Pending |
+| DEPS-03 | Phase 59 | Pending |
+| DEPS-04 | Phase 59 | Pending |
+| MCP-02 | Phase 59 | Pending |
+| MCP-01 | Phase 60 | Pending |
+| MCP-03 | Phase 60 | Pending |
+| VER-01 | Phase 61 | Pending |
+| VER-02 | Phase 61 | Pending |
 
 **Coverage:**
 - v5.2.0 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-21*
-*Last updated: 2026-03-21 after initial definition*
+*Last updated: 2026-03-21 after roadmap creation (traceability complete)*
