@@ -21,6 +21,8 @@ export const state = {
   filterPanelOpen: false,
   searchFilter: "",
   currentProject: null,   // hash of currently loaded project
+  latestScanVersionId: null,   // ID of the most recent scan (from /graph response metadata)
+  showChanges: true,           // When true, highlight nodes/edges from the latest scan
   isDragging: false,
   dragNodeId: null,
   isPanning: false,
