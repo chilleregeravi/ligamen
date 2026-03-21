@@ -8,13 +8,14 @@
 import { state } from "./modules/state.js";
 import { render } from "./modules/renderer.js";
 import { computeLayout } from "./modules/layout.js";
-import { setupInteractions, setupControls } from "./modules/interactions.js";
+import { setupInteractions, teardownInteractions, setupControls } from "./modules/interactions.js";
 import { hideDetailPanel } from "./modules/detail-panel.js";
 import { showProjectPicker } from "./modules/project-picker.js";
 import { initLogTerminal } from "./modules/log-terminal.js";
 // Stub — will be implemented in Plan 02
 import { initProjectSwitcher } from "./modules/project-switcher.js";
 import { populateFilterDropdowns } from "./modules/filter-panel.js";
+import { initKeyboard } from "./modules/keyboard.js";
 
 // Guard: detail-close listener is wired once across multiple loadProject calls
 let _detailCloseWired = false;
@@ -143,8 +144,10 @@ export async function loadProject(hash, canvas) {
   state.layerBoxes = layerBoxes;
   render();
 
+  teardownInteractions(canvas);
   setupInteractions(canvas);
   setupControls();
+  initKeyboard();
 
   // fitToScreen — self-contained, always wired (works after project switch too)
   const fitBtn = document.getElementById("fit-btn");
