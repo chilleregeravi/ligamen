@@ -1,480 +1,421 @@
 # Architecture Research
 
-**Domain:** Ligamen v5.2.0 — Plugin Distribution Fix (Runtime Dependency Installation + NODE_PATH MCP Launch)
+**Domain:** Scan intelligence and enrichment integration into existing Ligamen pipeline
 **Researched:** 2026-03-21
-**Confidence:** HIGH — based on direct source inspection of all affected components
+**Confidence:** HIGH — based on direct codebase inspection
 
----
+## Standard Architecture
 
-## Context
-
-This file covers v5.2.0 integration architecture only. The single question answered: how do runtime dependency
-installation via SessionStart hook and NODE_PATH-based MCP server launching integrate with the existing plugin
-architecture? What changes, what is new, and in what order should work proceed?
-
----
-
-## The Distribution Problem
-
-When a user installs Ligamen from the marketplace (`claude plugin marketplace add` + `claude plugin install`):
-
-1. Claude Code copies plugin source to an install location (inaccessible path, no `node_modules`)
-2. `CLAUDE_PLUGIN_ROOT` is set to that install location at runtime
-3. The `.mcp.json` tells Claude to run `node ${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js`
-4. `server.js` opens with bare ESM imports: `import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"`
-5. Node.js fails — there are no `node_modules` at `CLAUDE_PLUGIN_ROOT`
-6. MCP server never starts; all 8 impact/drift tools are unavailable
-
-The fix has two parts that must work together:
-
-- **Install side:** SessionStart hook installs npm deps into `${CLAUDE_PLUGIN_DATA}` on first run
-- **Launch side:** `.mcp.json` passes `NODE_PATH` env var pointing at installed deps so Node.js finds modules
-
----
-
-## Existing System Overview
+### Existing System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                         Claude Code Plugin Runtime                               │
-│                                                                                  │
-│   CLAUDE_PLUGIN_ROOT=/path/to/installed/plugin  (set by Claude Code)            │
-│   CLAUDE_PLUGIN_DATA=/path/to/plugin/data       (writable per-plugin storage)  │
-│   CLAUDE_PLUGIN_CONFIG=...                       (plugin config dir)            │
-└──────────────┬───────────────────────────────────────────────┬───────────────────┘
-               │                                               │
-               ▼                                               ▼
-┌──────────────────────────────┐           ┌──────────────────────────────────────┐
-│         Hook Layer           │           │           MCP Layer                  │
-│  hooks/hooks.json            │           │  .mcp.json (per-plugin)              │
-│                              │           │                                      │
-│  SessionStart →              │           │  ligamen-impact server:              │
-│    scripts/session-start.sh  │           │    command: node                     │
-│                              │           │    args: [${CLAUDE_PLUGIN_ROOT}/     │
-│  PostToolUse (Write|Edit) →  │           │           worker/mcp/server.js]      │
-│    scripts/format.sh         │           │    env: {}    ← MISSING NODE_PATH    │
-│    scripts/lint.sh           │           │                                      │
-│                              │           │  server.js bare ESM imports:         │
-│  PreToolUse (Write|Edit) →   │           │    @modelcontextprotocol/sdk         │
-│    scripts/file-guard.sh     │           │    better-sqlite3                    │
-│                              │           │    fastify, zod, chromadb            │
-└──────────────────────────────┘           └──────────────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│      session-start.sh        │           ┌─────────────────────────────────────┐
-│  (current, pre-v5.2)         │           │         Data Directory              │
-│                              │           │  ~/.ligamen/  (LIGAMEN_DATA_DIR)    │
-│  1. Dedup by SESSION_ID      │           │  ├── worker.pid / worker.port       │
-│  2. Source worker-client.sh  │           │  ├── settings.json                  │
-│  3. Auto-start worker if     │           │  ├── projects/<hash>/               │
-│     ligamen.config.json      │           │  │   └── impact-map.db (SQLite)     │
-│     has [impact-map] key     │           │  └── logs/                          │
-│  4. Detect project type      │           │                                     │
-│  5. Emit additionalContext   │           │  CLAUDE_PLUGIN_DATA (new in v5.2)   │
-│     JSON to stdout           │           │  └── node_modules/ ← TO BE CREATED  │
-└──────────────────────────────┘           └─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  ENTRY POINTS                                                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │ /ligamen:map │  │  MCP Tools   │  │  POST /scan  │              │
+│  │  (shell cmd) │  │  (8 tools)   │  │ (HTTP route) │              │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
+└─────────┼─────────────────┼─────────────────┼──────────────────────┘
+          │                 │                 │
+┌─────────▼─────────────────▼─────────────────▼──────────────────────┐
+│  SCAN ORCHESTRATION  (worker/scan/manager.js)                        │
+│                                                                      │
+│  detectRepoType() -> selectPrompt() -> agentRunner() -> parseOutput()│
+│                                                                      │
+│  Prompt templates: agent-prompt-{service,library,infra,common}.md   │
+│  Schema: agent-schema.json (validated by findings.js)               │
+│                                                                      │
+│  beginScan(repoId) -> [agent call] -> persistFindings() -> endScan()│
+└─────────────────────────────────────────────────────────────────────┘
+          │ findings object
+          v
+┌─────────────────────────────────────────────────────────────────────┐
+│  PERSISTENCE  (worker/db/query-engine.js)                            │
+│                                                                      │
+│  persistFindings() writes to:                                        │
+│  - services (name, root_path, language, type, scan_version_id)      │
+│  - connections (protocol, method, path, source_file, target_file,   │
+│                 crossing, scan_version_id)                           │
+│  - schemas (name, role, file) -> fields (name, type, required)      │
+│  - exposed_endpoints (method, path, kind, handler)                  │
+│  - actors + actor_connections (from crossing='external')            │
+│                                                                      │
+│  NOTE: confidence and evidence from agent output are currently       │
+│  validated by findings.js but DROPPED -- not written to the DB.     │
+│  schemas/fields ARE persisted but NOT surfaced in GET /graph.       │
+└─────────────────────────────────────────────────────────────────────┘
+          │
+          v
+┌─────────────────────────────────────────────────────────────────────┐
+│  QUERY LAYER  (worker/db/query-engine.js)                            │
+│                                                                      │
+│  getGraph()         -> /graph HTTP response (nodes, edges, actors)  │
+│  getService()       -> /service/:name                                │
+│  getImpact()        -> /impact                                        │
+│  transitiveImpact() -> MCP tool responses                            │
+│  detectMismatches() -> embedded in /graph response                  │
+│  search()           -> 3-tier: ChromaDB -> FTS5 -> SQL               │
+└─────────────────────────────────────────────────────────────────────┘
+          │
+          v
+┌─────────────────────────────────────────────────────────────────────┐
+│  HTTP SERVER  (worker/server/http.js)  -- Fastify                    │
+│                                                                      │
+│  GET  /graph          GET  /service/:name   GET  /impact             │
+│  POST /scan           GET  /versions        GET  /projects            │
+│  GET  /api/logs       GET  /api/readiness   GET  /api/version        │
+└─────────────────────────────────────────────────────────────────────┘
+          │
+          v
+┌─────────────────────────────────────────────────────────────────────┐
+│  CANVAS UI  (worker/ui/)                                             │
+│                                                                      │
+│  graph.js -> state.js -> renderer.js -> canvas                       │
+│  detail-panel.js     -- node click panel                             │
+│  filter-panel.js     -- protocol/layer/boundary toggles             │
+│  interactions.js     -- zoom/pan/click/keyboard                      │
+│  layout.js           -- deterministic grid layout                    │
+│  project-switcher.js -- per-project DB switching                    │
+│  log-terminal.js     -- real-time log polling                        │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Component Responsibilities
 
-## v5.2.0 Target Architecture
+| Component | Responsibility | Status |
+|-----------|----------------|--------|
+| `scan/manager.js` | Orchestrates two-phase scan, injects prompts, calls agent, parses output | Existing — needs enrichment pass added |
+| `scan/findings.js` | Validates agent JSON output against schema | Existing — needs new fields (confidence, evidence, auth, db_backend, owner) |
+| `scan/agent-schema.json` | Machine-readable schema embedded in agent prompts | Existing — needs source_file/target_file guidance |
+| `db/query-engine.js` | All DB reads/writes; `persistFindings()` central write path | Existing — needs confidence/evidence columns, node_metadata writes |
+| `db/migrations/` | Sequential schema versioning | Existing — migration 009 needed |
+| `server/http.js` | REST API; `/graph` aggregates all node data into one payload | Existing — /graph response needs schema/confidence/owner fields via getGraph() |
+| `ui/modules/detail-panel.js` | Renders per-node detail panel from graph data | Existing — needs schema section, confidence badge, owner row |
+| `mcp/server.js` | 8 MCP tools for agent-autonomous queries | Existing — MCP responses can pull from enrichment data post-change |
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                         Claude Code Plugin Runtime                               │
-│   CLAUDE_PLUGIN_ROOT  — plugin source (read-only after install)                  │
-│   CLAUDE_PLUGIN_DATA  — writable per-plugin data dir (npm install target)        │
-└──────────────┬───────────────────────────────────────────────┬───────────────────┘
-               │                                               │
-               ▼                                               ▼
-┌──────────────────────────────┐           ┌──────────────────────────────────────┐
-│         Hook Layer           │           │           MCP Layer (MODIFIED)       │
-│  hooks/hooks.json (UNCHANGED)│           │  .mcp.json                           │
-│                              │           │                                      │
-│  SessionStart →              │           │  ligamen-impact server:              │
-│    scripts/session-start.sh  │           │    command: node                     │
-│    (MODIFIED: adds dep       │           │    args: [${CLAUDE_PLUGIN_ROOT}/     │
-│     install step)            │           │           worker/mcp/server.js]      │
-│                              │           │    env:                              │
-│                              │           │      NODE_PATH: ${CLAUDE_PLUGIN_DATA}│
-│                              │           │               /node_modules          │
-└──────────────────────────────┘           └──────────────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                    session-start.sh (MODIFIED — new Step 0)                      │
-│                                                                                  │
-│  Step 0 (NEW): Runtime dep install                                               │
-│    - Check CLAUDE_PLUGIN_DATA is set and writable                                │
-│    - Check ${CLAUDE_PLUGIN_DATA}/.ligamen-deps-version                           │
-│    - If version missing or != current plugin version → run npm install           │
-│      npm install --prefix ${CLAUDE_PLUGIN_DATA}                                  │
-│               --no-save --no-package-lock                                        │
-│               --ignore-scripts                                                   │
-│               $(jq -r deps from runtime-deps.json | format as pkg@ver)          │
-│    - On success: write version stamp to .ligamen-deps-version                    │
-│    - On failure: exit 0 (non-blocking; MCP server will just fail gracefully)     │
-│                                                                                  │
-│  Step 1 (UNCHANGED): Dedup by SESSION_ID flag file                               │
-│  Step 2 (UNCHANGED): Source worker-client.sh, auto-start worker                 │
-│  Step 3 (UNCHANGED): Detect project type                                         │
-│  Step 4 (UNCHANGED): Emit additionalContext JSON                                 │
-└──────────────────────────────────────────────────────────────────────────────────┘
-               │ npm install
-               ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                    CLAUDE_PLUGIN_DATA/                                           │
-│  ├── node_modules/                     ← npm install target                     │
-│  │   ├── @modelcontextprotocol/sdk/                                             │
-│  │   ├── better-sqlite3/                                                         │
-│  │   ├── fastify/                                                                │
-│  │   ├── @fastify/cors/                                                          │
-│  │   ├── @fastify/static/                                                        │
-│  │   ├── chromadb/                                                               │
-│  │   └── zod/                                                                   │
-│  └── .ligamen-deps-version             ← version stamp (e.g. "5.2.0")          │
-└──────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Component Responsibilities
-
-| Component | Responsibility | v5.2.0 Change |
-|-----------|----------------|---------------|
-| `hooks/hooks.json` | Hook event routing — SessionStart, PostToolUse, PreToolUse | UNCHANGED |
-| `scripts/session-start.sh` | Session initialization: context injection, worker start | MODIFIED: add Step 0 dep install before existing logic |
-| `.mcp.json` | MCP server spawn config — command, args, env | MODIFIED: add `env.NODE_PATH` pointing to installed deps |
-| `runtime-deps.json` | Manifest of npm packages needed by MCP server | NEW FILE (already exists in repo — needs to be the authoritative source) |
-| `.claude-plugin/plugin.json` | Plugin metadata: name, version, author | MODIFIED: version bump to match milestone |
-| `.claude-plugin/marketplace.json` (plugin-level) | Marketplace listing metadata | MODIFIED: version sync |
-| `.claude-plugin/marketplace.json` (root-level) | Repo-level marketplace discovery | MODIFIED: version sync |
-| `package.json` | npm package metadata for dev install path | MODIFIED: version sync |
-| `worker/mcp/server.js` | MCP server — 8 tools for impact + drift queries | UNCHANGED: Node.js ESM resolution will find modules via NODE_PATH |
-| Root `.mcp.json` | Dev repo MCP config | UNCHANGED: already `{"mcpServers": {}}` — correct for dev repo |
-
----
-
-## Key Integration Points
-
-### 1. SESSION_ID Deduplication vs. Dep Install Timing
-
-**The tension:** session-start.sh has a dedup guard (exits 0 if flag file for SESSION_ID already exists). The dep install step must happen BEFORE the dedup check, or it will only run on the very first session and never again after updates.
-
-**Resolution:** Place dep install as Step 0, before the SESSION_ID flag file check. The install itself is idempotent (version stamp prevents unnecessary reinstalls), so running it every session start is safe — the stamp check makes it near-zero cost after first install.
+## Recommended Project Structure
 
 ```
-session-start.sh execution order:
-  1. (NEW) Dep install check: CLAUDE_PLUGIN_DATA version stamp ≠ plugin version → npm install
-  2. (existing) SESSION_ID dedup: exit if flag file exists
-  3. (existing) Worker auto-start
-  4. (existing) Project detection
-  5. (existing) Emit additionalContext JSON
+worker/
+├── scan/
+│   ├── manager.js              # [MODIFY] add runEnrichmentPass() after parseAgentOutput
+│   ├── findings.js             # [MODIFY] accept new optional fields in schema validation
+│   ├── agent-schema.json       # [MODIFY] document source_file/target_file guidance (THE-942)
+│   ├── enrichment/             # [NEW]
+│   │   ├── enricher.js         # [NEW] orchestrates enrichment passes
+│   │   ├── codeowners.js       # [NEW] parses CODEOWNERS -> owner per path pattern
+│   │   └── auth-db-extractor.js# [NEW] reads source files for auth/db patterns
+│   ├── agent-prompt-common.md  # [MODIFY] add source_file/target_file usage guidance
+│   └── agent-prompt-service.md # [MODIFY] add source_file/target_file guidance (THE-942)
+├── db/
+│   ├── query-engine.js         # [MODIFY] persistFindings writes confidence/evidence;
+│   │                           #   new upsertNodeMetadata(); getGraph() includes
+│   │                           #   schemas_by_connection, owner/auth/db on services
+│   └── migrations/
+│       └── 009_enrichment.js   # [NEW] adds confidence/evidence to connections
+└── ui/
+    └── modules/
+        ├── detail-panel.js     # [MODIFY] render schema section, confidence badge,
+        │                       #   owner/auth/db rows; show "unknown" fallbacks
+        └── utils.js            # [MODIFY] add getConfidenceColor() helper
 ```
 
-### 2. NODE_PATH Resolution in .mcp.json
+### Structure Rationale
 
-**What NODE_PATH does:** When set, Node.js searches these directories for modules before its normal resolution path. A module imported as `@modelcontextprotocol/sdk/server/mcp.js` will be found at `${NODE_PATH}/@modelcontextprotocol/sdk/server/mcp.js`.
+- **scan/enrichment/**: Isolated from scan/manager.js to keep the enrichment pass swappable without touching orchestration logic. Each enricher is a standalone function (`matchOwner(repoPath, servicePath)`, `extractAuthAndDb(repoPath, services)`) with no coupling to the DB or agent runner.
+- **Migration 009**: Additive-only (ALTER TABLE ADD COLUMN). New columns are nullable with no DEFAULT, consistent with the convention established in migration 005 (`scan_version_id`). Existing rows survive intact.
+- **detail-panel.js**: Receives enrichment data already embedded in the `/graph` response — no new API calls needed. Consistent with the "embed exposes in /graph" decision made in v2.3.
 
-**The variable:** `.mcp.json` env values support `${CLAUDE_PLUGIN_DATA}` expansion. The path must be `${CLAUDE_PLUGIN_DATA}/node_modules` — the direct `node_modules` dir, not the parent.
+## Architectural Patterns
 
-**Current `.mcp.json`:**
-```json
+### Pattern 1: Layered Enrichment Pass (Post-Agent, Pre-Persist)
+
+**What:** After `agentRunner()` returns and `parseAgentOutput()` validates findings, a second synchronous pass runs file-system reads (CODEOWNERS, grep for auth/DB patterns) and mutates the findings object before `persistFindings()` is called.
+
+**When to use:** For metadata that requires file-system access but not agent intelligence. CODEOWNERS is a pure text parse. Auth/DB pattern detection is grep-over-source — deterministic, no LLM needed.
+
+**Trade-offs:** Keeps agent prompt simpler (does not ask for ownership, which the agent cannot reliably derive from code). Runs synchronously in the scan bracket — failure must be silent/graceful (enrich-or-skip, never enrich-or-fail-scan).
+
+**Integration point in manager.js:**
+```javascript
+// After parseAgentOutput(), before persistFindings()
+const enriched = runEnrichmentPass(result.findings, repoPath, queryEngine);
+queryEngine.persistFindings(repo.id, enriched, currentHead, scanVersionId);
+```
+
+**Critical constraint:** `runEnrichmentPass` must never throw. Wrap all enrichment in try/catch and fall back to the original findings. A broken CODEOWNERS file must not abort the scan.
+
+### Pattern 2: node_metadata as Enrichment Sink
+
+**What:** The existing `node_metadata` table (`service_id`, `view`, `key`, `value`, `source`, `updated_at`) is the designed-for home of enrichment data that does not fit the core schema. It was purpose-built in migration 008 for STRIDE, vuln scan, and deployment metadata — ownership, auth mechanism, and DB backend are exactly this pattern.
+
+**When to use:** For metadata that is view-specific and not part of graph layout or mismatch detection. `owner`, `auth_mechanism`, `db_backend` are detail-panel-only fields, not graph topology.
+
+**Trade-offs:** Key/value is flexible but requires the UI to know which keys to expect. Use a fixed set of well-known keys: `view='scan'`, keys `owner`, `auth_mechanism`, `db_backend`. Schemas/fields are NOT candidates for `node_metadata` — they have their own normalized tables already.
+
+**Alternative rejected:** Adding `owner TEXT`, `auth_mechanism TEXT`, `db_backend TEXT` directly to `services`. Simpler for `getGraph()` but incurs migration cost and clutters the services schema. The `node_metadata` table was designed to avoid this. Use it.
+
+### Pattern 3: Confidence/Evidence on Connections Table (New Columns)
+
+**What:** The agent already emits `confidence` and `evidence` per connection (both validated by `findings.js`). These fields are currently dropped in `persistFindings()`. Migration 009 adds `confidence TEXT` and `evidence TEXT` columns to `connections`. `persistFindings()` then writes them.
+
+**When to use:** These belong in `connections` (not `node_metadata`) because they are per-connection facts, not per-service metadata. They are the data behind connection-level confidence badges in the UI.
+
+**Trade-offs:** Small migration (two nullable columns on `connections`). `getGraph()` needs to include them in the connections SELECT query. The detail panel can show a confidence badge and evidence snippet per connection in the outgoing/incoming connection lists.
+
+**Important:** Do NOT add `confidence` to `services` for v5.3.0. Per-service confidence can be added later via `node_metadata`. The detail panel only needs per-connection confidence for meaningful display.
+
+### Pattern 4: Schema/Field Surfacing in /graph Response
+
+**What:** The `schemas` and `fields` tables are already populated by `persistFindings()`. They are not currently included in the `getGraph()` response, so the detail panel never shows them. The data is in the DB — the gap is only in `getGraph()` and `detail-panel.js`.
+
+**When to use:** Now. The only changes needed are a JOIN in `getGraph()` and a schema section in `detail-panel.js`.
+
+**Integration point in getGraph():**
+```javascript
+// Attach schemas grouped by connection_id
+const allSchemaFields = db.prepare(`
+  SELECT s.connection_id, s.name, s.role, s.file,
+         f.name as field_name, f.type as field_type, f.required
+  FROM schemas s
+  JOIN fields f ON f.schema_id = s.id
+`).all();
+// Group by connection_id, return as schemas_by_connection object
+```
+
+**Trade-offs:** Schemas are connection-scoped (FK to `connection_id`). The detail panel looks up schemas via the connections to/from the selected node. This is a read-time grouping, not a structural change to the DB schema.
+
+### Pattern 5: "unknown" Fallback for Missing Metadata
+
+**What:** When `node_metadata` has no row for a given `(service_id, view, key)`, the `/graph` response includes the field as `null`. The detail panel renders "unknown" for any null enrichment string. This applies to `owner`, `auth_mechanism`, and `db_backend`.
+
+**When to use:** Always — for any field that comes from enrichment passes that may not have run (first scan without CODEOWNERS, repos where auth pattern detection finds nothing).
+
+**Trade-offs:** The field must always be present in the response (not absent) so the UI can distinguish null from missing. Include all enrichment fields in the `getGraph()` response with `null` as the default.
+
+## Data Flow
+
+### New Feature: Enrichment Pass Flow
+
+```
+/ligamen:map invoked
+      |
+      v
+scanRepos() -- for each repo:
+      |
+      +-- beginScan(repoId)
+      |
+      +-- detectRepoType() -> selectPrompt()
+      |
+      +-- agentRunner(prompt, repoPath)    [foreground, sequential]
+      |         |
+      |         v
+      |   parseAgentOutput()    [findings.js -- validates confidence, evidence]
+      |         |
+      |         v
+      |   runEnrichmentPass()   [NEW -- enricher.js]
+      |     |
+      |     +-- codeowners.js:      read CODEOWNERS, match service paths -> owner string
+      |     +-- auth-db-extractor:  grep source files for auth/DB patterns
+      |     |
+      |     v
+      |   enrichedFindings (findings + owner/auth/db annotations per service)
+      |         |
+      |         v
+      +-- persistFindings(repoId, enrichedFindings, commit, scanVersionId)
+      |         |
+      |         +-- upsertService()            [existing]
+      |         +-- upsertConnection()         with confidence + evidence  [MODIFIED]
+      |         +-- upsertSchema()             [existing]
+      |         +-- upsertField()              [existing]
+      |         +-- upsertExposedEndpoint()    [existing]
+      |         +-- upsertNodeMetadata()       owner/auth/db per service  [NEW]
+      |
+      +-- endScan(repoId, scanVersionId)
+```
+
+### Updated /graph Response Shape
+
+```
+GET /graph?project=/path
+      |
+      v
+getGraph()
+  |
+  +-- SELECT services + JOIN repos             [existing]
+  +-- attach exposes per service               [existing]
+  +-- SELECT connections (+ confidence/evidence columns)  [MODIFIED]
+  +-- SELECT schemas + JOIN fields             [NEW -- group by connection_id]
+  +-- SELECT node_metadata WHERE view='scan'   [NEW -- pivot to per-service fields]
+  +-- detectMismatches()                       [existing]
+  +-- SELECT actors                            [existing]
+  |
+  v
 {
-  "mcpServers": {
-    "ligamen-impact": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js"]
+  services: [
+    {
+      id, name, language, type, repo_name, exposes, scan_version_id,
+      owner: "team-payments" | null,         -- NEW from node_metadata
+      auth_mechanism: "jwt" | null,          -- NEW from node_metadata
+      db_backend: "postgres" | null          -- NEW from node_metadata
     }
-  }
+  ],
+  connections: [
+    {
+      id, protocol, method, path, source_file, target_file,
+      source, target, scan_version_id,
+      confidence: "high" | "low" | null,    -- NEW from connections table
+      evidence: "fetch('/api/users')" | null -- NEW from connections table
+    }
+  ],
+  schemas_by_connection: {                   -- NEW
+    "<connection_id>": [
+      { name, role, file, fields: [{name, type, required}] }
+    ]
+  },
+  mismatches, actors, repos, boundaries, latest_scan_version_id
 }
 ```
 
-**Target `.mcp.json`:**
-```json
-{
-  "mcpServers": {
-    "ligamen-impact": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js"],
-      "env": {
-        "NODE_PATH": "${CLAUDE_PLUGIN_DATA}/node_modules"
-      }
-    }
-  }
-}
-```
-
-**Why not `--require` or `--loader`:** NODE_PATH is the standard mechanism for redirecting module resolution without modifying source. It works with ESM (`import`) when Node.js falls through to `NODE_PATH` directories after failing local resolution.
-
-**Confidence note:** Claude Code's variable expansion of `${CLAUDE_PLUGIN_DATA}` in `.mcp.json` `env` blocks should be confirmed against official docs. The `${CLAUDE_PLUGIN_ROOT}` pattern in `args` is proven to work (it's in the existing hooks.json). Extension to `env` values is likely but not confirmed from source.
-
-### 3. runtime-deps.json as Authoritative Manifest
-
-**Current state:** `runtime-deps.json` exists at `plugins/ligamen/runtime-deps.json` with correct deps. `package.json` also has the same deps listed as `dependencies`. There are now two sources of truth.
-
-**Integration:** `session-start.sh` Step 0 must read from `runtime-deps.json`, not `package.json`. Reading `package.json` would install all deps including dev tooling. `runtime-deps.json` is intentionally trimmed to MCP server needs only.
-
-**Install command pattern:**
-```bash
-# Read runtime-deps.json, format as "pkg@version" list, pass to npm install
-DEPS_JSON="${CLAUDE_PLUGIN_ROOT}/runtime-deps.json"
-INSTALL_ARGS=$(jq -r '
-  .dependencies // {} |
-  to_entries[] |
-  "\(.key)@\(.value | ltrimstr("^") | ltrimstr("~"))"
-' "$DEPS_JSON")
-npm install --prefix "${CLAUDE_PLUGIN_DATA}" \
-  --no-save --no-package-lock --ignore-scripts \
-  $INSTALL_ARGS
-```
-
-Note: `optionalDependencies` (chromadb embed) should be handled separately — pass `--no-optional` on main install, attempt optional in a second pass that exits 0 on failure.
-
-### 4. Version Stamp Mechanism
-
-**Purpose:** Prevents npm install from running on every session start after deps are already installed. Also ensures deps are re-installed after plugin upgrade.
-
-**Location:** `${CLAUDE_PLUGIN_DATA}/.ligamen-deps-version`
-**Contents:** The plugin version string (e.g., `5.2.0`)
-**Source of truth for version:** `${CLAUDE_PLUGIN_ROOT}/runtime-deps.json` `.version` field
-
-**Logic:**
-```bash
-STAMP="${CLAUDE_PLUGIN_DATA}/.ligamen-deps-version"
-CURRENT_VERSION=$(jq -r '.version // empty' "${CLAUDE_PLUGIN_ROOT}/runtime-deps.json" 2>/dev/null)
-INSTALLED_VERSION=$(cat "$STAMP" 2>/dev/null || echo "")
-
-if [[ "$INSTALLED_VERSION" == "$CURRENT_VERSION" && -d "${CLAUDE_PLUGIN_DATA}/node_modules" ]]; then
-  # Deps are current — skip install
-  :
-else
-  # Install (or re-install on version mismatch)
-  npm install ... && echo "$CURRENT_VERSION" > "$STAMP"
-fi
-```
-
-### 5. Version Sync Across Manifest Files
-
-Four files carry the plugin version; they must stay in sync:
-
-| File | Field | Current |
-|------|-------|---------|
-| `plugins/ligamen/runtime-deps.json` | `.version` | 5.1.2 |
-| `plugins/ligamen/package.json` | `.version` | 5.1.2 |
-| `plugins/ligamen/.claude-plugin/plugin.json` | `.version` | 5.1.2 |
-| `plugins/ligamen/.claude-plugin/marketplace.json` | `.plugins[0].version` | 5.1.2 |
-| `.claude-plugin/marketplace.json` (root) | `.plugins[0].version` | 5.1.1 (STALE) |
-
-The root `.claude-plugin/marketplace.json` is already stale (5.1.1 vs 5.1.2). Version sync is a discrete, independent step with no code dependencies.
-
----
-
-## Data Flow: v5.2.0 Runtime Boot
+### Detail Panel Rendering Flow (Updated)
 
 ```
-Claude Code starts new session
-    │
-    ▼
-SessionStart hook fires → session-start.sh
-    │
-    ├─ Step 0: Dep install check (NEW)
-    │   ├─ CLAUDE_PLUGIN_DATA set? → YES/NO
-    │   ├─ node_modules/ exists AND version stamp matches? → skip
-    │   └─ otherwise → npm install --prefix $CLAUDE_PLUGIN_DATA
-    │                  → write .ligamen-deps-version
-    │                  → exit 0 on failure (non-blocking)
-    │
-    ├─ Step 1: SESSION_ID dedup (unchanged)
-    ├─ Step 2: Worker auto-start (unchanged)
-    ├─ Step 3: Project detection (unchanged)
-    └─ Step 4: Emit additionalContext JSON (unchanged)
-
-Claude Code launches MCP server (separately, concurrently with hook)
-    │
-    ├─ Reads .mcp.json:
-    │   command: node
-    │   args: [${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js]
-    │   env: { NODE_PATH: "${CLAUDE_PLUGIN_DATA}/node_modules" }
-    │
-    └─ Node.js starts server.js
-        ├─ import { McpServer } from "@modelcontextprotocol/sdk/..."
-        │   └─ Node searches NODE_PATH → finds in $CLAUDE_PLUGIN_DATA/node_modules/
-        ├─ import Database from "better-sqlite3"
-        │   └─ Node searches NODE_PATH → finds native module
-        └─ MCP server initializes, 8 tools registered
+User clicks node
+      |
+      v
+showDetailPanel(node)
+      |
+      +-- Show: name, type (with color), language, repo_name
+      +-- Show: owner row        -- node.owner || "unknown"            [NEW]
+      +-- Show: auth_mechanism   -- node.auth_mechanism || "unknown"  [NEW]
+      +-- Show: db_backend       -- node.db_backend || "unknown"      [NEW]
+      |
+      +-- Render connections (outgoing/incoming):
+      |     For each connection:
+      |       +-- protocol, method, path, source_file/target_file    [existing]
+      |       +-- confidence badge (high=green, low=amber, null=gray) [NEW]
+      |       +-- evidence snippet (truncated to 80 chars)            [NEW]
+      |
+      +-- Render schemas section (service type):                      [NEW]
+            Look up state.graphData.schemas_by_connection for outgoing connections
+            For each schema: name (role), file, field list with types
 ```
 
-**Timing consideration:** MCP server launch and SessionStart hook may run concurrently. The dep install in SessionStart may not complete before the MCP server starts. This is acceptable:
-- On first install: MCP server fails to start (deps not yet installed). User can restart session.
-- On subsequent sessions: deps are already installed (stamp exists); install step is a fast no-op; MCP server starts normally.
-- Alternative: move dep install to a pre-install script (if Claude Code supports it). No evidence this exists in the plugin format.
+## Scaling Considerations
 
----
+This is a local CLI tool -- network scale is not the concern. The relevant concern is response payload size as the graph grows.
 
-## Recommended Build Order
-
-Dependencies flow strictly from manifest → install logic → MCP config.
-
-### Step 1 — Version sync across all manifest files (MODIFY 5 files)
-
-**Files:**
-- `plugins/ligamen/runtime-deps.json` — bump `.version` to 5.2.0
-- `plugins/ligamen/package.json` — bump `.version` to 5.2.0
-- `plugins/ligamen/.claude-plugin/plugin.json` — bump `.version` to 5.2.0
-- `plugins/ligamen/.claude-plugin/marketplace.json` — bump `.plugins[0].version` to 5.2.0
-- `.claude-plugin/marketplace.json` (root) — bump `.plugins[0].version` to 5.2.0 (also fix stale 5.1.1)
-
-**Why first:** Dep install step reads version from `runtime-deps.json`. If version is wrong, stamp check logic breaks. Do this before writing any install logic.
-
-**Risk:** None — pure string changes, no logic.
-
-### Step 2 — Update .mcp.json with NODE_PATH env (MODIFY 1 file)
-
-**File:** `plugins/ligamen/.mcp.json`
-
-**What:** Add `env.NODE_PATH` pointing to `${CLAUDE_PLUGIN_DATA}/node_modules`.
-
-**Why second:** Independent of the install logic — can be verified in isolation. A user can manually run the install and test MCP server launch with NODE_PATH set before the hook is written.
-
-**Risk:** Low — additive JSON change. If `${CLAUDE_PLUGIN_DATA}` expansion doesn't work in env values, fallback is to use an absolute path (less portable) or a wrapper script.
-
-### Step 3 — Add dep install Step 0 to session-start.sh (MODIFY 1 file)
-
-**File:** `plugins/ligamen/scripts/session-start.sh`
-
-**What:** Insert dep install block before the SESSION_ID dedup check. Read version from `runtime-deps.json`, compare stamp, run npm install if needed, write stamp. Non-blocking (exit 0 on any failure).
-
-**Why third:** Depends on Step 1 (`runtime-deps.json` version must be correct). Step 2 can precede this because MCP config and install logic are independent.
-
-**Risk:** Moderate. The install step runs in a hook context; `npm` may not be on PATH in all environments. Mitigation: check `command -v npm` before attempting, exit 0 silently if absent.
-
-### Step 4 — Clean up root .mcp.json (VERIFY, no change needed)
-
-**File:** `/Users/ravichillerega/sources/ligamen/.mcp.json`
-
-**Current state:** `{"mcpServers": {}}` — already correct. This is the dev repo's MCP config; it should not register the MCP server (developers use the plugin-scoped `.mcp.json` for that).
-
-**Why last:** Verification only. If any cleanup is needed, it's isolated and safe to do last.
-
----
-
-## What Does NOT Change
-
-| Component | Reason |
-|-----------|--------|
-| `hooks/hooks.json` | Hook event routing is correct; SessionStart already fires the right script |
-| `worker/mcp/server.js` | ESM imports are correct; NODE_PATH makes them findable at runtime |
-| `worker/index.js` | HTTP worker — started by worker-start.sh with full node_modules at plugin root (dev) or CLAUDE_PLUGIN_DATA (marketplace) |
-| `lib/worker-client.sh` | Worker HTTP helpers — no change |
-| `scripts/worker-start.sh` | Worker daemon launcher — no change |
-| All 8 MCP tool implementations | Pure business logic; module resolution is the only issue |
-| SQLite schema and migrations | No data model changes |
-| `worker/ui/` (graph UI) | Served from HTTP worker; not affected by MCP distribution changes |
-
----
+| Scale | Architecture Adjustment |
+|-------|-------------------------|
+| 0-50 services | `getGraph()` inline JOIN for schemas is fine -- all data in one response |
+| 50-200 services | Schema data in `/graph` may grow large. Consider lazy-loading via `/schemas?connection_id=X` if response exceeds ~500KB |
+| 200+ services | Not the current target; `node_metadata` handles extension without schema migrations |
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Run npm install on every session start
+### Anti-Pattern 1: Adding Enrichment Fields to Agent Prompts
 
-**What people do:** Skip the version stamp and run `npm install` unconditionally at the start of each session.
-**Why wrong:** `npm install` for 7 packages including native addons (`better-sqlite3`) takes 5-30 seconds. This blocks every session start. The hook has a 10-second timeout in `hooks.json` — it would fire timeout errors regularly.
-**Do this instead:** Version stamp check. If `${CLAUDE_PLUGIN_DATA}/.ligamen-deps-version` matches `runtime-deps.json` `.version` and `node_modules/` exists, skip the install entirely. Near-zero overhead on subsequent sessions.
+**What people do:** Add `owner`, `auth_mechanism`, `db_backend` to `agent-schema.json` and ask the agent to fill them in.
 
-### Anti-Pattern 2: Install deps into CLAUDE_PLUGIN_ROOT
+**Why it's wrong:** The agent hallucinates ownership (it cannot reliably know which team owns a service from code alone). Auth and DB patterns are deterministic from grep -- using an LLM to find `JWT.verify()` or `pg.connect()` is overkill and introduces inconsistency between runs.
 
-**What people do:** Run `npm install` into the plugin source directory (`${CLAUDE_PLUGIN_ROOT}/node_modules`).
-**Why wrong:** `CLAUDE_PLUGIN_ROOT` is the plugin install location — it may be read-only. The correct writable per-plugin storage is `CLAUDE_PLUGIN_DATA`, which is explicitly provided for this purpose.
-**Do this instead:** Always target `--prefix ${CLAUDE_PLUGIN_DATA}`.
+**Do this instead:** Run the enrichment pass after agent output using deterministic file-system reads. The agent's responsibility is connection topology. CODEOWNERS parsing and auth/DB grep are the right tools for the remaining metadata.
 
-### Anti-Pattern 3: Hardcode dependencies in session-start.sh
+### Anti-Pattern 2: New HTTP Endpoints Per Enrichment Type
 
-**What people do:** Write the npm install command with package names and versions hardcoded in the shell script.
-**Why wrong:** Every dependency update requires editing two places: `runtime-deps.json` and `session-start.sh`. They inevitably drift. The version stamp check also becomes unreliable (stamp could match even if the hardcoded list diverges).
-**Do this instead:** Read deps dynamically from `runtime-deps.json` using `jq`. Single source of truth.
+**What people do:** Add `/owner?service=X`, `/schemas?service=X`, `/confidence?connection=Y` as separate API routes.
 
-### Anti-Pattern 4: Place dep install after SESSION_ID dedup
+**Why it's wrong:** Breaks the established "embed everything in /graph" pattern (v2.3 decision). The UI would need multiple async fetches per node click, introducing race conditions and added complexity in `detail-panel.js`.
 
-**What people do:** Add the dep install block after the existing SESSION_ID flag file check.
-**Why wrong:** The dedup guard exits 0 if the flag file exists. Once the flag file is created in session N, session N+1 exits before reaching the install step. Deps never get re-installed after a plugin upgrade.
-**Do this instead:** Dep install (Step 0) must precede the SESSION_ID dedup check (Step 1). The stamp mechanism provides its own idempotency — the dedup guard is for context injection, not dep management.
+**Do this instead:** Include all enrichment data in the `/graph` response payload. Only create a separate endpoint if the payload grows unacceptably large (beyond ~500KB, which requires 200+ services with full schema data).
 
-### Anti-Pattern 5: Blocking session-start.sh on npm install failure
+### Anti-Pattern 3: Separate Enrichment Table Instead of node_metadata
 
-**What people do:** Use `set -e` semantics where an npm install failure causes session-start.sh to exit non-zero.
-**Why wrong:** Claude Code may treat a non-zero exit from a SessionStart hook as an error that blocks the session. The entire plugin policy is non-blocking (`trap 'exit 0' ERR` is already set).
-**Do this instead:** Wrap the npm install in a subshell or `|| true`. If install fails, the MCP server fails to start, but hooks still function and the user sees an error message through Claude's MCP status rather than a broken session.
+**What people do:** Create `service_enrichment (service_id, owner, auth_mechanism, db_backend)` as a new table.
 
----
+**Why it's wrong:** This is exactly what `node_metadata (service_id, view, key, value)` was purpose-built for in migration 008. Adding a parallel table creates schema fragmentation and doubles migration cost for future enrichment types.
 
-## Integration Boundaries
+**Do this instead:** Use `node_metadata` with `view='scan'` and well-known keys: `owner`, `auth_mechanism`, `db_backend`. The `upsertNodeMetadata()` method uses `INSERT OR REPLACE` with the existing `UNIQUE(service_id, view, key)` constraint -- fully idempotent across re-scans.
+
+### Anti-Pattern 4: Blocking Scan on CODEOWNERS Parse Failure
+
+**What people do:** Let `codeowners.js` throw if the CODEOWNERS file is malformed or absent, propagating the error up to `scanRepos()`.
+
+**Why it's wrong:** A bad CODEOWNERS file would abort the entire scan, losing all agent findings. The enrichment pass is additive -- it should never be a blocker.
+
+**Do this instead:** Wrap `runEnrichmentPass()` in try/catch in `manager.js`. On any enrichment error, log a WARN and return the original un-enriched findings. The scan succeeds; enrichment data is simply absent for that run.
+
+### Anti-Pattern 5: Confidence on Services Table Instead of node_metadata
+
+**What people do:** Add `confidence TEXT` to the `services` table to store per-service confidence from the agent.
+
+**Why it's wrong:** Per-service confidence is a low-signal field (the agent emits a top-level confidence, not per-service). Clutters the services schema with a column that may go unused. Per-service confidence is not needed for v5.3.0 detail panel rendering.
+
+**Do this instead:** Store per-service confidence in `node_metadata` if it becomes needed later (`view='scan'`, `key='confidence'`). For v5.3.0, only per-connection confidence is required -- that goes in the `connections` table via migration 009.
+
+## Integration Points
+
+### New vs Modified Components
+
+| Component | New/Modified | Change |
+|-----------|-------------|--------|
+| `scan/enrichment/enricher.js` | NEW | Orchestrates enrichment passes; called by manager.js after parseAgentOutput; receives queryEngine as parameter |
+| `scan/enrichment/codeowners.js` | NEW | Parses CODEOWNERS file; returns owner string per service root_path using glob-style pattern matching |
+| `scan/enrichment/auth-db-extractor.js` | NEW | Greps source files for auth (JWT/OAuth/session/API-key) and DB (postgres/mysql/mongo/redis) patterns using regex over readFileSync |
+| `scan/manager.js` | MODIFIED | Add `runEnrichmentPass()` call between parseAgentOutput and persistFindings; try/catch wraps entire call |
+| `scan/findings.js` | MODIFIED | Accept (but not require) `owner`, `auth_mechanism`, `db_backend` on service objects -- unknown fields pass through without error |
+| `scan/agent-schema.json` | MODIFIED | Improve `source_file`/`target_file` documentation (THE-942); do NOT add enrichment fields to agent schema |
+| `scan/agent-prompt-service.md` | MODIFIED | Add source_file/target_file guidance (THE-942) |
+| `db/migrations/009_enrichment.js` | NEW | ALTER TABLE connections ADD COLUMN confidence TEXT; ALTER TABLE connections ADD COLUMN evidence TEXT |
+| `db/query-engine.js` | MODIFIED | (1) persistFindings() writes confidence/evidence per connection; (2) new upsertNodeMetadata() method; (3) getGraph() includes schemas_by_connection, confidence/evidence on connections, owner/auth/db pivoted from node_metadata |
+| `server/http.js` | NOT MODIFIED | /graph route passes through getGraph() -- no route changes needed |
+| `ui/modules/detail-panel.js` | MODIFIED | Add schema section, confidence badge per connection, owner/auth/db rows, "unknown" fallbacks for all null enrichment fields |
+| `ui/modules/utils.js` | MODIFIED | Add `getConfidenceColor(level)` helper (high -> green #38a169, low -> amber #d69e2e, null -> gray #718096) |
+
+### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `session-start.sh` ↔ `runtime-deps.json` | Shell reads JSON via `jq` | `runtime-deps.json` must exist at `${CLAUDE_PLUGIN_ROOT}/runtime-deps.json` |
-| `session-start.sh` ↔ `CLAUDE_PLUGIN_DATA` | Shell writes files to writable dir | Must check `CLAUDE_PLUGIN_DATA` is set; not available in dev/direct-install context |
-| `.mcp.json` ↔ `CLAUDE_PLUGIN_DATA/node_modules` | Node.js ENV at server spawn | `NODE_PATH` is Node.js standard; requires `${CLAUDE_PLUGIN_DATA}` expansion in Claude Code `.mcp.json` env values |
-| `npm install` ↔ native addons | `node-gyp` at install time | `better-sqlite3` is a native addon; requires build tools (Python, C++ compiler). May fail in restricted environments. |
-| Version stamp ↔ dep install freshness | File read/write in `CLAUDE_PLUGIN_DATA` | Stamp must be written atomically after successful install (not before) |
+| enricher.js <-> manager.js | Direct function call: `runEnrichmentPass(findings, repoPath, queryEngine)` returns augmented findings | Must be synchronous from manager's perspective; async inside enricher is fine |
+| enricher.js <-> codeowners.js | Direct import: `matchOwner(repoPath, servicePath)` returns string or null | CODEOWNERS format: `path/pattern @team`; parse with line-by-line pattern matching |
+| enricher.js <-> auth-db-extractor.js | Direct import: `extractAuthAndDb(repoPath, services)` returns `Map<serviceName, {auth_mechanism, db_backend}>` | Uses fs.readFileSync + regex; no shell exec |
+| enricher.js <-> node_metadata | Writes via `queryEngine.upsertNodeMetadata(serviceId, view, key, value, source)`; queryEngine must be passed from manager.js | Cannot import queryEngine directly; dependency injection via parameter |
+| getGraph() <-> node_metadata table | Direct SQL SELECT pivoting rows into per-service object properties | Use `WHERE view='scan'`; graceful fallback (empty object) if table rows absent |
+| detail-panel.js <-> /graph response | detail-panel.js reads `state.graphData` populated from /graph; schemas looked up via `state.graphData.schemas_by_connection[connectionId]` | No new fetches; consistent with existing "single load" pattern |
 
----
+## Build Order
 
-## Recommended Project Structure Changes
+Dependencies drive this order. Each step unblocks the next:
 
-```
-plugins/ligamen/
-├── .claude-plugin/
-│   ├── plugin.json              # MODIFIED: version → 5.2.0
-│   └── marketplace.json         # MODIFIED: version → 5.2.0
-├── .mcp.json                    # MODIFIED: add env.NODE_PATH
-├── runtime-deps.json            # MODIFIED: version → 5.2.0 (was 5.1.2)
-├── package.json                 # MODIFIED: version → 5.2.0
-└── scripts/
-    └── session-start.sh         # MODIFIED: add Step 0 dep install block
+1. **Migration 009** (`db/migrations/009_enrichment.js`) — Foundation. Adds `confidence` and `evidence` columns to `connections`. No other code changes. Run in isolation; verify with existing DB.
 
-.claude-plugin/
-└── marketplace.json             # MODIFIED: version → 5.2.0 (fix stale 5.1.1)
-```
+2. **`upsertNodeMetadata()` in query-engine.js** — New write method using the existing `node_metadata` table from migration 008. Low-risk: new method, no changes to existing methods. Can be built alongside migration 009.
 
-No new files. No directory additions. All changes are modifications to existing files.
+3. **`codeowners.js` and `auth-db-extractor.js`** — Pure file-system utilities, no DB dependency. Build and test in isolation with mock repoPath values. These carry the most uncertainty (regex patterns for auth/DB may need iteration after real-world testing).
 
----
+4. **`enricher.js`** — Composes utilities from step 3. Depends on step 3. Receives `queryEngine` parameter from manager.js to call `upsertNodeMetadata()`. Unit-test by mocking both utility modules.
 
-## Confidence Assessment
+5. **`manager.js` modification** — Wire `runEnrichmentPass()` into the scan loop. Single insertion point between `parseAgentOutput()` and `persistFindings()`. Wrap in try/catch. Depends on step 4.
 
-| Area | Confidence | Source |
-|------|------------|--------|
-| MCP server ESM import failure root cause | HIGH | Direct inspection of server.js imports + installed file layout |
-| `CLAUDE_PLUGIN_DATA` as install target | HIGH | Standard Claude Code plugin convention; `CLAUDE_PLUGIN_ROOT` vs `CLAUDE_PLUGIN_DATA` distinction clear from env vars in session-start.sh |
-| NODE_PATH for ESM module resolution | HIGH | Node.js docs; standard mechanism; no source changes needed |
-| `${CLAUDE_PLUGIN_DATA}` expansion in .mcp.json env | MEDIUM | `${CLAUDE_PLUGIN_ROOT}` works in args (confirmed); env value expansion likely follows same pattern but not confirmed from official docs |
-| npm install in SessionStart hook timing | MEDIUM | MCP server and SessionStart may run concurrently; first-install race is known but acceptable |
-| `better-sqlite3` native addon build at install | LOW | Native addon requires build tools; may fail in some environments; no mitigation in current plan |
-| Session-start.sh dedup order issue | HIGH | Code directly read; SESSION_ID flag logic is lines 31-37; must precede flag write with Step 0 |
-| Version files needing sync | HIGH | All 5 files directly inspected; root marketplace.json confirmed stale at 5.1.1 |
+6. **`persistFindings()` modification** — Write `confidence` and `evidence` from the validated connection objects. Depends on migration 009 (step 1). The change is: add two fields to the `upsertConnection()` call; the data is already in the findings object.
 
----
+7. **`getGraph()` modification** — Include `schemas_by_connection`, `confidence`/`evidence` on connections, `owner`/`auth_mechanism`/`db_backend` on services from `node_metadata`. Depends on steps 1 and 2. Must use try/catch for pre-migration-009 DBs (same pattern used for actors in migration 008).
+
+8. **`detail-panel.js` and `utils.js` modification** — UI-only changes. Depend on step 7 (getGraph returning the new fields). Can be developed against a mock `/graph` payload before step 7 is complete.
+
+9. **Quality-gate spin-out (THE-937)** — Independent of all above; touches different files entirely. Can be done in parallel with any of steps 1-8 with no conflicts.
 
 ## Sources
 
-- `plugins/ligamen/worker/mcp/server.js` — ESM import statements (lines 1-14); confirmed bare package imports (source code, HIGH)
-- `plugins/ligamen/.mcp.json` — current spawn config without NODE_PATH (source code, HIGH)
-- `plugins/ligamen/runtime-deps.json` — authoritative dep list with versions (source code, HIGH)
-- `plugins/ligamen/scripts/session-start.sh` — dedup logic lines 31-37, overall flow (source code, HIGH)
-- `plugins/ligamen/hooks/hooks.json` — SessionStart → session-start.sh wiring (source code, HIGH)
-- `plugins/ligamen/lib/worker-client.sh` — worker start pattern (source code, HIGH)
-- `plugins/ligamen/scripts/worker-start.sh` — version mismatch restart pattern (reference for stamp approach) (source code, HIGH)
-- `plugins/ligamen/package.json` — version 5.1.2, dep list (source code, HIGH)
-- `plugins/ligamen/.claude-plugin/plugin.json` — version 5.1.2 (source code, HIGH)
-- `plugins/ligamen/.claude-plugin/marketplace.json` — version 5.1.2 (source code, HIGH)
-- `.claude-plugin/marketplace.json` (root) — version 5.1.1, confirmed stale (source code, HIGH)
-- `.planning/PROJECT.md` — v5.2.0 milestone goals (source code, HIGH)
+- Direct inspection of `plugins/ligamen/worker/` codebase (2026-03-21)
+- `worker/db/migrations/001_initial_schema.js` through `008_actors_metadata.js` — schema baseline
+- `worker/db/query-engine.js` — `persistFindings()`, `getGraph()`, `QueryEngine` constructor, statement preparation pattern
+- `worker/scan/manager.js` — scan bracket pattern, enrichment insertion point
+- `worker/scan/findings.js` — validated fields including confidence/evidence currently dropped after validation
+- `worker/scan/agent-schema.json` — agent output contract showing confidence/evidence are already in the schema
+- `worker/ui/modules/detail-panel.js` — existing panel rendering patterns and escapeHtml() usage
+- `worker/server/http.js` — /graph route and single-load payload pattern
 
 ---
-
-*Architecture research for: Ligamen v5.2.0 Plugin Distribution Fix*
+*Architecture research for: Ligamen v5.3.0 Scan Intelligence & Enrichment*
 *Researched: 2026-03-21*

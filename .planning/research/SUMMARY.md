@@ -1,212 +1,255 @@
 # Project Research Summary
 
-**Project:** Ligamen v5.2.0 — Plugin Distribution Fix
-**Domain:** Claude Code plugin runtime dependency distribution via SessionStart hook + MCP server configuration
+**Project:** Ligamen v5.3.0 — Scan Intelligence & Enrichment
+**Domain:** Claude Code plugin — post-scan enrichment pipeline, schema surfacing, confidence/evidence persistence, service ownership and auth/DB metadata
 **Researched:** 2026-03-21
-**Confidence:** HIGH
+**Confidence:** HIGH (based on direct codebase inspection plus verified ecosystem patterns)
 
 ## Executive Summary
 
-Ligamen is an existing Claude Code plugin (v5.1.2) with a fully functional MCP server exposing 8 impact/drift analysis tools backed by SQLite, Fastify, and the MCP SDK. The v5.2.0 milestone addresses a critical distribution bug: when a user installs the plugin from the marketplace, the MCP server subprocess starts without `node_modules` present, causing every ESM import to throw `ERR_MODULE_NOT_FOUND` at startup. All 8 tools silently vanish. The fix requires two coordinated changes — a SessionStart hook that installs runtime deps into a findable location, and correct module resolution so the running MCP server can find those deps.
+Ligamen v5.3.0 is a subsequent-milestone enrichment layer added to an already-shipping Claude Code plugin. The core scan pipeline (MCP server with 8 tools, SQLite with migrations 001-008, Fastify HTTP server, Canvas graph UI, agent-driven scanning with beginScan/endScan brackets) is fully validated and unchanged. This milestone's goal is to close four specific gaps: (1) confidence and evidence fields that the agent already emits but the DB silently drops, (2) schemas and fields already collected but never displayed in the UI, (3) ownership, auth mechanism, and DB backend metadata that currently has no extraction path, and (4) a quality-gate spin-out. The right approach is an additive post-scan enrichment pass that writes side-car data to the existing `node_metadata` table — never touching the primary scan tables, never triggering scan brackets.
 
-The recommended approach is to install npm deps directly into `${CLAUDE_PLUGIN_ROOT}` using `npm install --prefix ${CLAUDE_PLUGIN_ROOT}`, with a diff-based sentinel check against a copy of `runtime-deps.json` stored in `${CLAUDE_PLUGIN_DATA}`. This placement allows Node.js ESM to find the modules via its natural directory-walk resolution without any `NODE_PATH` tricks. The critical technical constraint cutting across all research files is that `worker/mcp/server.js` uses ESM (`"type": "module"` in package.json), and `NODE_PATH` has zero effect on ESM import resolution — a fact the official Claude Code docs example does not account for when recommending the `NODE_PATH` pattern (which applies to CJS only). This must be resolved in Phase 1 before any other work proceeds.
+The recommended architecture is a sequential enrichment pass (codeowners.js, auth-db-extractor.js) wired into manager.js between parseAgentOutput() and persistFindings(), with a single Migration 009 that adds `confidence TEXT` and `evidence TEXT` to the `connections` table plus denormalized `owner`, `auth_mechanism`, and `db_backend` columns to `services`. The only new production dependency is `picomatch ^4.0.3` for CODEOWNERS glob matching — everything else is Node.js built-ins and existing packages. Schema visualization uses two new DB tables (`schemas`, `schema_fields`) already implied by the existing schema but not yet wired into the `/graph` API or detail panel.
 
-The top risks are: (1) the NODE_PATH/ESM incompatibility invalidating the assumed architecture, (2) `better-sqlite3`'s native binary compiling for the wrong Node.js version, (3) a first-session race condition where the MCP server starts before the SessionStart hook finishes installing deps, and (4) the 10-second hook timeout aborting native compilation mid-way. All are solvable. Version sync across five manifest files is an independent, lower-risk concern that should be automated with a single bump script. The overall scope is small: three file modifications, five version bumps, one new script.
+The critical risk class for this milestone is pipeline completeness: confidence and evidence were validated for years but never persisted; the same pattern threatens to repeat unless each new field is verified end-to-end (agent output — findings.js — upsert — DB column — getGraph() — detail panel) before shipping. A secondary risk is schema data payload size — embedding schemas in the `/graph` response would bloat a 30-node graph from ~10KB to ~200KB and inject schema data into the D3 simulation worker on every tick. The mitigation is strict: schema data must never enter `getGraph()` as per-node data; instead it is attached as a top-level `schemas_by_connection` map.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new technologies are required for v5.2.0. The existing stack (Node.js 25, ESM, better-sqlite3, fastify, @modelcontextprotocol/sdk, bats, jq) is sufficient. The additions are: `npm install --prefix` to install deps at runtime into `${CLAUDE_PLUGIN_ROOT}`, `diff -q` as the idempotency guard (from official Claude Code docs), and a `scripts/bump-version.sh` bash script using `jq` to atomically sync versions across all five manifest files.
+The existing stack is unchanged: Node.js >=20 ESM, better-sqlite3 ^12.8.0, Fastify ^5.8.2, zod ^3.25.0, @modelcontextprotocol/sdk ^1.27.1. The only new production dependency is `picomatch ^4.0.3` for CODEOWNERS glob matching (zero dependencies, actively maintained, used by fast-glob/jest/chokidar — already likely an indirect dep; check before adding explicitly). Auth and DB detection require only `fs.readFileSync` + regex — no AST parsing, no new libraries. The enrichment pass orchestration uses a simple `for...of` async loop, not a queue library.
 
 See `.planning/research/STACK.md` for full detail including code-level patterns and alternatives considered.
 
 **Core technologies:**
-- `npm install --prefix ${CLAUDE_PLUGIN_ROOT}` — runtime dep install; ESM resolution walks up from `server.js` and finds `node_modules/` at CLAUDE_PLUGIN_ROOT automatically; no env vars needed
-- `diff -q` (coreutils) — sentinel check against `${CLAUDE_PLUGIN_DATA}/runtime-deps.json` copy to detect when deps need reinstall; exits nonzero on first run (no copy) or after plugin update (file differs)
-- `runtime-deps.json` as install manifest — scopes install to exactly the 7 MCP server runtime deps; avoids triggering reinstall on dev dep changes; version field bumps with plugin version to trigger reinstall after updates
-- `jq` (already required) — reads dep manifest dynamically; rewrites version fields in all manifest files atomically
-- `scripts/bump-version.sh` (new) — single command syncing version across all 5 files; added as `make bump VERSION=x.y.z`
+- `picomatch ^4.0.3`: CODEOWNERS glob matching — zero-dep, CJS imported via `createRequire(import.meta.url)` in ESM context, handles matchBase/dotfiles/double-glob correctly; avoids minimatch v10 ESM chain issue and the abandoned `codeowners-utils` package
+- `node:fs` + `node:readline` (built-in): CODEOWNERS file discovery (three-location probe: `.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS`) and line-by-line parse — ~30 lines of code, no library needed
+- `better-sqlite3 ^12.8.0` (existing): Migration 009 adds 2 new tables and 3 new columns to services; no breaking changes to existing queries
+- `zod ^3.25.0` (existing): Optionally reuse for enricher result validation; enrichers can also return plain objects
 
-**Critical non-use:** Do NOT add `NODE_PATH` to `.mcp.json` env for ESM resolution. Node.js ESM ignores `NODE_PATH` by design — documented explicitly in Node.js v25 ESM docs: "NODE_PATH is not part of resolving import specifiers." The official Claude Code plugin docs example that uses `NODE_PATH` applies to CJS `require()` only.
+**What NOT to use:**
+- `codeowners-utils`: CJS-only, last published 2020 (5 years ago), no ESM export
+- `minimatch v10+`: brace-expansion ESM chain breaking issue (GH #257); picomatch is safer with zero deps
+- Tree-sitter: native binaries per language grammar (10-15MB each), overkill for regex-level auth detection
+- Bull/BullMQ: queue overhead pointless for <10 enrichers per service; adds Redis dep for zero benefit
+- `"unknown"` stored in DB: keep DB truthful (NULL = not yet detected); normalize to `"unknown"` string at HTTP layer with `?? 'unknown'`
+- Separate worker thread for enrichment: enrichers are I/O-bound (file reads, DB writes), not CPU-bound; same worker process is correct
 
 ### Expected Features
 
-All features are P1 (required for v5.2.0 to work) or P2 (should-have for release quality). Full feature analysis in `.planning/research/FEATURES.md`.
+See `.planning/research/FEATURES.md` for full dependency graph and prioritization matrix.
 
-**Must have (table stakes for v5.2.0):**
-- SessionStart install hook — installs deps into `${CLAUDE_PLUGIN_ROOT}` on first run and after version bumps; MCP server fails silently on marketplace install without this
-- Idempotent install guard — diff-based sentinel using `runtime-deps.json` copy in `${CLAUDE_PLUGIN_DATA}`; install runs only when sentinel differs from bundled copy (first run or plugin update)
-- Separate hook entry with high timeout — current 10-second timeout must increase to 120-300 seconds for the install hook; keep existing session-start.sh entry at 10 seconds as a separate hooks.json entry
-- Root `.claude-plugin/marketplace.json` version fix — currently at 5.1.1 while all other manifests are at 5.1.2; causes users to receive wrong version via `claude plugin marketplace add`
-- All manifests bumped to 5.2.0 — five files: `package.json`, `plugin.json`, both `marketplace.json` files, `runtime-deps.json`
+**Must have (table stakes — required for v5.3.0 to be complete):**
+- Migration 009 — `confidence TEXT` and `evidence TEXT` on `connections`; `owner`, `auth_mechanism`, `db_backend` on `services`; new `schemas` and `schema_fields` tables with indexes
+- Persist confidence + evidence — currently validated by findings.js but silently dropped at the upsert step; upsertConnection() must write both columns
+- Enrichment pass architecture — `runEnrichmentPass(findings, repoPath, queryEngine)` framework wired into manager.js after parseAgentOutput(); each enricher is an isolated module; any enricher failure must be silent and graceful (try/catch in enricher.js, never abort the scan)
+- CODEOWNERS enrichment pass — probe CODEOWNERS file locations; last-match-wins per GitHub spec; write to `node_metadata(view='scan', key='owner')`; denormalize first owner into `services.owner`; handle missing file gracefully
+- Auth mechanism extraction — regex over entry-point files and known subdirectories (routes/, middleware/, auth/); per-language signal table covering Python, Node.js, Go, Rust; write `auth_mechanism` and `auth_confidence` to `node_metadata`; denormalize into `services.auth_mechanism`
+- DB backend extraction — probe `schema.prisma` first, then `.env`/`docker-compose.yml` DATABASE_URL, then ORM imports; write `db_backend` to `node_metadata`; denormalize into `services.db_backend`
+- Schema storage and display — store `schemas[]` from findings into `schemas` table + `schema_fields` join table; include in `/graph` response as `schemas_by_connection` (top-level map, not per-node); render in detail panel with field name/type/required columns
+- Agent prompt improvements (source_file/target_file) — update `agent-prompt-common.md` with explicit guidance; null only acceptable for genuinely external targets
+- Show "unknown" for missing metadata — normalize at HTTP layer using `?? 'unknown'`; never store `"unknown"` in DB
+- Quality-gate spin-out — remove `commands/quality-gate.sh` and `skills/quality-gate.md` from this plugin; fully independent of enrichment work
 
-**Should have (P2, include in same PR):**
-- `scripts/bump-version.sh` Makefile target — prevents future version drift with `make bump VERSION=x.y.z`
-- `make check` version consistency validation — CI-level guard asserting all manifests carry the same version
-- Bats tests for install script — covers first-run, idempotency, npm-missing fallback, partial-install recovery
+**Should have (add in v5.3.x patch if time allows):**
+- Confidence badge in detail panel — color-coded high/low per connection; requires migration 009 data to be present
+- Evidence snippet in detail panel — expandable `<code>` block with the agent-cited code snippet; trigger: first user feedback that "I can't tell if this connection is real"
+- Ownership filter in filter panel — filter graph by CODEOWNERS team; trigger: teams with >10 services
 
 **Defer (v6+):**
-- Declarative plugin dependency manifest — depends on Anthropic shipping issue #27113; `runtime-deps.json` already serves as the data source and will be a clean migration path
-
-**Anti-features explicitly avoided:**
-- Bundling `node_modules` in the plugin — platform-specific native binaries (better-sqlite3, chromadb) fail cross-platform; inflates plugin by ~40MB
-- `NODE_PATH` in `.mcp.json` — silently ignored by ESM; causes misleading debugging experience
-- Global `npm install -g` — requires elevated permissions; pollutes user's global namespace with Ligamen's deps
-- Inline npm install in hooks.json — untestable, unmaintainable; extract to `scripts/install-deps.sh`
-- Blocking SessionStart on npm install failure — non-zero exit from hook may break session; use `|| true` or `trap 'exit 0' ERR`
+- Generic `node_metadata` viewer in detail panel — needed when STRIDE/vuln views are being built
+- Multi-owner display as tag list — trigger: multi-team ownership patterns surface as user pain
+- Per-connection confidence timeline — requires scan version history correlation
 
 ### Architecture Approach
 
-The fix is surgical: three files modified (session-start.sh, runtime-deps.json version, hooks.json), five manifest files version-bumped, one new script added. No new files or directories. No changes to the MCP server tools, SQLite schema, HTTP worker, or graph UI. The dep install runs as Step 0 in session-start.sh — critically BEFORE the SESSION_ID dedup check — so it fires on every session and detects plugin updates. The MCP server launch config needs no changes when deps are installed into `${CLAUDE_PLUGIN_ROOT}`.
+The enrichment pipeline slots between `parseAgentOutput()` and `persistFindings()` in manager.js. This pre-persist position lets enrichment annotate the findings object before it hits the DB, avoiding temporal coupling between enrichment and scan bracket cleanup. Enrichment data flows exclusively to `node_metadata` (via a new `upsertNodeMetadata()` method) and to denormalized nullable columns in `services` — it never touches core tables via the primary scan upsert path. The `/graph` API continues the "embed everything at load" pattern established in v2.3, but schema data attaches as a separate `schemas_by_connection` key at the graph level to keep per-node payload size bounded.
 
-See `.planning/research/ARCHITECTURE.md` for full diagrams, data flow, integration boundary analysis, and build order rationale.
+See `.planning/research/ARCHITECTURE.md` for full data flow diagrams, component integration points, build order, and anti-pattern analysis.
 
-**Major components and their v5.2.0 changes:**
-1. `plugins/ligamen/scripts/session-start.sh` — MODIFIED: add Step 0 dep install block before SESSION_ID dedup; runs `diff -q` against sentinel, runs `npm install --prefix ${CLAUDE_PLUGIN_ROOT}` only when sentinel differs, updates sentinel on success, cleans sentinel on failure
-2. `plugins/ligamen/hooks/hooks.json` — MODIFIED: add separate SessionStart entry for install script with `"timeout": 300`; existing session-start.sh entry unchanged at `"timeout": 10`
-3. `plugins/ligamen/.mcp.json` — UNCHANGED: current config (`node ${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js`) is correct once node_modules exists at CLAUDE_PLUGIN_ROOT; no env block needed
-4. `plugins/ligamen/runtime-deps.json` — MODIFIED: version bumped to 5.2.0; remains authoritative install manifest
-5. `scripts/bump-version.sh` — NEW: jq-based version sync script for all 5 manifest files
+**Major components and their v5.3.0 changes:**
+1. `scan/enrichment/enricher.js` (NEW) — orchestrates enrichment pass; called by manager.js after parseAgentOutput(); receives queryEngine for DB writes; wraps all passes in try/catch; never throws
+2. `scan/enrichment/codeowners.js` (NEW) — pure file-system utility; reads CODEOWNERS; returns owner string per service root_path using picomatch; last-match-wins per GitHub spec
+3. `scan/enrichment/auth-db-extractor.js` (NEW) — regex-based; scans entry-point and known middleware files; returns `{auth_mechanism, auth_confidence, db_backend}` per service; explicitly excludes test fixtures and example files
+4. `db/migrations/009_enrichment.js` (NEW) — ALTER TABLE connections for confidence/evidence; ALTER TABLE services for owner/auth_mechanism/db_backend; CREATE TABLE schemas and schema_fields with indexes
+5. `db/query-engine.js` (MODIFIED) — new `upsertNodeMetadata()` method; extend `persistFindings()` to write confidence/evidence; extend `getGraph()` to include schemas_by_connection and pivot node_metadata to per-service fields; add `?? 'unknown'` normalization in http.js
+6. `ui/modules/detail-panel.js` (MODIFIED) — schema section, confidence badge per connection, owner/auth/db rows, "unknown" fallbacks, escapeHtml() on all new field renderings
+7. `server/http.js` (NOT MODIFIED) — /graph route passes through getGraph(); no route changes needed
 
 **Build order (dependency-driven):**
-1. Version sync first — no logic deps; fixes stale root marketplace.json; `runtime-deps.json` version must be correct before install step reads it
-2. hooks.json install entry + session-start.sh Step 0 — core fix; reads runtime-deps.json version
-3. `.mcp.json` verification — confirm no changes needed (should be automatic with deps in CLAUDE_PLUGIN_ROOT)
-4. `bump-version.sh` script — independent; prevents future drift
+1. Migration 009 + `upsertNodeMetadata()` — foundation; all other work depends on columns/tables existing
+2. `codeowners.js` and `auth-db-extractor.js` — pure utilities; build and test in isolation
+3. `enricher.js` — composes utilities; depends on step 2; receives queryEngine from manager.js
+4. `manager.js` modification — wire enrichment pass; single try/catch insertion point
+5. `persistFindings()` modification — write confidence/evidence; depends on migration 009
+6. `getGraph()` modification — include schemas_by_connection, confidence/evidence on edges, enrichment fields on services; depends on steps 1 and 5
+7. `detail-panel.js` and `utils.js` — UI-only; depends on step 6; can develop against mock graph payload
+8. Quality-gate spin-out — fully independent; no conflicts with steps 1-7
 
 ### Critical Pitfalls
 
-See `.planning/research/PITFALLS.md` for full coverage including recovery strategies, UX pitfalls, security notes, and a "looks done but isn't" verification checklist.
+See `.planning/research/PITFALLS.md` for full coverage including 10 critical pitfalls, technical debt patterns, integration gotchas, security mistakes, UX pitfalls, recovery strategies, and a "looks done but isn't" verification checklist.
 
-1. **NODE_PATH is silently ignored by ESM** — The official Claude Code docs recommend `NODE_PATH` in `.mcp.json` env, but this only works for CommonJS. `worker/mcp/server.js` is ESM (`"type": "module"`). ESM uses URL-based resolution; `NODE_PATH` is explicitly excluded. Solution: install deps into `${CLAUDE_PLUGIN_ROOT}` via `npm install --prefix`; ESM finds `node_modules/` via directory walk automatically. Do not add `NODE_PATH` to `.mcp.json`.
+1. **Enrichment stomps primary scan data** — if enrichment triggers a scan bracket (beginScan/endScan), the stale cleanup deletes services not re-confirmed by the enrichment pass. Prevention: enrichment never calls beginScan/endScan; all writes go to `node_metadata` or additive nullable columns; wrap entire enrichment call in try/catch in manager.js so any failure returns original un-enriched findings. Verify: `SELECT COUNT(*) FROM services` must not decrease after an enrichment run.
 
-2. **better-sqlite3 binary compiled for wrong Node.js version** — Claude Code may use a different Node runtime than the system `node`/`npm` on PATH. The installed native binary may be ABI-incompatible with the runtime that launches the MCP server. Prevention: add a smoke-test after install (`node -e "require('better-sqlite3')"` using Claude Code's node if determinable); handle gracefully with retry on next session via sentinel cleanup.
+2. **Confidence and evidence drop at the upsert boundary** — both fields have been validated by findings.js for multiple milestones but `_stmtUpsertConnection` never included them; they silently fall off. Prevention: add both columns in Migration 009 AND update the upsert statement atomically; verify end-to-end with `SELECT confidence FROM connections WHERE confidence IS NOT NULL LIMIT 5` returning real rows before shipping.
 
-3. **First-session race: MCP server starts before hook installs deps** — Claude Code starts the MCP server in parallel with SessionStart hooks. On first install, `npm install` (30-120 seconds with native compilation) may still be running when the MCP server starts. GitHub issue #10997 also indicates hooks may not fire at all on first marketplace install. Prevention: make the MCP wrapper self-healing — wrapper script checks for deps before exec'ing server.js; SessionStart is a fast-path optimization for subsequent sessions, not the sole install path.
+3. **Schema data in getGraph() bloats response and enters simulation worker** — a 30-node graph with schemas goes from ~10KB to ~200KB; if that data passes to the D3 Web Worker it gets serialized on every simulation tick (60Hz). Prevention: schemas attach as `schemas_by_connection` at graph level, not per-node; simulation worker receives only node IDs and positions; add a payload size assertion to integration tests.
 
-4. **SessionStart 10-second timeout aborts native compilation** — `better-sqlite3` requires `node-gyp` which takes 30-120 seconds on macOS/Linux. The current hook timeout of 10 seconds kills the install mid-way, leaving partial `node_modules`. Prevention: separate hooks.json entry for the install with `"timeout": 300`; keep existing session-start.sh at 10 seconds.
+4. **Auth extraction stores credential values** — regex over source files can extract actual JWT tokens, database URLs, and API keys from test fixtures and `.env.example`. Prevention: explicitly exclude `*.test.*`, `*.example`, `*.sample` files; store only mechanism type and pattern name (never the credential value); add a validator that rejects any extracted value matching common credential patterns (length >40 random chars, `Bearer [A-Za-z0-9+/=]{20,}`).
 
-5. **Version sync drift breaks the update mechanism** — Five manifest files carry version numbers. If any one is not bumped, Claude Code's caching/update mechanism delivers the stale plugin or wrong dep list. Root `.claude-plugin/marketplace.json` is already stale at 5.1.1 vs the rest at 5.1.2. Prevention: `scripts/bump-version.sh` atomically updates all five; `make check` enforces consistency.
+5. **Migration guard try/catch silently drops columns** — the existing fallback pattern catches failed prepare statements but provides no observable signal if a column is missing. Prevention: after Migration 009 runs, verify with `PRAGMA table_info(connections)` that all expected columns are present; if not, throw with a clear message rather than silently falling back.
 
 ## Implications for Roadmap
 
-Based on combined research, the milestone work splits into three phases ordered by technical dependency. All three are small in scope. The only genuine architectural decision is the ESM/NODE_PATH resolution in Phase 1 — everything else is implementation of well-understood patterns.
+Based on combined research, the build order is strictly dictated by data flow dependencies. Each phase unblocks the next and cannot be safely reordered (except quality-gate which is fully independent throughout).
 
-### Phase 1: Runtime Dependency Installation
+### Phase 1: Foundation — Migration 009 + Storage Plumbing
 
-**Rationale:** This is the core bug fix. The ESM/NODE_PATH incompatibility (Pitfall 1) must be resolved here first — it invalidates the assumed architecture from the official docs and requires a deliberate decision on install target location before any install script is written. All other work is unblocked once deps are reliably installable and findable by the ESM loader.
+**Rationale:** Everything else depends on the DB schema being correct. Migration 009 is additive-only (ALTER TABLE ADD COLUMN for nullable columns; CREATE TABLE for schemas/schema_fields) — the lowest-risk phase. `upsertNodeMetadata()` is a new method with no changes to existing methods. These two items are the prerequisite for all enrichment, confidence/evidence, and schema work.
 
-**Delivers:** MCP server starts after marketplace install; all 8 MCP tools visible to Claude on second session (first-session race is acceptable on v5.2.0; self-healing wrapper eliminates it permanently)
+**Delivers:** DB schema with confidence/evidence columns on connections; owner/auth_mechanism/db_backend on services; schemas and schema_fields tables with indexes; `upsertNodeMetadata()` method in query-engine.js
 
-**Addresses:**
-- Separate hooks.json install entry with `"timeout": 300`
-- `scripts/install-deps.sh` implementing the `diff -q ... || (cp ... && npm install --prefix ${CLAUDE_PLUGIN_ROOT}) || rm -f ...` pattern
-- Step 0 in session-start.sh: check sentinel, invoke install script, handle failure non-blocking
-- better-sqlite3 smoke-test after install
-- ChromaDB optional dep isolation verification (3-tier fallback must activate at module load)
-- Partial install recovery: `rm -f` sentinel on npm failure ensures next session retries
+**Addresses:** Migration 009 (critical table stakes); Pitfalls 2, 3, 9 prevention (pipeline completeness, schema stale cleanup, migration guard)
 
-**Avoids:**
-- Pitfall 1: Install into `${CLAUDE_PLUGIN_ROOT}` (not CLAUDE_PLUGIN_DATA + NODE_PATH)
-- Pitfall 2: Smoke-test native binary after install
-- Pitfall 3: Self-healing MCP wrapper as belt-and-suspenders for first-session race
-- Pitfall 4: Separate high-timeout hook entry, existing session-start.sh unchanged
-- Pitfall 7: Sentinel is only written after successful install; partial installs cause sentinel cleanup, not persistence
+**Avoids:** Silently dropped confidence/evidence data; schema data having nowhere to persist; try/catch migration guard hiding column omissions; picomatch package should be added to package.json in this phase
 
-**Research flag: VALIDATE ONE ASSUMPTION** — Confirm whether `${CLAUDE_PLUGIN_ROOT}` in the plugin cache is truly user-writable at SessionStart hook time. STACK.md confirms `~/.claude/plugins/cache/ligamen/ligamen/5.1.2/` is `drwxr-xr-x ravichillerega` (user-owned). However, verify empirically that npm can write `node_modules/` there at hook runtime before committing to this approach.
+**Research flag:** Standard patterns — SQLite ALTER TABLE convention established in 001-008; no additional research needed
 
-### Phase 2: MCP Server Launch Verification
+### Phase 2: Enrichment Architecture + CODEOWNERS Pass
 
-**Rationale:** Independent of install logic — verifies that once deps exist at `${CLAUDE_PLUGIN_ROOT}/node_modules`, the Node.js ESM loader resolves them correctly when the MCP server is launched from `.mcp.json`. This is primarily a verification and hardening phase.
+**Rationale:** The enrichment framework (enricher.js) must exist before any individual enricher can be wired in. CODEOWNERS is the simplest enricher (pure file-system read + picomatch pattern match, no regex fragility) and validates the enricher signature contract and manager.js wiring before adding auth/DB complexity.
 
-**Delivers:** Confirmed end-to-end MCP server startup from a marketplace-simulated install; all 8 tools visible; `.mcp.json` confirmed to need no env changes; root dev repo `.mcp.json` confirmed as `{"mcpServers": {}}` (correct)
+**Delivers:** `enricher.js` orchestrator wired into manager.js post-parseAgentOutput(); `codeowners.js` with picomatch glob matching; owner written to node_metadata and services.owner; enrichment is graceful-failure by design (never aborts scan)
 
-**Addresses:**
-- Run `node ${CLAUDE_PLUGIN_ROOT}/worker/mcp/server.js` with deps in place; confirm no `ERR_MODULE_NOT_FOUND`
-- Verify `better-sqlite3` loads correctly in ESM context (bare `import` should work in v12.x; fall back to `module.createRequire` if not)
-- Confirm `${CLAUDE_PLUGIN_DATA}` expansion behavior in `.mcp.json` `env` block (needed only if hooks.json expansion of CLAUDE_PLUGIN_DATA is used; not needed for CLAUDE_PLUGIN_ROOT install path)
-- Confirm ChromaDB graceful degradation: delete `@chroma-core/default-embed`, verify MCP server still starts
+**Addresses:** Enrichment pass architecture; CODEOWNERS extraction; ownership string normalization (store canonical GitHub handle formatted as lowercase-hyphenated `owner_key`; reject free-form strings)
 
-**Avoids:**
-- Pitfall 1: Verify ESM directory-walk resolution works; no NODE_PATH needed
-- Pitfall 2: Smoke-test using same Node binary Claude Code uses for MCP servers
+**Avoids:** Pitfall 1 (enrichment stomps primary scan data) — enforced by try/catch wrapper and node_metadata-only writes; Pitfall 6 (unstructured ownership strings) — enforced by normalization at extraction time; Pitfall 7 (two-phase scan partial state) — enrichment runs synchronously within the primary scan bracket, not as a separate pass
 
-**Research flag: STANDARD PATTERNS** — If Phase 1 installs into `${CLAUDE_PLUGIN_ROOT}`, ESM resolution is automatic and well-documented. No new research needed; this is an integration test phase.
+**Research flag:** Standard patterns — CODEOWNERS format documented by GitHub/GitLab; picomatch API is well-documented; no additional research needed
 
-### Phase 3: Version Sync and Release Tooling
+### Phase 3: Auth/DB Enrichment Pass
 
-**Rationale:** Independent of install work. Fixes the current 5.1.1 drift in root marketplace.json, bumps all files to 5.2.0, and adds automation to prevent future drift. Must be complete before the v5.2.0 release tag.
+**Rationale:** Auth and DB extraction follow the same enricher contract from Phase 2. The complexity is in the regex signal table (per-language patterns for JWT/OAuth2/session/API-key and postgres/mysql/sqlite/mongodb detection). Keeping this as a separate phase isolates auth/DB pattern iteration from the framework.
 
-**Delivers:** All five manifest files at 5.2.0; `scripts/bump-version.sh` + `make bump` + `make check`; confirmed `claude plugin marketplace add` offers 5.2.0; bats tests for install script (P2)
+**Delivers:** `auth-db-extractor.js` with per-language regex signal tables; auth_mechanism and db_backend written to node_metadata and denormalized into services columns; auth_confidence (high/low based on whether pattern found in boundary_entry vs secondary file); credential extraction prevention
 
-**Addresses:**
-- Root `.claude-plugin/marketplace.json` fix (5.1.1 → 5.2.0)
-- `scripts/bump-version.sh` with jq — updates all five files atomically per STACK.md template
-- `make bump VERSION=5.2.0` target
-- `make check` version consistency validation (checks all five files match)
-- Bats tests for install script: first-run, idempotency, npm-absent fallback, partial-install recovery
+**Addresses:** Auth mechanism extraction; DB backend extraction; credential value exclusion via file-scope filtering and value-pattern validator
 
-**Avoids:**
-- Pitfall 5: Automated sync prevents manual version drift across five files
-- Pitfall 6: Version bump in all files ensures Claude Code cache refresh triggers correctly on plugin update
+**Avoids:** Pitfall 4 (auth extraction stores credential values) — prevent by excluding test fixture files and validating that no extracted value matches credential patterns before DB write
 
-**Research flag: STANDARD PATTERNS** — Pure jq/bash scripting with well-understood patterns. STACK.md provides the exact script template. No research needed.
+**Research flag:** Likely needs post-implementation tuning — regex signal table is per-language and per-framework; real-world testing on diverse repos may reveal missing patterns; plan for a tuning iteration after initial integration tests run on actual repos
+
+### Phase 4: Confidence + Evidence Pipeline Completion
+
+**Rationale:** Migration 009 added the columns (Phase 1); this phase wires the data through persistFindings(). The agent already emits confidence and evidence in validated findings.js — this is only a upsert statement change plus getGraph() SELECT change. Low code volume, high correctness value. Must include end-to-end verification.
+
+**Delivers:** confidence and evidence written by persistFindings(); returned by getGraph() on each connection object; pipeline verified end-to-end with a SELECT assertion (`SELECT confidence FROM connections WHERE confidence IS NOT NULL LIMIT 5` must return rows)
+
+**Addresses:** Persist confidence + evidence (critical table-stakes feature that has been dropping silently for multiple milestones)
+
+**Avoids:** Pitfall 2 (confidence never reaches DB) and Pitfall 3 (evidence never reaches DB) — both closed by updating `_stmtUpsertConnection` to include the new columns
+
+**Research flag:** Standard patterns — mechanical change; add two fields to existing upsert; no research needed
+
+### Phase 5: Schema Storage + /graph API Extension
+
+**Rationale:** schemas and schema_fields tables exist after Phase 1. The scan already collects schema data. The gap is that getGraph() does not include it and stale cleanup correctness is unverified. This phase closes both gaps before building any UI on top.
+
+**Delivers:** `schemas_by_connection` in /graph response; stale schema cleanup verified (re-scan removes deleted fields); getGraph() includes owner/auth_mechanism/db_backend pivoted from node_metadata; `?? 'unknown'` normalization in http.js for all enrichment fields; response payload size assertion added to confirm schemas_by_connection does not inflate per-node data
+
+**Addresses:** Schema storage; API extension for all enrichment data; "unknown" normalization at HTTP layer; anti-pattern prevention (schema data stays out of simulation worker)
+
+**Avoids:** Pitfall 5 (stale schema data accumulates across re-scans) — verify scan_version_id on schemas/schema_fields before shipping; Pitfall 10 (schema data in getGraph() bloats response) — schemas attach as top-level map keyed by connection_id, not embedded per-node
+
+**Research flag:** Storage audit required — verify that schemas and schema_fields tables have scan_version_id in migration 001; if missing, add in this phase and test stale cleanup before building the UI
+
+### Phase 6: Detail Panel UI
+
+**Rationale:** All data is now in the graph response. This phase is pure UI: schema section rendering, confidence badge per connection, owner/auth/db rows, "unknown" fallbacks, and escapeHtml() coverage for TypeScript generics and special characters.
+
+**Delivers:** Schema section in detail panel (collapsible, field table with name/type/required); owner/auth/db rows with "unknown" fallback; confidence badge per connection (high=green, low=amber, null=gray); evidence snippet (expandable `<code>` block); `getConfidenceColor()` helper in utils.js
+
+**Addresses:** Schema display in detail panel; confidence badge (P2); evidence snippet (P2); show "unknown" for missing metadata
+
+**Avoids:** Pitfall 10 detail panel concern — escapeHtml() must cover all new field renderings; TypeScript generics (`Array<Record<string, unknown>>`) must render as literal characters in the panel, not as invisible HTML tags
+
+**Research flag:** Standard patterns — detail-panel.js patterns (innerHTML + escapeHtml) are established and well-understood throughout the existing UI codebase; no additional research needed
+
+### Phase 7: Agent Prompt Improvements + Quality-Gate Spin-Out
+
+**Rationale:** Two independent cleanup tasks. Agent prompt improvements for source_file/target_file are low-risk markdown edits with no DB or API changes. Quality-gate spin-out is a removal-only change fully decoupled from enrichment. Grouped here because they share the property of being independent of all other phases.
+
+**Delivers:** agent-prompt-common.md updated with source_file/target_file guidance and examples; null only accepted for genuinely external targets; `commands/quality-gate.sh` and `skills/quality-gate.md` removed from this plugin; README updated to reference the standalone plugin
+
+**Addresses:** Agent prompt improvements (THE-942); Quality-gate spin-out (THE-937)
+
+**Avoids:** Pitfall 8 (quality gate process coupling) — quality gate shell commands must remain pure read-only; if quality gate MCP tools are added later they must use SELECT-only queries and never intersect scan brackets
+
+**Research flag:** Standard patterns — markdown edits and file removal; no research needed
 
 ### Phase Ordering Rationale
 
-- Phase 1 before Phase 2: Cannot verify MCP server launch until deps are installable and in place
-- Phase 2 before Phase 3: Release-quality version bump should happen after the fix is confirmed working end-to-end; avoids shipping a 5.2.0 tag against unverified install behavior
-- Phase 3 is the release gate: version consistency is required before `claude plugin publish`; the stale 5.1.1 in root marketplace.json is already a live bug affecting users on v5.1.x
-- The ESM/NODE_PATH decision in Phase 1 is the only genuine architectural decision; all other work follows from it
+- **Migration first:** All enrichment, confidence, evidence, and schema work requires the DB schema to exist first; any work done without Migration 009 must later be revisited when schema changes invalidate assumptions
+- **Framework before enrichers:** enricher.js must exist and be tested before individual enrichers (codeowners.js, auth-db-extractor.js) can be registered into it; CODEOWNERS validates the framework with simpler logic before auth/DB adds regex complexity
+- **Confidence/evidence pipeline after framework:** the data pipeline change is small but benefits from being tested alongside enrichment so both can be verified in the same integration context
+- **API before UI:** detail-panel.js reads from `state.graphData` populated from /graph; UI can be developed against a mock graph payload but must be verified against real getGraph() output before shipping
+- **Quality-gate and prompt improvements last:** fully decoupled; no reason to block enrichment work on them
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 1:** One empirical validation needed — confirm `${CLAUDE_PLUGIN_ROOT}` is writable at SessionStart hook runtime (not just at dev time). Also confirm which `node` binary Claude Code uses to launch MCP servers (system PATH vs. bundled) to assess better-sqlite3 ABI risk. Both can be tested directly on the developer's machine in the first Phase 1 task.
+Phases needing attention during planning:
+- **Phase 3 (Auth/DB enrichment):** Regex signal table is per-language and per-framework; real-world testing will likely reveal missing patterns; plan for a tuning iteration after initial integration tests; the credential-value exclusion logic must be verified on an actual repo containing `.env.example` before release
+- **Phase 5 (Schema storage/API):** Verify whether `schemas` and `schema_fields` tables have `scan_version_id` in migration 001; if missing, stale cleanup will not work and old fields will accumulate silently across re-scans
 
-Phases with standard patterns (skip research-phase):
-- **Phase 2:** ESM directory-walk module resolution is thoroughly documented; no unknowns once Phase 1 install target is confirmed
-- **Phase 3:** jq-based version sync is straightforward; `make` targets are standard; STACK.md provides exact script implementation
+Phases with well-documented standard patterns (skip research-phase):
+- **Phase 1 (Migration 009):** SQLite ALTER TABLE patterns established by 8 prior migrations in this codebase
+- **Phase 2 (CODEOWNERS):** GitHub CODEOWNERS format is documented; picomatch API is straightforward; last-match-wins semantics are confirmed by both GitHub and GitLab docs
+- **Phase 4 (Confidence/evidence pipeline):** Mechanical change — add two fields to existing upsert statement
+- **Phase 6 (Detail panel UI):** detail-panel.js patterns are established across the existing codebase
+- **Phase 7 (Prompt improvements / quality-gate):** Markdown edits and removal-only change
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Official Node.js ESM docs + Claude Code plugin docs + direct package.json inspection; all sources agree; NODE_PATH/ESM incompatibility confirmed from primary source |
-| Features | HIGH | Derived entirely from direct code inspection of current plugin state + official docs; current broken state is directly observable and reproducible |
-| Architecture | HIGH | Direct source inspection of all affected files; build order is dependency-driven with no ambiguity; one MEDIUM item noted below |
-| Pitfalls | HIGH | ESM/NODE_PATH documented in official Node.js v25 docs; better-sqlite3 ABI issue from issue tracker; race condition from Claude Code issue #10997; hook timeout from direct hooks.json inspection |
+| Stack | HIGH | Direct inspection of existing codebase + npm registry for picomatch; all rejections (codeowners-utils, minimatch, Tree-sitter, Bull) have clear rationale from primary sources |
+| Features | HIGH | Features derived from direct codebase inspection of agent-schema.json, findings.js, migrations 001-008, detail-panel.js confirming exactly what exists and what is missing |
+| Architecture | HIGH | Build order and component boundaries from direct code reading of query-engine.js, manager.js, http.js, detail-panel.js; existing patterns clearly identified; integration points confirmed |
+| Pitfalls | HIGH | Grounded in 8-milestone retrospective documents from this exact codebase, not generic advice; specific symptoms, verification checklists, and recovery strategies included per pitfall |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **`${CLAUDE_PLUGIN_ROOT}` write permissions at runtime** (MEDIUM, Phase 1): STACK.md confirms the cache directory is user-owned and writable at dev time. Needs empirical confirmation that npm can write `node_modules/` there during a live SessionStart hook. If it is read-only in some environments, the fallback is to install into `${CLAUDE_PLUGIN_DATA}` and create a runtime symlink at `${CLAUDE_PLUGIN_ROOT}/node_modules -> ${CLAUDE_PLUGIN_DATA}/node_modules` (symlinks ARE followed by ESM). Test this in the first Phase 1 task.
+- **Auth/DB regex signal completeness:** The signal table covers Python, Node.js, Go, and Rust. Repos using Ruby (Rails/Devise), Java (Spring Security), PHP (Laravel Sanctum), or Kotlin are not covered. This is acceptable for v5.3.0 given the current supported language set, but enrichers should return `null` (not a false positive) when the language is unrecognized — handle this with an early-return guard in auth-db-extractor.js.
 
-- **Which Node binary does Claude Code use for MCP servers?** (MEDIUM, Phase 1): If Claude Code's bundled Node differs from system `node`, the better-sqlite3 binary compiled during the hook may be ABI-incompatible with the MCP server runtime. Resolution: add a smoke-test in the install script using the correct node; document build tool requirements for source compilation fallback.
+- **Schema stale cleanup verification:** ARCHITECTURE.md assumes schemas/schema_fields have scan_version_id but flags it as needing direct confirmation in migration 001. This must be verified before Phase 5 begins; if the column is absent, add it to Migration 009 and test stale cleanup before building any UI that depends on schema accuracy.
 
-- **GitHub issue #10997 (hooks may not fire on first marketplace install)** (MEDIUM, Phase 1): If confirmed reproducible, the self-healing MCP wrapper is mandatory (not optional) for the first-session experience. Test empirically: uninstall and reinstall the plugin, confirm whether SessionStart fires on first session. If it does not, implement MCP wrapper script as `command` in `.mcp.json`.
+- **picomatch CJS import in ESM context:** picomatch v4.0.3 ships CJS (`"main": "index.js"` without `"type":"module"`). The import pattern `createRequire(import.meta.url)` is validated in STACK.md but should be tested in a minimal ESM file in the existing worker context before the CODEOWNERS enricher ships.
 
-- **`better-sqlite3` ESM bare import in Node v25** (LOW, Phase 2): v12.x ships ESM-compatible exports but the native addon loads via CJS internally. Verify `import Database from 'better-sqlite3'` works in Node 25 ESM context without `module.createRequire`. If it fails, use `module.createRequire(import.meta.url)` as the fix — server.js already uses ESM so this is a one-line change.
+- **Incremental scan enrichment policy:** STACK.md recommends skipping enrichment when `getChangedFiles` returns an empty set. The exact integration point with the incremental scan path in manager.js needs to be confirmed during Phase 2 implementation — the changed-files detection API shape may differ from what research assumed.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Claude Code Plugins Reference](https://code.claude.com/docs/en/plugins-reference) — CLAUDE_PLUGIN_DATA path resolution (`~/.claude/plugins/data/{id}/`), CLAUDE_PLUGIN_ROOT definition, SessionStart npm install diff pattern, NODE_PATH in MCP env example (CJS context), version management warnings, caching behavior
-- [Node.js ESM Documentation v25.8.1](https://nodejs.org/api/esm.html) — NODE_PATH not supported in ESM import resolution; native addon loading via `module.createRequire`
-- Direct codebase inspection: `plugins/ligamen/worker/mcp/server.js` (ESM imports), `.mcp.json` (current spawn config), `runtime-deps.json` (dep manifest), `hooks/hooks.json` (timeout: 10), `scripts/session-start.sh` (dedup logic), `package.json` ("type": "module"), `plugin.json`, both `marketplace.json` files, `package-lock.json` (resolved versions)
-- Local filesystem: `~/.claude/plugins/cache/ligamen/ligamen/5.1.2/` confirmed user-owned (`drwxr-xr-x ravichillerega`); `~/.claude/plugins/data/ligamen-ligamen/` confirmed present and empty
+- Direct codebase inspection: `worker/scan/agent-schema.json`, `worker/scan/findings.js`, `worker/db/query-engine.js`, `worker/db/migrations/001-008`, `worker/scan/manager.js`, `worker/ui/modules/detail-panel.js`, `worker/server/http.js` — confirmed current state of all integration points and gaps
+- `.planning/RETROSPECTIVE.md` (v2.0, v2.2, v2.3, v3.0 lessons) — grounded all pitfalls in actual project history; not generic advice
+- [GitHub CODEOWNERS syntax docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners) — last-match-wins semantics, owner format, file locations
+- [GitLab CODEOWNERS reference](https://docs.gitlab.com/user/project/codeowners/reference/) — cross-platform confirmation of last-pattern-wins semantics
+- [github.com/micromatch/picomatch](https://github.com/micromatch/picomatch) — v4.0.3, zero deps, CJS build confirmed
 
 ### Secondary (MEDIUM confidence)
-- [Claude Code issue #11240](https://github.com/anthropics/claude-code/issues/11240) — PostInstall/PreInstall lifecycle hooks not yet implemented; SessionStart is the only available hook for setup work
-- [Claude Code issue #10997](https://github.com/anthropics/claude-code/issues/10997) — SessionStart hooks may not fire on first marketplace plugin run
-- [Claude Code issue #19491](https://github.com/anthropics/claude-code/issues/19491) — SessionStart hooks may run before plugins are fully loaded
-- [Claude Code issue #27113](https://github.com/anthropics/claude-code/issues/27113) — Declarative plugin dependency manifest (feature request, not shipped; runtime-deps.json is the migration path)
+- [FastAPI JWT auth docs](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/) — Python auth regex pattern rationale
+- [Django REST Framework auth guide](https://www.django-rest-framework.org/api-guide/authentication/) — Python auth pattern taxonomy
+- [actix.rs middleware docs](https://actix.rs/docs/middleware/) — Rust auth pattern rationale
+- [npmjs.com/package/codeowners-utils](https://www.npmjs.com/package/codeowners-utils) — rejection rationale confirmed (CJS-only, 5 years unmaintained)
+- [Nemesis 2.x enrichment architecture](https://specterops.io/blog/2026/03/10/the-nemesis-2-x-development-guide/) — ELT enrichment pass pattern; side-car write model
+- [Grafana SDG panel](https://grafana.com/grafana/plugins/novatec-sdg-panel/) — detail panel UX patterns for dependency graph tools; schema-in-detail-panel (not on graph edges) is the established pattern
 
-### Tertiary (MEDIUM confidence, issue trackers)
-- [better-sqlite3 issue #1384](https://github.com/WiseLibs/better-sqlite3/issues/1384) — Node.js v24 prebuilt binary availability delay; pattern applies to any non-LTS Node version
-- [better-sqlite3 issue #549](https://github.com/WiseLibs/better-sqlite3/issues/549) — NODE_MODULE_VERSION mismatch pattern and recovery steps
+### Tertiary (lower confidence — needs validation during implementation)
+- [github.com/isaacs/minimatch/issues/257](https://github.com/isaacs/minimatch/issues/257) — minimatch v10 ESM chain issue; may be resolved in newer versions but picomatch is preferred regardless
+- Node.js Web Worker postMessage structured clone behavior — documented behavior but not tested in this codebase's specific D3 worker setup; the schema-in-worker concern is sound as a principle; exact performance threshold needs measurement in Phase 5
 
 ---
 *Research completed: 2026-03-21*
