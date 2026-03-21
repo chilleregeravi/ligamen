@@ -51,6 +51,8 @@ export async function loadProject(hash, canvas) {
   }
 
   const raw = await resp.json();
+  // Store latest scan version for "what changed" overlay (Phase 56)
+  state.latestScanVersionId = raw.latest_scan_version_id ?? null;
 
   // Map API response to UI shape
   const serviceNameToId = {};
@@ -76,6 +78,7 @@ export async function loadProject(hash, canvas) {
       repo_name: s.repo_name,
       exposes: s.exposes || [],
       boundary: nameToBoundary[s.name] || null,
+      scan_version_id: s.scan_version_id ?? null,
     };
   });
 
@@ -89,6 +92,7 @@ export async function loadProject(hash, canvas) {
     source_file: c.source_file,
     target_file: c.target_file,
     mismatch: c.id ? mismatchSet.has(c.id) : false,
+    scan_version_id: c.scan_version_id ?? null,
   }));
 
   state.graphData.mismatches = raw.mismatches || [];
