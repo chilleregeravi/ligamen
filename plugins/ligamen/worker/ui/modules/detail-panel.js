@@ -290,6 +290,36 @@ function renderActorDetail(node) {
   return html;
 }
 
+export function showBundlePanel(bundle) {
+  const panel = document.getElementById("detail-panel");
+  const content = document.getElementById("detail-content");
+
+  const nameById = {};
+  state.graphData.nodes.forEach((n) => (nameById[n.id] = n.name));
+
+  const srcName = nameById[bundle.source_service_id] || bundle.source_service_id;
+  const tgtName = nameById[bundle.target_service_id] || bundle.target_service_id;
+
+  let html = `<h3>${escapeHtml(srcName)} → ${escapeHtml(tgtName)}</h3>`;
+  html += `<div class="detail-section">
+    <div class="detail-label">Bundled connections (${bundle.count})</div>`;
+
+  for (const e of bundle.edges) {
+    const mismatchFlag = e.mismatch
+      ? ' <span style="color:#fc8181;font-weight:bold" title="Endpoint not verified in target">✗</span>'
+      : "";
+    html += `<div class="connection-item"${e.mismatch ? ' style="border-left:2px solid #fc8181"' : ""}>
+      <div><span class="conn-method">${escapeHtml(e.method || e.protocol)}</span> <span class="conn-path">${escapeHtml(e.path || "")}</span>${mismatchFlag}</div>
+      ${e.source_file ? `<div class="conn-file">${escapeHtml(e.source_file)}</div>` : ""}
+      ${e.mismatch ? '<div class="conn-file" style="color:#fc8181">⚠ Endpoint handler not found in target</div>' : ""}
+    </div>`;
+  }
+
+  html += `</div>`;
+  content.innerHTML = html;
+  panel.style.display = "block";
+}
+
 export function hideDetailPanel() {
   document.getElementById("detail-panel").style.display = "none";
 }

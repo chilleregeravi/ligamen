@@ -3,15 +3,24 @@
  */
 
 import { state, NODE_RADIUS } from "./state.js";
-import { hitTest, toWorld, fetchImpact, getNodeType, getConnectionCount } from "./utils.js";
+import { hitTest, toWorld, fetchImpact, getNodeType, getConnectionCount, edgeHitTest } from "./utils.js";
 import { render } from "./renderer.js";
-import { showDetailPanel, hideDetailPanel } from "./detail-panel.js";
+import { showDetailPanel, hideDetailPanel, showBundlePanel } from "./detail-panel.js";
 import { setupFilterPanel } from "./filter-panel.js";
 
 // Module-scoped refs set by setupInteractions — needed so named handlers
 // can access canvas and tooltip, and so removeEventListener can match refs.
 let _canvas = null;
 let _tooltip = null;
+let _rafId = null;
+
+function scheduleRender() {
+  if (_rafId) return;
+  _rafId = requestAnimationFrame(() => {
+    _rafId = null;
+    render();
+  });
+}
 
 // ── Named event handlers (module scope) ───────────────────────────────────
 // Must be declared at module scope so the same function reference is used in
@@ -25,7 +34,7 @@ function onMouseMove(e) {
     const { x: wx, y: wy } = toWorld(px, py);
     state.positions[state.dragNodeId] = { x: wx, y: wy };
     state.dragStarted = true;
-    render();
+    scheduleRender();
     return;
   }
 
@@ -33,7 +42,7 @@ function onMouseMove(e) {
     state.transform.x = state.panStartTransformX + (px - state.panStartX);
     state.transform.y = state.panStartTransformY + (py - state.panStartY);
     state.dragStarted = true;
-    render();
+    scheduleRender();
     return;
   }
 
@@ -110,10 +119,19 @@ function onClick(e) {
       }
     }
   } else {
-    state.selectedNodeId = null;
-    state.blastNodeId = null;
-    state.blastSet = new Set();
-    hideDetailPanel();
+    const bundle = edgeHitTest(e.offsetX, e.offsetY);
+    if (bundle) {
+      // Bundle click — show bundle detail, deselect any node
+      state.selectedNodeId = null;
+      state.blastNodeId = null;
+      state.blastSet = new Set();
+      showBundlePanel(bundle);
+    } else {
+      state.selectedNodeId = null;
+      state.blastNodeId = null;
+      state.blastSet = new Set();
+      hideDetailPanel();
+    }
   }
 
   render();
@@ -139,7 +157,7 @@ function onWheel(e) {
     state.transform.y -= e.deltaY;
   }
 
-  render();
+  scheduleRender();
 }
 
 function onMouseLeave() {
