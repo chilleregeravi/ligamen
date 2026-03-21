@@ -158,7 +158,9 @@ Plans:
   1. Each service object in the /graph response includes a `scan_version_id` field with the ID of the scan that last updated it
   2. Each connection object in the /graph response includes a `scan_version_id` field with the ID of the scan that created it
   3. The maximum scan_version_id across all services represents the latest scan and is included in the response metadata
-**Plans**: 2 plans
+**Plans**: 1 plan
+Plans:
+- [ ] 55-01-PLAN.md — Add scan_version_id to getGraph() SQL and /graph response, with tests
 
 ### Phase 56: What-Changed Overlay
 **Goal**: Nodes and edges introduced or modified in the latest scan are visually distinct so users can spot recent changes at a glance
@@ -185,6 +187,9 @@ Plans:
   3. Clicking a bundled edge opens the detail panel listing all individual connections within the bundle (protocol, kind, endpoint)
   4. Unbundled (unique) edges render and behave identically to pre-bundling behavior
 **Plans**: 2 plans
+Plans:
+- [ ] 57-01-PLAN.md — computeEdgeBundles + bundle rendering in renderer.js (thick line, count badge, mismatch cross)
+- [ ] 57-02-PLAN.md — edgeHitTest + showBundlePanel (click bundle to see all connections)
 
 ### Phase 58: Documentation
 **Goal**: README and commands reference are updated to accurately describe all v5.1 graph capabilities
@@ -194,7 +199,7 @@ Plans:
   1. README contains a keyboard shortcut reference table listing F, Esc, /, I, 2, 3 with their actions
   2. README describes the PNG export button, subgraph isolation, what-changed overlay, and edge bundling in the graph UI section
   3. docs/commands.md graph UI section reflects all new interactive capabilities introduced in v5.1
-**Plans**: 2 plans
+**Plans**: TBD
 
 ## Progress
 
@@ -215,7 +220,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56 → 57 → 58
 | 52. Keyboard Shortcuts & PNG Export | v5.1 | 0/2 | Not started | - |
 | 53. Clickable Detail Panel Targets | v5.1 | 0/1 | Not started | - |
 | 54. Subgraph Isolation | v5.1 | 0/2 | Not started | - |
-| 55. Scan Version API | v5.1 | 0/TBD | Not started | - |
+| 55. Scan Version API | v5.1 | 0/1 | Not started | - |
 | 56. What-Changed Overlay | v5.1 | 0/TBD | Not started | - |
 | 57. Edge Bundling | v5.1 | 0/TBD | Not started | - |
 | 58. Documentation | v5.1 | 0/TBD | Not started | - |
