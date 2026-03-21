@@ -92,7 +92,7 @@ Full details: `.planning/milestones/v4.1-ROADMAP.md`
 
 - [x] **Phase 49: Directory Restructure** - Move all plugin files into `plugins/ligamen/`, leaving only repo-level files at root (completed 2026-03-21)
 - [x] **Phase 50: Path and Install Updates** - Update all internal paths, imports, hooks references, README install instructions, and Makefile targets (completed 2026-03-21)
-- [ ] **Phase 51: Verification** - Confirm bats tests pass and marketplace install flow works end-to-end
+- [x] **Phase 51: Verification** - Confirm bats tests pass and marketplace install flow works end-to-end (completed 2026-03-21)
 
 ## Phase Details
 
@@ -150,6 +150,6 @@ Plans:
 | 33-38 | v3.0 | 11/11 | Complete | 2026-03-18 |
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
-| 49. Directory Restructure | 1/1 | Complete   | 2026-03-21 | - |
-| 50. Path and Install Updates | 2/2 | Complete   | 2026-03-21 | - |
-| 51. Verification | 1/2 | In Progress|  | - |
+| 49. Directory Restructure | 1/1 | Complete    | 2026-03-21 | - |
+| 50. Path and Install Updates | 2/2 | Complete    | 2026-03-21 | - |
+| 51. Verification | 1/2 | Complete    | 2026-03-21 | - |
