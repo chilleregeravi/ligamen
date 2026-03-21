@@ -64,6 +64,12 @@ Confirm? (yes / edit / no)
 
 Save confirmed list to `ligamen.config.json`.
 
+Capture the project root at this point:
+
+```bash
+PROJECT_ROOT="$(pwd)"
+```
+
 ---
 
 ## Step 2: Scan Each Repo (Two-Phase)
@@ -171,7 +177,7 @@ Write the confirmed findings directly to SQLite using the Ligamen db module:
 node --input-type=module -e "
   import { openDb, writeScan } from '${CLAUDE_PLUGIN_ROOT}/worker/db/database.js';
   import { QueryEngine } from '${CLAUDE_PLUGIN_ROOT}/worker/db/query-engine.js';
-  const db = openDb();
+  const db = openDb('${PROJECT_ROOT}');
   const qe = new QueryEngine(db);
   const findings = JSON.parse(process.argv[1]);
   const repoId = qe.upsertRepo({ path: findings.repo_path, name: findings.repo_name, type: 'single' });
