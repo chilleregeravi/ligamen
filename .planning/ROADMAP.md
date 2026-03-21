@@ -129,7 +129,9 @@ Full details: `.planning/milestones/v5.0-ROADMAP.md`
   1. Clicking a service name in the detail panel's connections list selects that node and pans the canvas to center it
   2. The clicked node's detail panel opens, replacing the previous panel
   3. Clicking a target that is hidden by the current filter shows no broken behavior (click is a no-op or filter is surfaced)
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 53-01-PLAN.md — Add selectAndPanToNode helper and .conn-target click wiring
 
 ### Phase 54: Subgraph Isolation
 **Goal**: Users can focus on a selected node's immediate neighborhood, hiding the rest of the graph
@@ -201,7 +203,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56 → 57 → 58
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
 | 49-51 | v5.0 | 5/5 | Complete | 2026-03-21 |
 | 52. Keyboard Shortcuts & PNG Export | v5.1 | 0/TBD | Not started | - |
-| 53. Clickable Detail Panel Targets | v5.1 | 0/TBD | Not started | - |
+| 53. Clickable Detail Panel Targets | v5.1 | 0/1 | Not started | - |
 | 54. Subgraph Isolation | v5.1 | 0/TBD | Not started | - |
 | 55. Scan Version API | v5.1 | 0/TBD | Not started | - |
 | 56. What-Changed Overlay | v5.1 | 0/TBD | Not started | - |
