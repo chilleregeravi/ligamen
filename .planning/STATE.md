@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 64-02-PLAN.md
-last_updated: "2026-03-21T19:25:38.539Z"
+stopped_at: Completed 65-01-PLAN.md
+last_updated: "2026-03-21T19:26:46.160Z"
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -49,6 +49,7 @@ Plan: 2 of 2 (complete)
 - [Phase 63-scan-bracket-integrity]: endScan() now GC-deletes NULL scan_version_id connections+services after successful scan — connections deleted before services (FK order, no CASCADE)
 - [Phase 63-scan-bracket-integrity]: buildDb() test helper extended to apply migrations 005+006 — without 006, QueryEngine ON CONFLICT(path) for repos fails
 - [Phase 64-undefined-value-crash-chain]: CLI fallback map.md Step 4: pass PROJECT_ROOT captured in Step 1 to openDb() to ensure correct DB hash regardless of process.cwd() at node -e invocation time
+- [Phase 65-service-id-scoping]: [Phase 65-service-id-scoping]: _resolveServiceId scoped by repoId — same-repo preference with global fallback and console.warn on ambiguous multi-repo matches
 
 ### Pending Todos
 
@@ -60,7 +61,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-21T19:25:38.535Z
-Stopped at: Completed 64-02-PLAN.md
+Last session: 2026-03-21T19:26:46.156Z
+Stopped at: Completed 65-01-PLAN.md
 Resume file: None
 Next action: Phase 64 complete — proceed to Phase 65 (service ID collision fix, SVCR-01)

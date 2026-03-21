@@ -14,7 +14,7 @@ Requirements for Scan Data Integrity patch. Each maps to roadmap phases.
 
 ### Service Resolution
 
-- [ ] **SVCR-01**: Cross-repo service ID resolution scoped to avoid name collisions (THE-932)
+- [x] **SVCR-01**: Cross-repo service ID resolution scoped to avoid name collisions (THE-932)
 
 ### Scan Reliability
 
@@ -62,7 +62,7 @@ Deferred to future milestones. Tracked but not in current roadmap.
 | SCAN-02 | Phase 63 | Complete |
 | SREL-02 | Phase 64 | Pending |
 | SREL-03 | Phase 64 | Complete |
-| SVCR-01 | Phase 65 | Pending |
+| SVCR-01 | Phase 65 | Complete |
 | CONF-01 | Phase 66 | Pending |
 | SREL-01 | Phase 66 | Pending |
 
