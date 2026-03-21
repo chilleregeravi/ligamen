@@ -1,7 +1,7 @@
 .PHONY: test lint check install uninstall dev help
 
 PLUGIN_NAME := ligamen
-PLUGIN_DIR  := $(shell pwd)
+PLUGIN_DIR  := $(shell pwd)/plugins/$(PLUGIN_NAME)
 BATS        := ./tests/bats/bin/bats
 
 help: ## Show available targets
@@ -12,11 +12,11 @@ test: ## Run all bats tests
 	$(BATS) tests/*.bats
 
 lint: ## Shellcheck scripts and libs
-	shellcheck -x -e SC1091 scripts/*.sh lib/*.sh
+	shellcheck -x -e SC1091 plugins/$(PLUGIN_NAME)/scripts/*.sh plugins/$(PLUGIN_NAME)/lib/*.sh
 
 check: ## Validate plugin.json and hooks.json
-	jq empty .claude-plugin/plugin.json
-	jq empty hooks/hooks.json
+	jq empty plugins/$(PLUGIN_NAME)/.claude-plugin/plugin.json
+	jq empty plugins/$(PLUGIN_NAME)/hooks/hooks.json
 	@echo "JSON valid"
 
 install: plugins/$(PLUGIN_NAME) ## Register marketplace and install plugin
@@ -24,8 +24,7 @@ install: plugins/$(PLUGIN_NAME) ## Register marketplace and install plugin
 	claude plugin install $(PLUGIN_NAME)@$(PLUGIN_NAME) --scope user
 
 plugins/$(PLUGIN_NAME):
-	mkdir -p plugins
-	ln -sfn $(PLUGIN_DIR) plugins/$(PLUGIN_NAME)
+	@test -d plugins/$(PLUGIN_NAME) || (echo "ERROR: plugins/$(PLUGIN_NAME) not found. Complete Phase 49 (directory restructure) first." && exit 1)
 
 uninstall: ## Remove plugin and marketplace registration
 	claude plugin uninstall $(PLUGIN_NAME)@$(PLUGIN_NAME) || true
