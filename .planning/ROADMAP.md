@@ -297,7 +297,10 @@ Plans:
   2. When the worker crashes and the CLI fallback scan runs, it writes scan results to the correct project database rather than a cwd-relative fallback path
   3. After a crash-recovery fallback scan, the /graph response reflects the correct project's data — not a phantom database created at the wrong path
   4. Re-running `/ligamen:map` after a previous crash-recovery produces a clean scan with no orphaned database files
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 64-01-PLAN.md — Add sanitizeBindings() helper to QueryEngine; patch upsertService and upsertConnection to call it before .run()
+- [ ] 64-02-PLAN.md — Capture PROJECT_ROOT in map.md Step 1; pass explicit root to openDb() in Step 4 node snippet
 
 ### Phase 65: Service ID Scoping
 **Goal**: Cross-repo service ID resolution is scoped per project so that a service named identically in two different repos resolves to the correct ID in each context
@@ -343,6 +346,6 @@ Phases execute in numeric order: 63 → 64 → 65 → 66
 | 52-58 | v5.1 | 11/11 | Complete | 2026-03-21 |
 | 59-62 | v5.2.0 | 5/5 | Complete | 2026-03-21 |
 | 63. Scan Bracket Integrity | v5.2.1 | 0/TBD | Not started | - |
-| 64. Undefined Value Crash Chain | v5.2.1 | 0/TBD | Not started | - |
+| 64. Undefined Value Crash Chain | v5.2.1 | 0/2 | Not started | - |
 | 65. Service ID Scoping | v5.2.1 | 0/TBD | Not started | - |
 | 66. Agent Interaction Fixes | v5.2.1 | 0/TBD | Not started | - |
