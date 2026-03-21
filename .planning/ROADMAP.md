@@ -318,7 +318,10 @@ Plans:
   2. Responding with an ambiguous or unrecognized string to a confirmation prompt triggers a clear re-prompt asking for yes/no explicitly
   3. When the incremental scan agent prompt runs, the agent's scan is bounded to the set of changed files passed in the prompt — the agent does not re-scan unchanged files
   4. An incremental scan invoked with no changed files produces a no-op result rather than a full re-scan
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 66-01-PLAN.md — applyEdits synonym normalization + NEEDS_REPROMPT sentinel in confirmation.js
+- [ ] 66-02-PLAN.md — Incremental scan changed-files constraint injected into agent prompt in manager.js
 
 ## Progress
 
