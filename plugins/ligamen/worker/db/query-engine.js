@@ -656,12 +656,19 @@ export class QueryEngine {
     const services = this._db
       .prepare(
         `
-      SELECT s.id, s.name, s.root_path, s.language, s.type, s.repo_id, r.name as repo_name, r.path as repo_path
+      SELECT s.id, s.name, s.root_path, s.language, s.type, s.repo_id, r.name as repo_name, r.path as repo_path, s.scan_version_id
       FROM services s
       JOIN repos r ON r.id = s.repo_id
     `,
       )
       .all();
+
+    const latest_scan_version_id = services.reduce(
+      (max, s) => (s.scan_version_id != null && (max === null || s.scan_version_id > max))
+        ? s.scan_version_id
+        : max,
+      null
+    );
 
     // Attach exposes per service node
     try {
@@ -687,7 +694,7 @@ export class QueryEngine {
       .prepare(
         `
       SELECT c.id, c.protocol, c.method, c.path, c.source_file, c.target_file,
-             s_src.name as source, s_tgt.name as target
+             s_src.name as source, s_tgt.name as target, c.scan_version_id
       FROM connections c
       JOIN services s_src ON c.source_service_id = s_src.id
       JOIN services s_tgt ON c.target_service_id = s_tgt.id
@@ -730,7 +737,7 @@ export class QueryEngine {
       // actors table doesn't exist yet (migration 008 not applied)
     }
 
-    return { services, connections, repos, mismatches, actors };
+    return { services, connections, repos, mismatches, actors, latest_scan_version_id };
   }
 
   /**
