@@ -47,12 +47,14 @@ export const COLORS = {
     selected: "#f6ad55",
     blast: "#fc8181",
     dimmed: "#2d3748",
+    new: "#f6e05e",        // warm yellow — what-changed overlay
   },
   edge: {
     default: "#4a5568",
     selected: "#f6ad55",
     blast: "#fc8181",
     dimmed: "#1a202c",
+    new: "#f6e05e",        // warm yellow — what-changed overlay
   },
   label: {
     default: "#e2e8f0",

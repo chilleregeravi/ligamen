@@ -195,6 +195,18 @@ export function render() {
       color = "#fc8181";
     }
 
+    // What-changed overlay: brighten edges from the latest scan
+    const isNewEdge =
+      state.showChanges &&
+      state.latestScanVersionId !== null &&
+      edge.scan_version_id === state.latestScanVersionId;
+
+    // Override color and width only when there's no selection/blast active
+    if (isNewEdge && !hasSelection && !hasBlast) {
+      color = COLORS.edge.new;
+      lineWidth = 2;
+    }
+
     ctx.beginPath();
     ctx.setLineDash(scaledDash);
     ctx.moveTo(srcPos.x, srcPos.y);
@@ -330,6 +342,46 @@ export function render() {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2 / state.transform.scale;
       ctx.stroke();
+    }
+
+    // What-changed overlay: draw glow ring around nodes from the latest scan
+    const isNewNode =
+      state.showChanges &&
+      state.latestScanVersionId !== null &&
+      node.scan_version_id === state.latestScanVersionId;
+
+    if (isNewNode && isVisible) {
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = COLORS.node.new;
+      ctx.lineWidth = 2.5 / state.transform.scale;
+      ctx.shadowColor = COLORS.node.new;
+      ctx.shadowBlur = 8 / state.transform.scale;
+      // Redraw just the outline path for the glow ring (same shape, larger radius offset)
+      const glowR = NODE_RADIUS + 4;
+      ctx.beginPath();
+      if (nodeType === "actor") {
+        const r = NODE_RADIUS * 1.1 + 4;
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i - Math.PI / 2;
+          const hx = pos.x + r * Math.cos(angle);
+          const hy = pos.y + r * Math.sin(angle);
+          if (i === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+      } else if (nodeType === "library" || nodeType === "sdk" || nodeType === "infra") {
+        const r = NODE_RADIUS * 1.2 + 4;
+        ctx.moveTo(pos.x, pos.y - r);
+        ctx.lineTo(pos.x + r, pos.y);
+        ctx.lineTo(pos.x, pos.y + r);
+        ctx.lineTo(pos.x - r, pos.y);
+        ctx.closePath();
+      } else {
+        ctx.arc(pos.x, pos.y, glowR, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+      ctx.restore();
     }
 
     // Name label
