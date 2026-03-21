@@ -4,6 +4,8 @@
 # Functions: worker_running(), worker_call(), wait_for_worker(),
 #            worker_start_background(), worker_status_line()
 
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] || { echo "Source this file; do not execute directly." >&2; exit 1; }
+
 worker_running() {
   local data_dir="${LIGAMEN_DATA_DIR:-$HOME/.ligamen}"
   local port_file="${data_dir}/worker.port"
