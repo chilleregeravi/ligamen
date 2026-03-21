@@ -92,20 +92,17 @@ Every edit is automatically formatted and linted, every quality check runs with 
 - ✓ All 5 manifest files version-synced to 5.2.0 — v5.2.0
 - ✓ Plugin directory cleanup: README, LICENSE, .gitignore, source guards — v5.2.0
 
+- ✓ POST /scan uses beginScan/endScan bracket for stale data cleanup (THE-930) — v5.2.1
+- ✓ Legacy NULL scan_version_id rows garbage collected after full scan (THE-931) — v5.2.1
+- ✓ Cross-repo service ID resolution scoped by repoId (THE-932) — v5.2.1
+- ✓ Incremental scan bounded to changed files with no-op on empty diff (THE-933) — v5.2.1
+- ✓ Confirmation flow accepts synonyms, re-prompts on ambiguous input (THE-934) — v5.2.1
+- ✓ upsertService/upsertConnection sanitize undefined→null (THE-935) — v5.2.1
+- ✓ CLI fallback scan passes explicit project root to openDb (THE-936) — v5.2.1
+
 ### Active
 
-## Current Milestone: v5.2.1 Scan Data Integrity
-
-**Goal:** Fix 7 scan reliability bugs — stale data cleanup, service ID collision, undefined value crashes, project hash mismatch, and confirmation flow failures.
-
-**Target features:**
-- POST /scan uses beginScan/endScan bracket for stale data cleanup (THE-930)
-- Legacy NULL scan_version_id rows garbage collected (THE-931)
-- Cross-repo service ID resolution scoped to avoid name collisions (THE-932)
-- Incremental scan prompt guidance for changed-files constraint (THE-933)
-- Confirmation flow tolerant parsing with synonym support (THE-934)
-- upsertService/upsertConnection sanitize undefined→null (THE-935)
-- CLI fallback scan passes explicit project root to openDb (THE-936)
+(Defined per milestone — see REQUIREMENTS.md when next milestone starts)
 
 ### Out of Scope
 
@@ -119,7 +116,7 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ## Context
 
-Shipped v5.2.0 with ~43,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 62 phases across 11 milestones, 109 plans. Repo restructured as Claude Code marketplace — plugin source lives under `plugins/ligamen/`, installable via `claude plugin marketplace add` + `claude plugin install`. MCP server has 8 tools (5 impact + 3 drift). Runtime deps installed automatically on first session via SessionStart hook + self-healing MCP wrapper.
+Shipped v5.2.1 with ~43,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 66 phases across 12 milestones, 116 plans. Repo restructured as Claude Code marketplace — plugin source lives under `plugins/ligamen/`, installable via `claude plugin marketplace add` + `claude plugin install`. MCP server has 8 tools (5 impact + 3 drift). Runtime deps installed automatically on first session via SessionStart hook + self-healing MCP wrapper.
 
 Architecture: commands/ for user-invoked features, skills/ for auto-invoked knowledge, hooks/ for formatting/linting/guarding, worker/ for Node.js daemon (db/, server/, scan/, mcp/, ui/ subdirectories), lib/ for shared bash/JS libraries. Agent scan prompts modularized into type-specific variants (service, library, infra) with shared common component. Graph UI uses deterministic layered layout with boundary grouping, external actor hexagons, and protocol-differentiated edges. Filter panel provides protocol, layer, boundary, language, mismatch, and isolated-node toggles.
 
@@ -182,4 +179,4 @@ Known tech debt: no log rotation, db/database.js has console.log in script-mode 
 | .mcp.json points to wrapper script not node directly | Enables self-healing path; wrapper handles dep check before exec | ✓ Good |
 
 ---
-*Last updated: 2026-03-21 after v5.2.1 milestone started*
+*Last updated: 2026-03-21 after v5.2.1 milestone*
