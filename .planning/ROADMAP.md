@@ -236,7 +236,9 @@ Plans:
   2. All 8 MCP tools (5 impact + 3 drift) are listed and callable after server startup
   3. Removing @chroma-core/default-embed from node_modules and restarting the server does not crash it — the 3-tier search fallback activates instead
   4. The root dev-repo .mcp.json is confirmed as {"mcpServers": {}} and does not interfere with the plugin's .mcp.json
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 60-01-PLAN.md — MCP launch verification + ChromaDB fallback + root .mcp.json validation bats tests
 
 ### Phase 61: Version Sync
 **Goal**: All five manifest files are at version 5.2.0 and a bump script prevents future version drift
@@ -267,5 +269,5 @@ Phases execute in numeric order: 59 → 60 → 61
 | 49-51 | v5.0 | 5/5 | Complete | 2026-03-21 |
 | 52-58 | v5.1 | 11/11 | Complete | 2026-03-21 |
 | 59. Runtime Dependency Installation | v5.2.0 | 0/2 | Not started | - |
-| 60. MCP Server Launch Verification | v5.2.0 | 0/TBD | Not started | - |
+| 60. MCP Server Launch Verification | v5.2.0 | 0/1 | Not started | - |
 | 61. Version Sync | v5.2.0 | 0/TBD | Not started | - |
