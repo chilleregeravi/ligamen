@@ -1,6 +1,6 @@
 {
   "name": "ligamen",
-  "version": "5.1.1",
+  "version": "5.1.2",
   "description": "Auto-format, auto-lint, and cross-repo quality gates for Claude Code",
   "author": {
     "name": "Ravi Chillerega"
