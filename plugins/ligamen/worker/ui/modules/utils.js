@@ -157,6 +157,44 @@ export function computeEdgeBundles(edges) {
   return bundles;
 }
 
+export function edgeHitTest(px, py) {
+  const { x: wx, y: wy } = toWorld(px, py);
+
+  // Build filtered bundles (same filter logic as renderer.js)
+  const filteredEdges = state.graphData.edges.filter(edge => {
+    if (!state.activeProtocols.has(edge.protocol)) return false;
+    if (state.mismatchesOnly && !edge.mismatch) return false;
+    return true;
+  });
+  const bundles = computeEdgeBundles(filteredEdges);
+
+  // Only hit-test bundles with count > 1 (single edges are not clickable)
+  const multiBundles = bundles.filter(b => b.count > 1);
+
+  const HIT_RADIUS = 10; // logical pixels — how close to the line counts as a hit
+
+  for (const bundle of multiBundles) {
+    const srcPos = state.positions[bundle.source_service_id];
+    const tgtPos = state.positions[bundle.target_service_id];
+    if (!srcPos || !tgtPos) continue;
+
+    // Distance from point (wx, wy) to line segment (srcPos → tgtPos)
+    const dx = tgtPos.x - srcPos.x;
+    const dy = tgtPos.y - srcPos.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) continue;
+
+    // Project point onto segment, clamp t to [0,1]
+    const t = Math.max(0, Math.min(1, ((wx - srcPos.x) * dx + (wy - srcPos.y) * dy) / lenSq));
+    const closestX = srcPos.x + t * dx;
+    const closestY = srcPos.y + t * dy;
+    const dist = Math.hypot(wx - closestX, wy - closestY);
+
+    if (dist < HIT_RADIUS) return bundle;
+  }
+  return null;
+}
+
 export async function fetchImpact(nodeName, nodeId) {
   if (state.blastCache[nodeName] !== undefined) {
     return state.blastCache[nodeName];
