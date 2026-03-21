@@ -437,4 +437,106 @@ console.log("Test C: endScan() on repo A does not delete NULL rows for repo B");
 }
 console.log("  PASS");
 
+// ---------------------------------------------------------------------------
+// Test D: cross-repo: same-repo service preferred over foreign service with same name
+// ---------------------------------------------------------------------------
+console.log("Test D: cross-repo: same-repo service preferred over foreign service with same name");
+{
+  const db = await buildDb();
+  const { QueryEngine } = await import("./query-engine.js?v=D");
+  const qe = new QueryEngine(db);
+
+  const repoAId = db
+    .prepare("INSERT INTO repos(path, name, type) VALUES(?,?,?)")
+    .run("/tmp/rA-d", "repoA-D", "single").lastInsertRowid;
+  const repoBId = db
+    .prepare("INSERT INTO repos(path, name, type) VALUES(?,?,?)")
+    .run("/tmp/rB-d", "repoB-D", "single").lastInsertRowid;
+
+  // Insert "api-gateway" in repo B first (so it gets a lower id)
+  const idB = qe.upsertService({ repo_id: repoBId, name: "api-gateway", root_path: "/tmp", language: "node" });
+  // Insert "api-gateway" in repo A
+  const idA = qe.upsertService({ repo_id: repoAId, name: "api-gateway", root_path: "/tmp", language: "node" });
+
+  // Resolving with repoId=repoA should return idA, not idB
+  const resolved = qe._resolveServiceId("api-gateway", repoAId);
+  assert.strictEqual(resolved, idA, `Expected idA (${idA}), got ${resolved}`);
+  db.close();
+}
+console.log("  PASS");
+
+// ---------------------------------------------------------------------------
+// Test E: cross-repo: unique foreign service name resolves without warning
+// ---------------------------------------------------------------------------
+console.log("Test E: cross-repo: unique foreign service name resolves without warning");
+{
+  const db = await buildDb();
+  const { QueryEngine } = await import("./query-engine.js?v=E");
+  const qe = new QueryEngine(db);
+
+  const repoAId = db
+    .prepare("INSERT INTO repos(path, name, type) VALUES(?,?,?)")
+    .run("/tmp/rA2-e", "repoA2-E", "single").lastInsertRowid;
+  const repoBId = db
+    .prepare("INSERT INTO repos(path, name, type) VALUES(?,?,?)")
+    .run("/tmp/rB2-e", "repoB2-E", "single").lastInsertRowid;
+
+  // Insert "shared-lib" only in repo B
+  const idShared = qe.upsertService({ repo_id: repoBId, name: "shared-lib", root_path: "/tmp", language: "go" });
+
+  // Stub console.warn
+  const warns = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warns.push(a);
+
+  // Resolving "shared-lib" from repoA's perspective — no same-repo match, only one global match
+  const resolved = qe._resolveServiceId("shared-lib", repoAId);
+
+  console.warn = origWarn;
+
+  assert.strictEqual(resolved, idShared, `Expected idShared (${idShared}), got ${resolved}`);
+  assert.strictEqual(warns.length, 0, `Expected no warnings, got ${warns.length}`);
+  db.close();
+}
+console.log("  PASS");
+
+// ---------------------------------------------------------------------------
+// Test F: cross-repo: ambiguous name across repos emits console.warn
+// ---------------------------------------------------------------------------
+console.log("Test F: cross-repo: ambiguous name across repos emits console.warn");
+{
+  const db = await buildDb();
+  const { QueryEngine } = await import("./query-engine.js?v=F");
+  const qe = new QueryEngine(db);
+
+  const repoAId = db
+    .prepare("INSERT INTO repos(path, name, type) VALUES(?,?,?)")
+    .run("/tmp/rA3-f", "repoA3-F", "single").lastInsertRowid;
+  const repoBId = db
+    .prepare("INSERT INTO repos(path, name, type) VALUES(?,?,?)")
+    .run("/tmp/rB3-f", "repoB3-F", "single").lastInsertRowid;
+
+  // Insert "collision-svc" in both repos
+  qe.upsertService({ repo_id: repoAId, name: "collision-svc", root_path: "/tmp", language: "node" });
+  qe.upsertService({ repo_id: repoBId, name: "collision-svc", root_path: "/tmp", language: "go" });
+
+  // Stub console.warn
+  const warns = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warns.push(a);
+
+  // Call with no repoId (old call path / unknown context) — hits two rows globally
+  qe._resolveServiceId("collision-svc", null);
+
+  console.warn = origWarn;
+
+  assert.strictEqual(warns.length, 1, `Expected 1 warning, got ${warns.length}`);
+  assert.ok(
+    warns[0][0].includes("Ambiguous service name"),
+    `Expected warning to contain "Ambiguous service name", got: ${warns[0][0]}`
+  );
+  db.close();
+}
+console.log("  PASS");
+
 console.log("\nAll query-engine upsert rewrite tests PASS");
