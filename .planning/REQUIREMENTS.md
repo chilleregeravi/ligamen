@@ -25,7 +25,7 @@ Requirements for Graph Interactivity milestone. Each maps to roadmap phases.
 
 ### Export
 
-- [ ] **EXP-01**: User can click an export button to download the current canvas view as PNG
+- [x] **EXP-01**: User can click an export button to download the current canvas view as PNG
 
 ### Documentation
 
@@ -74,7 +74,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GRAPH-02 | Phase 57 | Pending |
 | GRAPH-03 | Phase 56 | Pending |
 | GRAPH-04 | Phase 55 | Pending |
-| EXP-01 | Phase 52 | Pending |
+| EXP-01 | Phase 52 | Complete |
 | DOC-01 | Phase 58 | Pending |
 | DOC-02 | Phase 58 | Pending |
 
