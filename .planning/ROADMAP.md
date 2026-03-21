@@ -217,7 +217,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56 → 57 → 58
 | 39-45 | v4.0 | 14/14 | Complete | 2026-03-20 |
 | 46-48 | v4.1 | 6/6 | Complete | 2026-03-20 |
 | 49-51 | v5.0 | 5/5 | Complete | 2026-03-21 |
-| 52. Keyboard Shortcuts & PNG Export | v5.1 | 0/2 | Not started | - |
+| 52. Keyboard Shortcuts & PNG Export | 1/2 | In Progress|  | - |
 | 53. Clickable Detail Panel Targets | v5.1 | 0/1 | Not started | - |
 | 54. Subgraph Isolation | v5.1 | 0/2 | Not started | - |
 | 55. Scan Version API | v5.1 | 0/1 | Not started | - |
