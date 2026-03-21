@@ -47,12 +47,17 @@ parse_drift_args() {
 # Source linked-repos library and discover linked repos
 source "${PLUGIN_ROOT}/lib/linked-repos.sh"
 
-# LINKED_REPOS: space-separated list of linked repo paths
-LINKED_REPOS=$(list_linked_repos "${PLUGIN_ROOT}" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+# LINKED_REPOS: use test override if set, otherwise discover from config
+if [[ -n "${DRIFT_TEST_LINKED_REPOS:-}" ]]; then
+  LINKED_REPOS="$DRIFT_TEST_LINKED_REPOS"
+else
+  LINKED_REPOS=$(list_linked_repos "${PLUGIN_ROOT}" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+fi
 
 if [[ -z "${LINKED_REPOS:-}" ]]; then
   echo "No linked repos found. Configure linked-repos in ligamen.config.json or run from a directory with sibling git repos." >&2
-  exit 0
+  # Use return (not exit) since this file is always sourced; parent script handles control flow.
+  return 0
 fi
 
 export PLUGIN_ROOT SHOW_INFO LINKED_REPOS

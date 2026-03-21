@@ -38,7 +38,11 @@ if [[ -f "$PID_FILE" ]]; then
       RUNNING_VERSION=$(curl -s "http://127.0.0.1:${_port}/api/version" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)
     fi
 
-    if [[ -n "$INSTALLED_VERSION" && -n "$RUNNING_VERSION" && "$INSTALLED_VERSION" != "$RUNNING_VERSION" ]]; then
+    # Only restart on version mismatch if we can determine the running version.
+    # "unknown" means the worker could not read its own package.json — treat as same.
+    if [[ -n "$INSTALLED_VERSION" && -n "$RUNNING_VERSION" \
+        && "$RUNNING_VERSION" != "unknown" \
+        && "$INSTALLED_VERSION" != "$RUNNING_VERSION" ]]; then
       echo "version mismatch (installed=$INSTALLED_VERSION, running=$RUNNING_VERSION) — restarting" >&2
       kill "$PID" 2>/dev/null || true
       sleep 1

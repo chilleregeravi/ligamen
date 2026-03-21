@@ -70,7 +70,7 @@ async function createHttpServer(queryEngine, options = {}) {
   // 1b. GET /api/version — returns running worker version (for auto-restart on update)
   fastify.get("/api/version", async (_request, reply) => {
     try {
-      const pkgPath = path.join(__dirname, "..", "package.json");
+      const pkgPath = path.join(__dirname, "..", "..", "package.json");
       const pkg = JSON.parse(
         (await import("fs")).default.readFileSync(pkgPath, "utf8"),
       );
