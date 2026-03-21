@@ -11,6 +11,7 @@ import { z } from "zod";
 import { createLogger } from '../lib/logger.js';
 import { getQueryEngine, getQueryEngineByHash, getQueryEngineByRepo } from '../db/pool.js';
 import { enrichImpactResult, enrichSearchResult } from '../db/query-engine.js';
+import { chromaSearch, isChromaAvailable } from '../server/chroma.js';
 
 const dataDir =
   process.env.LIGAMEN_DATA_DIR || path.join(os.homedir(), ".ligamen");
@@ -397,7 +398,7 @@ export async function queryGraph(
 }
 
 /**
- * Full-text search across connections via FTS5, with SQL LIKE fallback.
+ * Full-text search across connections: ChromaDB -> FTS5 -> SQL LIKE fallback.
  * @param {Database|null} db
  * @param {{ query: string, limit?: number }} params
  * @returns {{ results: Array, search_mode: string }}
@@ -405,7 +406,28 @@ export async function queryGraph(
 export async function querySearch(db, { query, limit = 20 }) {
   if (!db) return { results: [] };
 
-  // Attempt FTS5 query first
+  // Tier 1: ChromaDB semantic search (when available)
+  if (isChromaAvailable()) {
+    try {
+      const chromaResults = await chromaSearch(query, limit);
+      if (chromaResults.length > 0) {
+        return {
+          results: chromaResults.map((r) => ({
+            path: r.document || r.id,
+            protocol: (r.metadata && r.metadata.protocol) || "unknown",
+            source_service: (r.metadata && r.metadata.source) || "unknown",
+            target_service: (r.metadata && r.metadata.target) || "unknown",
+            score: r.score,
+          })),
+          search_mode: "chroma",
+        };
+      }
+    } catch (err) {
+      logger.warn('ChromaDB search failed, falling back to FTS5', { error: err.message });
+    }
+  }
+
+  // Tier 2: FTS5 keyword search
   try {
     const rows = db
       .prepare(
@@ -424,28 +446,29 @@ export async function querySearch(db, { query, limit = 20 }) {
       .all(query, limit);
     return { results: rows, search_mode: "fts5" };
   } catch (err) {
-    // If FTS5 table doesn't exist, fall back to SQL LIKE
-    if (err.message && err.message.includes("no such table: connections_fts")) {
-      const pattern = `%${query}%`;
-      const rows = db
-        .prepare(
-          `
-        SELECT c.path, c.protocol,
-               s_src.name as source_service,
-               s_tgt.name as target_service
-        FROM connections c
-        JOIN services s_src ON c.source_service_id = s_src.id
-        JOIN services s_tgt ON c.target_service_id = s_tgt.id
-        WHERE c.path LIKE ? OR c.source_file LIKE ?
-        LIMIT ?
-      `,
-        )
-        .all(pattern, pattern, limit);
-      return { results: rows, search_mode: "sql_fallback" };
+    // If FTS5 table doesn't exist, fall through to SQL LIKE
+    if (!err.message || !err.message.includes("no such table: connections_fts")) {
+      logger.error('querySearch FTS5 error', { error: err.message });
     }
-    logger.error('querySearch error', { error: err.message });
-    return { results: [], search_mode: "error" };
   }
+
+  // Tier 3: SQL LIKE fallback (always available)
+  const pattern = `%${query}%`;
+  const rows = db
+    .prepare(
+      `
+    SELECT c.path, c.protocol,
+           s_src.name as source_service,
+           s_tgt.name as target_service
+    FROM connections c
+    JOIN services s_src ON c.source_service_id = s_src.id
+    JOIN services s_tgt ON c.target_service_id = s_tgt.id
+    WHERE c.path LIKE ? OR c.source_file LIKE ?
+    LIMIT ?
+  `,
+    )
+    .all(pattern, pattern, limit);
+  return { results: rows, search_mode: "sql_fallback" };
 }
 
 // ─────────────────────────────────────────────────────────────

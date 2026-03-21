@@ -1,10 +1,10 @@
 # Configuration
 
-Ligamen works with zero configuration. All features auto-detect project types and tools.
+Ligamen works with zero configuration. All features auto-detect your project type, tools, and linked repos. You only need a config file if you want to customize behavior.
 
 ## Project Config: `ligamen.config.json`
 
-Lives in your project root. Committed to git.
+Create this file in your project root and commit it to git. It tells Ligamen which repos to scan together and how to group your services.
 
 ```json
 {
@@ -13,9 +13,6 @@ Lives in your project root. Committed to git.
     "../auth",
     "../sdk"
   ],
-  "impact-map": {
-    "history": true
-  },
   "boundaries": [
     {
       "name": "core",
@@ -31,25 +28,42 @@ Lives in your project root. Committed to git.
 }
 ```
 
-| Key | Purpose |
-|-----|---------|
-| `linked-repos` | Explicit list of connected repos. Auto-discovered from parent dir if absent. |
-| `impact-map` | Created automatically after first `/ligamen:map`. Presence triggers worker auto-start. |
-| `boundaries` | Optional service grouping for the graph UI. Each boundary draws a labeled box around its member services. |
+### Linked Repos
+
+The `linked-repos` array tells Ligamen which repositories to include when scanning. Use relative paths from your project root.
+
+If you don't set this, Ligamen auto-discovers repos by looking at sibling directories (other folders next to your project). This works well for typical multi-repo setups where all repos live under the same parent directory.
 
 ### Boundaries
 
-Boundaries group services visually in the graph UI. Each boundary needs:
+Boundaries group services visually in the graph UI. Each boundary draws a labeled box around its member services.
 
-- `name` — identifier (used in filter dropdown and `node.boundary` field)
-- `label` — display text shown on the boundary box
-- `services` — array of service names (must match names from scan results)
+- `name` — identifier used internally and in filter dropdowns
+- `label` — display text shown on the boundary box in the graph
+- `services` — array of service names (must match the names Ligamen discovers during scanning)
 
-Services not assigned to any boundary appear ungrouped in the services row. A service can only belong to one boundary.
+Services not assigned to any boundary appear ungrouped. A service can only belong to one boundary.
 
-## Machine Settings: `~/.ligamen/settings.json` {#machine-settings}
+### Impact Map
 
-Machine-specific settings. Never committed.
+After your first `/ligamen:map` scan, Ligamen adds an `impact-map` key to your config automatically. You don't need to set this yourself. Its presence tells Ligamen to auto-start the background worker when you open a Claude Code session.
+
+## Disabling Features
+
+Set these environment variables to turn off specific automatic behaviors:
+
+| Variable | Effect |
+|----------|--------|
+| `LIGAMEN_DISABLE_FORMAT=1` | Skip auto-formatting after edits |
+| `LIGAMEN_DISABLE_LINT=1` | Skip auto-linting after edits |
+| `LIGAMEN_DISABLE_GUARD=1` | Skip file guard (allows writes to sensitive files) |
+| `LIGAMEN_DISABLE_SESSION_START=1` | Skip session context injection |
+| `LIGAMEN_LINT_THROTTLE=<seconds>` | Throttle Rust clippy checks (default: 30s) |
+| `LIGAMEN_EXTRA_BLOCKED=<patterns>` | Additional colon-separated glob patterns for file guard to block |
+
+## Advanced: Machine Settings
+
+Machine-specific settings live in `~/.ligamen/settings.json`. This file is never committed to git — it's for local overrides only.
 
 ```json
 {
@@ -62,16 +76,14 @@ Machine-specific settings. Never committed.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `LIGAMEN_WORKER_PORT` | `37888` | Worker daemon HTTP port |
+| `LIGAMEN_WORKER_PORT` | `37888` | Port for the background worker |
 | `LIGAMEN_WORKER_HOST` | `127.0.0.1` | Worker bind address |
-| `LIGAMEN_DATA_DIR` | `~/.ligamen` | Data directory for DBs, logs, settings |
+| `LIGAMEN_DATA_DIR` | `~/.ligamen` | Where Ligamen stores databases and logs |
 | `LIGAMEN_LOG_LEVEL` | `INFO` | Log verbosity (`INFO` or `DEBUG`) |
 
-## ChromaDB (optional) {#chromadb}
+## Advanced: ChromaDB (Semantic Search)
 
-Ligamen can sync service graph data to [ChromaDB](https://www.trychroma.com/) for semantic vector search. This enhances MCP tool responses and `/ligamen:cross-impact` results with richer, context-aware matches.
-
-Without ChromaDB, Ligamen falls back to SQLite FTS5 full-text search — still functional, but keyword-based rather than semantic.
+By default, Ligamen uses keyword-based search (SQLite full-text search) when you query your service graph. For smarter, semantic search — where a query like "what services handle payments" returns results even when "payments" doesn't appear literally — you can optionally connect ChromaDB.
 
 ### Setup
 
@@ -102,7 +114,7 @@ chroma run --host localhost --port 8000
 /ligamen:map
 ```
 
-After scanning, service data is synced to ChromaDB automatically. Subsequent MCP queries and impact checks use ChromaDB for semantic search when available.
+After scanning, Ligamen syncs your service data to ChromaDB automatically. MCP queries and impact checks will use semantic search when available.
 
 ### ChromaDB Settings
 
@@ -110,7 +122,7 @@ Add these to `~/.ligamen/settings.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `LIGAMEN_CHROMA_MODE` | _(empty)_ | Set to `"local"` to enable ChromaDB sync |
+| `LIGAMEN_CHROMA_MODE` | _(empty)_ | Set to `"local"` to enable ChromaDB |
 | `LIGAMEN_CHROMA_HOST` | `localhost` | ChromaDB server hostname |
 | `LIGAMEN_CHROMA_PORT` | `8000` | ChromaDB server port |
 | `LIGAMEN_CHROMA_SSL` | `false` | Enable HTTPS for ChromaDB connection |
@@ -120,41 +132,10 @@ Add these to `~/.ligamen/settings.json`:
 
 ### What Gets Synced
 
-Each service becomes a ChromaDB document with:
-- Service name, type, language
-- Connected services and protocols
-- Boundary membership (if configured)
-- External actor relationships (detected from scan)
-
-This enables queries like "what services handle payments" to return results even when the word "payments" doesn't appear literally in endpoint paths.
+Each service becomes a searchable document containing its name, type, language, connected services and protocols, boundary membership, and external actor relationships.
 
 ### Troubleshooting
 
-- **ChromaDB not running:** Ligamen logs a warning and falls back to FTS5. No scan data is lost.
-- **Connection refused:** Check `LIGAMEN_CHROMA_HOST` and `LIGAMEN_CHROMA_PORT` match your ChromaDB instance.
+- **ChromaDB not running:** Ligamen logs a warning and falls back to keyword search. No data is lost.
+- **Connection refused:** Check that `LIGAMEN_CHROMA_HOST` and `LIGAMEN_CHROMA_PORT` match your ChromaDB instance.
 - **Stale data:** Re-run `/ligamen:map` to resync. ChromaDB collections are replaced on each scan.
-
-## Environment Variables {#environment-variables}
-
-| Variable | Effect |
-|----------|--------|
-| `LIGAMEN_DISABLE_FORMAT=1` | Skip auto-formatting |
-| `LIGAMEN_DISABLE_LINT=1` | Skip auto-linting |
-| `LIGAMEN_DISABLE_GUARD=1` | Skip file guard |
-| `LIGAMEN_DISABLE_SESSION_START=1` | Skip session context |
-| `LIGAMEN_LINT_THROTTLE=<seconds>` | Cargo clippy throttle (default: 30) |
-| `LIGAMEN_EXTRA_BLOCKED=<patterns>` | Colon-separated glob patterns to block |
-
-## Data Directory: `~/.ligamen/`
-
-```
-~/.ligamen/
-├── settings.json              # machine settings
-├── worker.pid                 # daemon PID
-├── worker.port                # actual bound port
-├── logs/                      # worker logs
-└── projects/
-    └── <project-hash>/
-        ├── impact-map.db      # per-project graph DB (SQLite)
-        └── snapshots/         # version history
-```

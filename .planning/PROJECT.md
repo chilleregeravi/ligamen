@@ -113,7 +113,7 @@ Known tech debt: no log rotation, db/database.js has console.log in script-mode 
 - **Plugin format**: Must follow Claude Code plugin conventions (commands/, skills/, hooks.json)
 - **Framework-agnostic**: Detect project type from files, never assume a specific framework
 - **No external service deps**: Every command must work with only local files and git
-- **License**: Apache 2.0
+- **License**: AGPL-3.0-only
 - **Testing**: Bats-core for hook shell scripts, node:test for worker JS
 - **Detect, don't configure**: Infer everything from project files; zero-config by default with optional overrides via ligamen.config.json
 - **Non-blocking hooks**: Format/lint hooks must not block edits on failure — warn and continue

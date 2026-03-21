@@ -1,91 +1,105 @@
 # Architecture
 
-## Project Structure
+> **Audience:** Contributors to the Ligamen codebase. If you're a user looking to get started, see [Commands](commands.md) and [Service Map](service-map.md).
+
+## System Overview
 
 ```
-ligamen/
-  .claude-plugin/
-    plugin.json              # plugin manifest
-  commands/                  # user-invoked slash commands (auto-namespaced)
-    quality-gate.md
-    cross-impact.md
-    drift.md
-    map.md
-  skills/                    # auto-invoked contextual knowledge
-    quality-gate/SKILL.md    # auto-invocable quality gate
-    impact/SKILL.md          # impact recommendations
-  hooks/
-    hooks.json               # hook event bindings
-  scripts/                   # hook implementations + worker lifecycle
-    format.sh
-    lint.sh
-    file-guard.sh
-    session-start.sh
-    impact.sh                # legacy grep-based scanner
-    worker-start.sh
-    worker-stop.sh
-    drift-versions.sh
-    drift-types.sh
-    drift-openapi.sh
-    drift-common.sh
-  lib/                       # shared bash libraries
-    config.sh
-    detect.sh
-    linked-repos.sh
-    worker-client.sh
-  worker/                    # Node.js service dependency intelligence
-    index.js                 # worker entry point
-    db/
-      database.js            # SQLite lifecycle (WAL, migrations)
-      pool.js                # per-project DB pool
-      query-engine.js        # graph queries, impact classification
-      migrations/
-        001_initial_schema.js
-        002_service_type.js
-        003_exposed_endpoints.js
-    mcp/
-      server.js              # MCP stdio server (8 tools)
-    scan/
-      manager.js             # agent dispatch + incremental scanning
-      findings.js            # findings validation
-      confirmation.js        # user confirmation UX
-      discovery.js           # repo discovery module
-      agent-prompt-deep.md   # Phase 2 deep scan prompt
-      agent-prompt-discovery.md  # Phase 1 discovery prompt
-    server/
-      http.js                # Fastify REST API
-      chroma.js              # optional ChromaDB sync
-    ui/
-      index.html             # D3 Canvas graph (zero build step)
-      graph.js               # Canvas renderer + interactions
-      force-worker.js        # off-thread force simulation
-  tests/
-    *.bats                   # bats tests (173+)
-    integration/             # E2E tests
-    storage/                 # query engine tests
+┌─────────────────────────────────────────────────┐
+│  Claude Code                                     │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────┐ │
+│  │  Hooks    │  │ Commands │  │    Skills       │ │
+│  │ format.sh │  │ map.md   │  │ quality-gate/  │ │
+│  │ lint.sh   │  │ drift.md │  │ impact/        │ │
+│  │ guard.sh  │  │ ...      │  │                │ │
+│  └──────────┘  └──────────┘  └────────────────┘ │
+└──────────────────┬──────────────────────────────┘
+                   │ spawns/queries
+    ┌──────────────┴──────────────┐
+    │                              │
+    ▼                              ▼
+┌──────────┐              ┌──────────────┐
+│  Worker   │              │  MCP Server   │
+│  (Fastify)│              │  (stdio)      │
+│  :37888   │              │  8 tools      │
+│           │              │               │
+│  /graph   │              │  impact_query │
+│  /impact  │              │  drift_*      │
+│  /scan    │              │  ...          │
+│  /projects│              └───────┬──────┘
+│  /api/logs│                      │
+└─────┬─────┘                      │
+      │                            │
+      ▼                            ▼
+┌──────────────────────────────────────┐
+│  SQLite (per-project, WAL mode)      │
+│                                       │
+│  repos, services, connections,        │
+│  schemas, fields, exposed_endpoints,  │
+│  scan_versions, actors, node_metadata │
+│                                       │
+│  Optional: ChromaDB vector sync       │
+└──────────────────────────────────────┘
 ```
 
-## Commands vs Skills
+## Plugin Structure
 
-- **`commands/`** — user types `/ligamen:<name>`. Auto-namespaced with `(plugin:ligamen)`.
-- **`skills/`** — Claude auto-loads based on context. Not user-invoked.
+Ligamen is a Claude Code marketplace plugin. Repo root has `marketplace.json`; all source lives under `plugins/ligamen/`.
+
+| Directory | Purpose |
+|-----------|---------|
+| `commands/` | User-invoked slash commands (`/ligamen:*`). Markdown prompts Claude follows. |
+| `skills/` | Auto-invoked by Claude based on context triggers. Not user-invoked. |
+| `hooks/` | Event bindings — PostToolUse (format/lint), PreToolUse (file guard), SessionStart (context). |
+| `scripts/` | Shell implementations for hooks, drift checks, and worker lifecycle. |
+| `lib/` | Shared bash libraries (config, detect, linked-repos, worker-client). |
+| `worker/` | Node.js background daemon — DB, HTTP API, MCP server, scan agents, graph UI. |
 
 ## Worker Process
 
-The worker is a Node.js background daemon that:
+Background Node.js daemon started by `worker-start.sh`:
 
-- Serves the graph UI on localhost
-- Provides REST API for graph queries
-- Is project-agnostic (resolves DB per-request via `?project=` or `?hash=`)
-- Auto-restarts on version mismatch (same pattern as claude-mem)
-- Auto-starts via session hook when `impact-map` config section exists
+- Serves the graph UI on `localhost:37888`
+- REST API for graph queries and scan persistence (9 endpoints)
+- Project-agnostic — resolves per-project DB via `?project=` or `?hash=` query params
+- Auto-restarts on version mismatch
 
 ## MCP Server
 
-Separate stdio process (not part of the worker). Reads SQLite directly. Provides 8 tools for any Claude agent to query the impact map.
+Separate stdio process (not part of the worker). Reads SQLite directly via per-call DB resolution. 8 tools:
+
+- **Impact** (5): `impact_query`, `impact_changed`, `impact_graph`, `impact_search`, `impact_scan`
+- **Drift** (3): `drift_versions`, `drift_types`, `drift_openapi`
+
+Drift tools query the filesystem directly — repo paths from SQLite, actual files from disk.
 
 ## Storage
 
-- **SQLite** with WAL mode — primary storage, always available
-- **ChromaDB** (optional) — vector search enhancement
-- **Fallback chain**: ChromaDB → FTS5 → direct SQL
+- **SQLite** with WAL mode — 8 migrations, per-project isolation via SHA256 path hashing under `~/.ligamen/projects/`
+- **ChromaDB** (optional) — vector search with boundary/actor-enriched embeddings
+- **Search fallback chain** (same for both worker and MCP): ChromaDB → FTS5 → SQL LIKE
+
+## Graph UI
+
+Vanilla JavaScript single-page app served by the worker. Canvas-based, no build step, no framework.
+
+- **Layout**: Deterministic layered grid — services top, libraries middle, infra bottom, with boundary grouping
+- **Node shapes**: Circles (services), outline diamonds (libraries), filled diamonds (infra), hexagons (actors)
+- **Edge styles**: Solid (REST), dashed (gRPC), dotted (events), red (mismatch), bundled (parallel edges with count badge)
+- **Keyboard shortcuts**: F (fit), Esc (deselect), / (search), I (isolate subgraph), 2/3 (expand depth)
+- **Features**: Drag/pan/zoom, click-to-detail with clickable navigation, edge bundle expansion, "what changed" overlay, PNG export
+
+## Scan Pipeline
+
+Two-phase agent-based scanning:
+
+1. **Discovery** (fast) — reads manifests and directory structure, returns language/framework hints
+2. **Deep scan** (targeted) — reads source files guided by discovery, extracts services, connections, schemas
+
+Type-specific prompts for services, libraries, and infrastructure. Scan bracket pattern (`beginScan`/`endScan`) ensures atomic stale-row cleanup — failed scans leave prior data intact.
+
+## Hook Architecture
+
+- **PostToolUse** — auto-format and auto-lint after file edits. Non-blocking (warn on failure, don't block).
+- **PreToolUse** — file guard blocks writes to sensitive files.
+- **SessionStart** — injects project context and optionally starts the worker daemon.

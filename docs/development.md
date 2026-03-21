@@ -1,5 +1,7 @@
 # Development
 
+> **Audience:** Contributors to the Ligamen codebase. If you just want to use Ligamen, see [Commands](commands.md).
+
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)

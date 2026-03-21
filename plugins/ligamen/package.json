@@ -1,15 +1,15 @@
 {
   "name": "@ligamen/cli",
-  "version": "2.0.0",
+  "version": "5.1.1",
   "description": "Ligamen — auto-format, auto-lint, and cross-repo quality gates for Claude Code",
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AetherHQ/ligamen"
+    "url": "https://github.com/chilleregeravi/ligamen"
   },
   "bin": {
     "ligamen-init": "./bin/ligamen-init.js"

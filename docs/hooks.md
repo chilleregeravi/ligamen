@@ -1,55 +1,57 @@
-# Hooks
+# Automatic Behaviors
 
-Ligamen hooks run automatically in the background with zero configuration.
+Ligamen runs several things automatically in the background with zero configuration. You don't need to invoke these — they happen every time Claude edits a file or starts a session.
 
-## Auto-Format (PostToolUse)
+## Formatting After Edits
 
-Every time Claude writes or edits a file, Ligamen runs the appropriate formatter:
+Every time Claude writes or edits a file, Ligamen runs the appropriate formatter for that file type:
 
-| Extension | Formatter |
-|-----------|-----------|
+| File type | Formatter used |
+|-----------|---------------|
 | `.py` | `ruff format` or `black` |
 | `.rs` | `rustfmt` |
 | `.ts` `.tsx` `.js` `.jsx` | `prettier` or `eslint --fix` |
 | `.go` | `gofmt` |
 | `.json` `.yaml` `.yml` | `prettier` |
 
-- If a formatter isn't found, the hook silently skips
-- If it crashes, it exits cleanly — never blocks Claude
-- Files in `node_modules/`, `.venv/`, `target/` are skipped
+If a formatter isn't installed, the step is silently skipped. If it crashes, it exits cleanly and never blocks Claude from working. Files in `node_modules/`, `.venv/`, and `target/` are always skipped.
 
-## Auto-Lint (PostToolUse)
+## Linting After Edits
 
-After every write/edit, Ligamen runs your linter and surfaces issues as a system message:
+After every write or edit, Ligamen also runs your project's linter and surfaces any issues as a system message to Claude:
 
-| Language | Linter |
-|----------|--------|
+| Language | Linter used |
+|----------|-------------|
 | Python | `ruff check` |
 | Rust | `cargo clippy` (throttled to once per 30s) |
 | TypeScript/JavaScript | `eslint` |
 | Go | `golangci-lint` |
 
-Lint output is informational only — never blocks edits.
+Lint output is informational only — it never blocks edits. Claude sees the warnings and can choose to fix them.
 
-## File Guard (PreToolUse)
+## File Guard (Write Protection)
 
-Blocks writes to sensitive files before they happen:
+Before Claude writes to a file, Ligamen checks if it's a sensitive file and blocks the write if so. This prevents accidental modifications to files that should be changed manually or not at all.
 
-**Hard block (write prevented):**
-- `.env`, `.env.*`, `*.pem`, `*.key`, `*credentials*`, `*secret*`
-- `package-lock.json`, `Cargo.lock`, `poetry.lock`, `yarn.lock`, `bun.lock`, `Pipfile.lock`
-- `node_modules/`, `.venv/`, `target/`
+**Blocked files (write prevented):**
 
-**Soft warn (write allowed with caution):**
+- Secrets and credentials: `.env`, `.env.*`, `*.pem`, `*.key`, `*credentials*`, `*secret*`
+- Lock files: `package-lock.json`, `Cargo.lock`, `poetry.lock`, `yarn.lock`, `bun.lock`, `Pipfile.lock`
+- Generated directories: `node_modules/`, `.venv/`, `target/`
+
+**Warning-only files (write allowed, but flagged):**
+
 - Migration files (`migrations/*.sql`, `migrations/*.py`)
 - Generated code (`*.pb.go`, `*_generated.*`, `*.gen.*`)
 - `CHANGELOG.md`
 
-## Session Context (SessionStart)
+You can add your own blocked patterns with the `LIGAMEN_EXTRA_BLOCKED` environment variable (colon-separated glob patterns).
 
-On session start, Ligamen detects your project type and injects available commands. Also auto-starts the dependency map worker if configured.
+## Session Context
 
-## Disabling Hooks
+When you start a Claude Code session, Ligamen detects your project type and injects the available commands into context. If you've previously built a dependency map, it also starts the background worker automatically so the graph UI and MCP tools are ready.
+
+## Disabling Behaviors
 
 | Variable | Effect |
 |----------|--------|

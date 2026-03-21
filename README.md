@@ -197,4 +197,4 @@ After building your first map, add the Ligamen MCP server so all Claude agents c
 
 ## License
 
-Apache-2.0
+AGPL-3.0-only — see [LICENSE](LICENSE)
