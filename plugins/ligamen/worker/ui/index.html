@@ -256,6 +256,21 @@
       #export-btn:hover {
         border-color: #63b3ed;
       }
+      #changes-btn {
+        background: #2d3748;
+        border: 1px solid #4a5568;
+        color: #e2e8f0;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #changes-btn:hover,
+      #changes-btn.active {
+        border-color: #f6e05e;
+        color: #f6e05e;
+      }
       .log-panel {
         flex-shrink: 0;
         background: #0d1117;
@@ -428,6 +443,7 @@
       />
       <button id="fit-btn" title="Fit all nodes to screen">Fit</button>
       <button id="export-btn" title="Download current view as PNG">Export PNG</button>
+      <button id="changes-btn" class="active" title="Toggle what-changed overlay">Changes</button>
       <button id="filters-btn">Filters</button>
       <span id="node-info">Loading...</span>
     </div>

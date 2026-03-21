@@ -155,6 +155,19 @@ export async function loadProject(hash, canvas) {
   initKeyboard();
   initExport();
 
+  // Wire changes toggle — replace node to clear old listeners across project reloads
+  const changesBtn = document.getElementById("changes-btn");
+  if (changesBtn) {
+    const newChangesBtn = changesBtn.cloneNode(true);
+    changesBtn.parentNode.replaceChild(newChangesBtn, changesBtn);
+    newChangesBtn.classList.toggle("active", state.showChanges);
+    newChangesBtn.addEventListener("click", () => {
+      state.showChanges = !state.showChanges;
+      newChangesBtn.classList.toggle("active", state.showChanges);
+      render();
+    });
+  }
+
   // fitToScreen — self-contained, always wired (works after project switch too)
   const fitBtn = document.getElementById("fit-btn");
   if (fitBtn) {
