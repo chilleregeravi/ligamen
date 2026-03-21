@@ -36,6 +36,33 @@ export function getNeighborIds(nodeId) {
   return ids;
 }
 
+/**
+ * Returns all node IDs within `depth` hops of nodeId, including nodeId itself.
+ * Uses BFS over bidirectional edges. Safe on cyclic graphs.
+ *
+ * @param {number} nodeId - The anchor node ID.
+ * @param {number} depth  - Number of hops to expand (1, 2, or 3).
+ * @returns {Set<number>} Set of node IDs in the N-hop neighborhood.
+ */
+export function getNeighborIdsNHop(nodeId, depth) {
+  const visited = new Set([nodeId]);
+  let frontier = new Set([nodeId]);
+  for (let hop = 0; hop < depth; hop++) {
+    const next = new Set();
+    for (const e of state.graphData.edges) {
+      if (frontier.has(e.source_service_id) && !visited.has(e.target_service_id)) {
+        next.add(e.target_service_id);
+      }
+      if (frontier.has(e.target_service_id) && !visited.has(e.source_service_id)) {
+        next.add(e.source_service_id);
+      }
+    }
+    for (const id of next) visited.add(id);
+    frontier = next;
+  }
+  return visited;
+}
+
 export function getConnectionCount(nodeId) {
   let count = 0;
   for (const e of state.graphData.edges) {
