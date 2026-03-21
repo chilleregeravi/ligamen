@@ -48,6 +48,8 @@ Plan: 2 of 2 (complete)
 - [Phase 63-scan-bracket-integrity]: scanVersionId threaded through persistFindings as 4th arg so every row is stamped with non-null scan_version_id (fixes root cause of endScan never deleting stale rows)
 - [Phase 63-scan-bracket-integrity]: endScan() now GC-deletes NULL scan_version_id connections+services after successful scan — connections deleted before services (FK order, no CASCADE)
 - [Phase 63-scan-bracket-integrity]: buildDb() test helper extended to apply migrations 005+006 — without 006, QueryEngine ON CONFLICT(path) for repos fails
+- [Phase 64-01-undefined-value-crash-chain]: sanitizeBindings() added as module-level function in query-engine.js; patches upsertService and upsertConnection to convert undefined optional field values to null before .run() — prevents crash when scan output omits optional manifest keys
+- [Phase 64-01-undefined-value-crash-chain]: better-sqlite3 v12.8 treats undefined named params as null for nullable columns (no TypeError); crash manifests as SQLITE_CONSTRAINT_NOTNULL or RangeError for missing params rather than TypeError
 - [Phase 64-undefined-value-crash-chain]: CLI fallback map.md Step 4: pass PROJECT_ROOT captured in Step 1 to openDb() to ensure correct DB hash regardless of process.cwd() at node -e invocation time
 - [Phase 65-service-id-scoping]: [Phase 65-service-id-scoping]: _resolveServiceId scoped by repoId — same-repo preference with global fallback and console.warn on ambiguous multi-repo matches
 
@@ -61,7 +63,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-21T19:26:46.156Z
-Stopped at: Completed 65-01-PLAN.md
+Last session: 2026-03-21T19:31:05Z
+Stopped at: Completed 64-01-PLAN.md
 Resume file: None
-Next action: Phase 64 complete — proceed to Phase 65 (service ID collision fix, SVCR-01)
+Next action: Phase 64 Plan 01 complete (sanitizeBindings). Phase 64 Plan 02 (CLI fallback fix) also complete. Proceed to Phase 66.
