@@ -10,6 +10,8 @@ export const state = {
   blastNodeId: null,
   blastSet: new Set(),
   blastCache: {},
+  isolatedNodeId: null,   // number|null — ID of node in isolation mode, or null when off
+  isolationDepth: 1,      // number — hop depth (1, 2, or 3)
   activeProtocols: new Set(["rest", "grpc", "events", "internal", "sdk"]),
   activeLayers: new Set(["services", "libraries", "infra", "external"]),
   mismatchesOnly: false,
