@@ -23,6 +23,11 @@ import {
   scanRepos,
   setAgentRunner,
 } from "./manager.js";
+import {
+  registerEnricher,
+  clearEnrichers,
+} from "./enrichment.js";
+import Database from "better-sqlite3";
 
 // ---------------------------------------------------------------------------
 // Helpers to build temp git repos
@@ -559,5 +564,219 @@ describe("scanRepos — incremental prompt constraint", () => {
     assert.equal(results[0].findings, null);
 
     cleanupDir(noopRepo);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scanRepos — enrichment pass wiring (68-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an in-memory SQLite DB with repos, services, and node_metadata tables.
+ * Used to test enrichment wiring: queryEngine._db is passed to runEnrichmentPass.
+ */
+function buildEnrichmentDb() {
+  const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  db.exec(`
+    CREATE TABLE repos (
+      id   INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL
+    );
+    CREATE TABLE services (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      repo_id        INTEGER NOT NULL REFERENCES repos(id),
+      name           TEXT    NOT NULL,
+      root_path      TEXT    NOT NULL,
+      language       TEXT,
+      boundary_entry TEXT
+    );
+    CREATE TABLE node_metadata (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      view       TEXT    NOT NULL,
+      key        TEXT    NOT NULL,
+      value      TEXT,
+      source     TEXT,
+      updated_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(service_id, view, key)
+    );
+  `);
+  // Insert a repo with id=42 to match the mock queryEngine
+  db.prepare("INSERT INTO repos (id, path, name, type) VALUES (?, ?, ?, ?)").run(42, "/tmp/test-repo", "test-repo", "service");
+  return db;
+}
+
+/**
+ * Build a queryEngine mock that includes a real _db (with services pre-seeded).
+ * persistFindings inserts a service into the DB so enrichment can query it.
+ */
+function makeEnrichmentQueryEngine(db, { repoState = null } = {}) {
+  return {
+    _db: db,
+    upsertRepo: (_repoData) => ({ id: 42 }),
+    getRepoState: (_id) => repoState,
+    setRepoState: (_id, _commit) => {},
+    getRepoByPath: (_path) => null,
+    beginScan: (_repoId) => 1,
+    persistFindings: (_repoId, _findings, _commit, _scanVersionId) => {
+      // Simulate a service being persisted into the DB for repo_id=42
+      const existing = db.prepare("SELECT id FROM services WHERE repo_id = 42").get();
+      if (!existing) {
+        db.prepare(
+          "INSERT INTO services (repo_id, name, root_path, language, boundary_entry) VALUES (?, ?, ?, ?, ?)"
+        ).run(42, "test-svc", "/tmp/test-repo", "javascript", "index.js");
+      }
+    },
+    endScan: (_repoId, _scanVersionId) => {},
+  };
+}
+
+const validFindingsJson = JSON.stringify({
+  service_name: "test-svc",
+  confidence: "high",
+  services: [
+    {
+      name: "test-svc",
+      root_path: ".",
+      language: "javascript",
+      confidence: "high",
+    },
+  ],
+  connections: [],
+  schemas: [],
+});
+
+describe("scanRepos — enrichment pass wiring", () => {
+  let repoDir;
+  let enrichmentDb;
+
+  before(() => {
+    const { dir } = makeTempRepo();
+    repoDir = dir;
+    writeFileSync(join(dir, "index.js"), "module.exports = {}");
+    execSync("git add index.js", { cwd: dir, stdio: "pipe" });
+    execSync('git commit -m "add index.js"', { cwd: dir, stdio: "pipe" });
+  });
+
+  after(() => {
+    cleanupDir(repoDir);
+    if (enrichmentDb) {
+      try { enrichmentDb.close(); } catch (_) {}
+    }
+  });
+
+  beforeEach(() => {
+    setAgentRunner(null);
+    clearEnrichers();
+    enrichmentDb = buildEnrichmentDb();
+  });
+
+  test("enrichment called on full scan success: spy enricher receives serviceId", async () => {
+    const qe = makeEnrichmentQueryEngine(enrichmentDb);
+    let spyCalled = false;
+    let spyServiceId = null;
+
+    registerEnricher("spy", async (ctx) => {
+      spyCalled = true;
+      spyServiceId = ctx.serviceId;
+      return {};
+    });
+
+    setAgentRunner(async () => `\`\`\`json\n${validFindingsJson}\n\`\`\``);
+
+    const results = await scanRepos([repoDir], {}, qe);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].mode, "full");
+    assert.ok(spyCalled, "spy enricher must be called after full scan success");
+    assert.ok(typeof spyServiceId === "number", "enricher ctx.serviceId must be a number");
+  });
+
+  test("enrichment skipped on skip mode", async () => {
+    const head = execSync("git rev-parse HEAD", {
+      cwd: repoDir,
+      encoding: "utf8",
+    }).trim();
+    const qe = makeEnrichmentQueryEngine(enrichmentDb, {
+      repoState: { last_scanned_commit: head, last_scanned_at: null },
+    });
+    let spyCalled = false;
+    registerEnricher("spy", async () => {
+      spyCalled = true;
+      return {};
+    });
+
+    setAgentRunner(async () => `\`\`\`json\n${validFindingsJson}\n\`\`\``);
+
+    const results = await scanRepos([repoDir], {}, qe);
+    assert.equal(results[0].mode, "skip");
+    assert.ok(!spyCalled, "spy enricher must NOT be called for skip mode");
+  });
+
+  test("enrichment skipped on incremental-noop", async () => {
+    const { dir: noopRepo } = makeTempRepo();
+    const firstCommit = execSync("git rev-parse HEAD", {
+      cwd: noopRepo,
+      encoding: "utf8",
+    }).trim();
+    execSync('git commit --allow-empty -m "second empty"', {
+      cwd: noopRepo,
+      stdio: "pipe",
+    });
+
+    const qe = makeEnrichmentQueryEngine(enrichmentDb, {
+      repoState: { last_scanned_commit: firstCommit, last_scanned_at: null },
+    });
+    let spyCalled = false;
+    registerEnricher("spy", async () => {
+      spyCalled = true;
+      return {};
+    });
+
+    setAgentRunner(async () => `\`\`\`json\n${validFindingsJson}\n\`\`\``);
+
+    const results = await scanRepos([noopRepo], {}, qe);
+    assert.equal(results[0].mode, "incremental-noop");
+    assert.ok(!spyCalled, "spy enricher must NOT be called for incremental-noop");
+    cleanupDir(noopRepo);
+  });
+
+  test("scan completes when enricher throws — findings still returned", async () => {
+    const qe = makeEnrichmentQueryEngine(enrichmentDb);
+
+    registerEnricher("thrower", async () => {
+      throw new Error("enricher boom");
+    });
+
+    setAgentRunner(async () => `\`\`\`json\n${validFindingsJson}\n\`\`\``);
+
+    const results = await scanRepos([repoDir], {}, qe);
+    assert.equal(results.length, 1);
+    assert.ok(results[0].findings !== null, "findings must be populated despite throwing enricher");
+    assert.ok(!("error" in results[0]), "result must not have top-level error field");
+  });
+
+  test("service count unchanged after enrichment", async () => {
+    // Pre-seed a service so the count before scan is 1.
+    // persistFindings mock uses INSERT OR IGNORE so count stays 1 after scan.
+    // Enrichment must not add or remove services.
+    enrichmentDb.prepare(
+      "INSERT OR IGNORE INTO services (id, repo_id, name, root_path, language, boundary_entry) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(1, 42, "pre-seeded-svc", "/tmp/test-repo", "javascript", "index.js");
+
+    const qe = makeEnrichmentQueryEngine(enrichmentDb);
+
+    registerEnricher("noop", async () => ({}));
+
+    setAgentRunner(async () => `\`\`\`json\n${validFindingsJson}\n\`\`\``);
+
+    const before = enrichmentDb.prepare("SELECT COUNT(*) as n FROM services").get().n;
+    assert.equal(before, 1, "should have one pre-seeded service");
+    await scanRepos([repoDir], {}, qe);
+    const after = enrichmentDb.prepare("SELECT COUNT(*) as n FROM services").get().n;
+
+    assert.strictEqual(before, after, "enrichment must not change service count");
   });
 });
