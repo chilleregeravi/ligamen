@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 71-02-PLAN.md
-last_updated: "2026-03-22T11:04:39.651Z"
+stopped_at: Completed 71-01-PLAN.md
+last_updated: "2026-03-22T11:06:34.308Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 12
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -54,6 +54,8 @@ Plan: 1 of 2
 - [Phase 70-confidence---evidence-pipeline]: v5.3.0: getGraph() connections SELECT wrapped in try/catch — primary SELECT projects c.confidence, c.evidence; fallback omits them on pre-migration-009 DBs without throwing
 - [Phase 71-schema-storage---api-extension]: enrichImpactResult and enrichAffectedResult never throw — try/catch wraps all node_metadata lookups for pre-migration-008 DB compatibility
 - [Phase 71-schema-storage---api-extension]: impact_changed enriched with owner/auth_mechanism/db_backend via enrichAffectedResult — null fields when qe._db unavailable
+- [Phase 71-schema-storage---api-extension]: v5.3.0: Schema/field cleanup in endScan() runs before stale connection delete to avoid FK violation (schemas table has no CASCADE DELETE on connections FK)
+- [Phase 71-schema-storage---api-extension]: v5.3.0: getGraph() fallback connections SELECT projects null as confidence, null as evidence for type consistency on pre-migration-009 DBs
 
 ### Pending Todos
 
@@ -66,6 +68,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T11:04:39.647Z
-Stopped at: Completed 71-02-PLAN.md
+Last session: 2026-03-22T11:06:34.305Z
+Stopped at: Completed 71-01-PLAN.md
 Resume file: None

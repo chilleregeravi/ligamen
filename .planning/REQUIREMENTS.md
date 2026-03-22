@@ -14,7 +14,7 @@ Requirements for Scan Intelligence & Enrichment milestone. Each maps to roadmap 
 ### Schema Surfacing
 
 - [ ] **SCHEMA-01**: Schema/field data displayed in detail panel when connection selected (THE-938)
-- [ ] **SCHEMA-02**: MCP impact tools include field-level severity in responses (THE-938)
+- [x] **SCHEMA-02**: MCP impact tools include field-level severity in responses (THE-938)
 
 ### Confidence & Evidence
 
@@ -25,7 +25,7 @@ Requirements for Scan Intelligence & Enrichment milestone. Each maps to roadmap 
 ### Team Ownership
 
 - [x] **OWN-01**: CODEOWNERS parsed and team ownership stored in node_metadata (THE-940)
-- [ ] **OWN-02**: Owner displayed in detail panel (THE-940)
+- [x] **OWN-02**: Owner displayed in detail panel (THE-940)
 - [x] **OWN-03**: Owner included in MCP impact_query/impact_changed responses (THE-940)
 
 ### Enrichment Architecture
@@ -94,8 +94,8 @@ Deferred to future milestones. Tracked but not in current roadmap.
 | AUTHDB-01 | Phase 69 | Complete |
 | AUTHDB-02 | Phase 69 | Complete |
 | CONF-03 | Phase 70 | Complete |
-| SCHEMA-02 | Phase 71 | Pending |
-| OWN-02 | Phase 71 | Pending |
+| SCHEMA-02 | Phase 71 | Complete |
+| OWN-02 | Phase 71 | Complete |
 | OWN-03 | Phase 71 | Complete |
 | AUTHDB-03 | Phase 71 | Complete |
 | SCHEMA-01 | Phase 72 | Pending |
