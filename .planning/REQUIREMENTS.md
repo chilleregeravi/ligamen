@@ -3,113 +3,73 @@
 **Defined:** 2026-03-22
 **Core Value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
 
-## v5.3.0 Requirements
+## v5.4.0 Requirements
 
-Requirements for Scan Intelligence & Enrichment milestone. Each maps to roadmap phases.
+Requirements for Scan Pipeline Hardening milestone. Each maps to roadmap phases.
 
-### Quality Gate Spinout
+### Scan Bugs
 
-- [x] **QGATE-01**: Quality-gate command and skill extracted to standalone plugin (THE-937)
+- [ ] **SBUG-01**: persistFindings checks target against known services before creating actor — eliminates phantom actor hexagons in graph UI (THE-945)
+- [ ] **SBUG-02**: detectRepoType correctly classifies service repos that have docker-compose.yml for local dev, with expanded Go/Java/Poetry library detection (THE-955)
+- [ ] **SBUG-03**: CODEOWNERS enricher passes relative service root_path to findOwners instead of absolute repo path — ownership patterns now match correctly (THE-956)
 
-### Schema Surfacing
+### Scan Architecture
 
-- [x] **SCHEMA-01**: Schema/field data displayed in detail panel when connection selected (THE-938)
-- [x] **SCHEMA-02**: MCP impact tools include field-level severity in responses (THE-938)
+- [ ] **SARC-01**: Discovery agent (Phase 1) runs before deep scan per repo, returning languages, frameworks, service hints, and file targets as {{DISCOVERY_JSON}} to the deep scan prompt (THE-953)
+- [ ] **SARC-02**: Active agent prompts use discovery context for language-specific pattern guidance instead of hardcoded Python/JS examples; entry points expanded for Java, C#, Ruby, Kotlin (THE-959)
+- [ ] **SARC-03**: Dead code removed: agent-prompt-deep.md deleted, promptDeep variable removed from manager.js, unique documentation migrated to active prompts first (THE-954)
 
-### Confidence & Evidence
+### Scan Validation
 
-- [x] **CONF-01**: Confidence column persisted on services and connections via migration 009 (THE-939)
-- [x] **CONF-02**: Evidence snippets persisted on connections (THE-939)
-- [x] **CONF-03**: Confidence badge visible on nodes/edges in graph UI (THE-939)
+- [ ] **SVAL-01**: findings.js validates services[].type as enum (service/library/sdk/infra), validates root_path and language presence as non-empty strings (THE-957)
+- [ ] **SVAL-02**: getChangedFiles and getCurrentHead use execFileSync with argument arrays instead of execSync with string interpolation — eliminates shell injection surface (THE-958)
 
-### Team Ownership
+### Scan Reliability
 
-- [x] **OWN-01**: CODEOWNERS parsed and team ownership stored in node_metadata (THE-940)
-- [x] **OWN-02**: Owner displayed in detail panel (THE-940)
-- [x] **OWN-03**: Owner included in MCP impact_query/impact_changed responses (THE-940)
+- [ ] **SREL-01**: Discovery agents run in parallel across repos; deep scan agents run in parallel where possible; failed agents retry once then skip with user warning (THE-952)
+- [ ] **SREL-02**: Graph UI /graph endpoint filters out actors whose name matches a known service, redirecting connections to the service node — defense in depth for stale actor data (THE-948)
 
-### Enrichment Architecture
+### Release
 
-- [x] **ENRICH-01**: Enrichment pass framework runs after core scan, before graph display (THE-941)
-- [x] **ENRICH-02**: Each pass writes to node_metadata with distinct view key (THE-941)
-- [x] **ENRICH-03**: Pass failures logged and skipped — never abort the scan (THE-941)
-
-### Agent Data Quality
-
-- [x] **AGENT-01**: Agent prompt makes source_file required on connections (THE-942)
-- [x] **AGENT-02**: Validation warns when source_file missing on connections (THE-942)
-- [x] **AGENT-03**: File paths displayed in detail panel connections list (THE-942)
-
-### Auth & DB Extraction
-
-- [x] **AUTHDB-01**: Auth mechanism extracted per service via enrichment pass (THE-943)
-- [x] **AUTHDB-02**: Database backend extracted per service via enrichment pass (THE-943)
-- [x] **AUTHDB-03**: Auth and DB info included in MCP impact responses (THE-943)
-
-### Unknown State Display
-
-- [x] **UNK-01**: Missing metadata fields show "unknown" in detail panel instead of being hidden (THE-944)
+- [ ] **REL-01**: All manifest files (package.json, marketplace.json, plugin.json) version-bumped to 5.4.0
 
 ## Future Requirements
 
-Deferred to future milestones. Tracked but not in current roadmap.
+### Crossing Semantics (deferred — THE-949)
 
-### Context Menu
-
-- **CTX-01**: User can right-click a node to access actions (copy name, show blast, open repo)
-- **CTX-02**: Context menu adapts options based on node type
-
-### Advanced Visualization
-
-- **VIZ-01**: Minimap overview showing full graph with viewport indicator
-- **VIZ-02**: On-canvas legend showing node shape → type mapping
-- **VIZ-03**: Zoom level indicator with reset-to-100% click
-- **VIZ-04**: URL state persistence for bookmarkable views
-
-### Release Tooling
-
-- **REL-01**: Automated bump-version.sh script for all manifest files
-- **REL-02**: make check version validation
+- **CROSS-01**: Redefine crossing field: external = truly unknown, cross-service = different service, internal = same deployable unit
+- **CROSS-02**: Post-scan reconciliation step downgrades external → cross-service when both endpoints are known services
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Security audit dashboard | Auth data serves Claude's coding workflow, not compliance reporting |
-| Team-based graph filtering | Filtering by owner is service catalog territory (Backstage, Cortex) |
-| Structured numbered confirmation UI | Tolerant synonym parsing from v5.2.1 is sufficient |
-| Schema diff viewer | Show data shape only; diff is future scope |
-| Deployment status/cost/SLA | Platform tool features, not coding plugin |
+| Crossing semantics rewrite (THE-949) | Related but larger scope — deferred to separate milestone |
+| ChromaDB integration changes | No scan schema changes affect vector sync in this milestone |
+| New MCP tools | Milestone focuses on scan pipeline, not API surface |
+| UI layout changes | Only actor dedup filter added; no layout engine changes |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONF-01 | Phase 67 | Complete |
-| CONF-02 | Phase 67 | Complete |
-| ENRICH-01 | Phase 68 | Complete |
-| ENRICH-02 | Phase 68 | Complete |
-| ENRICH-03 | Phase 68 | Complete |
-| OWN-01 | Phase 68 | Complete |
-| AUTHDB-01 | Phase 69 | Complete |
-| AUTHDB-02 | Phase 69 | Complete |
-| CONF-03 | Phase 70 | Complete |
-| SCHEMA-02 | Phase 71 | Complete |
-| OWN-02 | Phase 71 | Complete |
-| OWN-03 | Phase 71 | Complete |
-| AUTHDB-03 | Phase 71 | Complete |
-| SCHEMA-01 | Phase 72 | Complete |
-| UNK-01 | Phase 72 | Complete |
-| AGENT-01 | Phase 73 | Complete |
-| AGENT-02 | Phase 73 | Complete |
-| AGENT-03 | Phase 73 | Complete |
-| QGATE-01 | Phase 73 | Complete |
+| SBUG-01 | TBD | Pending |
+| SBUG-02 | TBD | Pending |
+| SBUG-03 | TBD | Pending |
+| SARC-01 | TBD | Pending |
+| SARC-02 | TBD | Pending |
+| SARC-03 | TBD | Pending |
+| SVAL-01 | TBD | Pending |
+| SVAL-02 | TBD | Pending |
+| SREL-01 | TBD | Pending |
+| SREL-02 | TBD | Pending |
+| REL-01 | TBD | Pending |
 
 **Coverage:**
-- v5.3.0 requirements: 19 total
-- Mapped to phases: 19
-- Unmapped: 0 ✓
+- v5.4.0 requirements: 11 total
+- Mapped to phases: 0 (awaiting roadmap)
+- Unmapped: 11
 
 ---
 *Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after roadmap creation — all 19 requirements mapped to phases 67-73*
+*Last updated: 2026-03-22 after initial definition*
