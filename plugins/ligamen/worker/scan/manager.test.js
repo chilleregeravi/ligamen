@@ -156,6 +156,24 @@ describe("getChangedFiles", () => {
     );
     assert.ok(rename, "should have rename entry from=old.txt to=new.txt");
   });
+
+  test("getChangedFiles works with spaces in repo path", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ligamen test spaces-"));
+    try {
+      execSync("git init", { cwd: dir, stdio: "pipe" });
+      execSync('git config user.email "test@test.com"', { cwd: dir, stdio: "pipe" });
+      execSync('git config user.name "Test"', { cwd: dir, stdio: "pipe" });
+      writeFileSync(join(dir, "hello.txt"), "world");
+      execSync("git add hello.txt", { cwd: dir, stdio: "pipe" });
+      execSync('git commit -m "add file"', { cwd: dir, stdio: "pipe" });
+
+      const result = getChangedFiles(dir, null);
+      assert.ok(!("error" in result), "should not return error for path with spaces");
+      assert.ok(result.modified.includes("hello.txt"), "should list hello.txt");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
