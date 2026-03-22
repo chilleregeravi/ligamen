@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 81-02-PLAN.md
-last_updated: "2026-03-22T20:45:14.776Z"
+stopped_at: Completed 81-01-PLAN.md
+last_updated: "2026-03-22T20:45:25.301Z"
 progress:
   total_phases: 4
   completed_phases: 2
@@ -51,6 +51,7 @@ Plan: 1 of 2
 - [Phase 81-data-integrity-port]: KEY_TO_VIEW in seedMeta ensures test inserts use the same view names production queries filter on
 - [Phase 81-data-integrity-port]: Version mismatch detection placed in worker-already-running branch so it fires only when a live worker is present
 - [Phase 81-data-integrity-port]: DINT-02: upsertRepo queries SELECT id FROM repos WHERE path after run() — lastInsertRowid is 0 on ON CONFLICT UPDATE
+- [Phase 81-data-integrity-port]: DINT-01: endScan schema pre-cleanup uses scan_version_id = ? only (no OR IS NULL) so NULL-versioned connection schemas are deleted before the connections themselves
 
 ### Pending Todos
 
@@ -62,6 +63,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:45:06.309Z
-Stopped at: Completed 81-02-PLAN.md
+Last session: 2026-03-22T20:45:25.297Z
+Stopped at: Completed 81-01-PLAN.md
 Resume file: None
