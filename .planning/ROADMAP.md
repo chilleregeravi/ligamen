@@ -358,7 +358,9 @@ Plans:
   2. After migration 009 runs, `PRAGMA table_info(services)` shows `owner TEXT`, `auth_mechanism TEXT`, and `db_backend TEXT` columns
   3. The `schemas` and `schema_fields` tables exist with indexes and the migration is idempotent — running it twice does not error
   4. `upsertNodeMetadata(serviceId, view, key, value)` is callable from a scan context and writes a row to the `node_metadata` table without triggering a scan bracket
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 67-01-PLAN.md — Migration 009: add confidence/evidence/enrichment columns + upsertNodeMetadata() method
 
 ### Phase 68: Enrichment Architecture & CODEOWNERS
 **Goal**: A post-scan enrichment pass framework runs after core agent output is parsed, each enricher is isolated and gracefully silenced on failure, and the CODEOWNERS enricher correctly stores team ownership for each service
@@ -420,7 +422,10 @@ Plans:
   3. The owner row in a service's detail panel shows the GitHub team handle, or "unknown" if no owner was extracted
   4. The auth mechanism and database backend rows show their values, or "unknown" when not detected — these rows are always visible, never hidden
   5. TypeScript generic type strings (e.g., `Array<Record<string, unknown>>`) render as literal characters in the panel, not as invisible HTML
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 72-01-PLAN.md — Wire enrichment fields into state + service metadata rows + confidence badges
+- [ ] 72-02-PLAN.md — Schema field table in connection detail panel + tests
 
 ### Phase 73: Agent Prompts & Quality-Gate Spinout
 **Goal**: Agent scan prompts explicitly require source_file on connections to reduce null paths; quality-gate command and skill are removed from this plugin in preparation for a standalone plugin
