@@ -512,7 +512,7 @@ Plans:
   4. The variable `promptDeep` does not appear in `plugins/ligamen/worker/scan/manager.js`
 **Plans:** 1 plan
 Plans:
-- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
+- [ ] 77-01-PLAN.md — Debias prompts with multi-language examples, add DISCOVERY_JSON, delete dead code
 
 ### Phase 78: Scan Reliability
 **Goal**: Discovery and deep-scan agents run in parallel across repos where possible, failed agents retry once before being skipped with a user-visible warning, and the graph UI filters stale actor data as a defense-in-depth layer
