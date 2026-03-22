@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 81-01-PLAN.md
-last_updated: "2026-03-22T20:47:48.459Z"
+stopped_at: Completed 82-01-PLAN.md
+last_updated: "2026-03-22T20:58:01Z"
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 81 — Data Integrity Port
+**Current focus:** Phase 82 — Reliability Hardening
 
 ## Current Position
 
-Phase: 81 (Data Integrity Port) — EXECUTING
-Plan: 1 of 2
+Phase: 82 (Reliability Hardening) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -52,6 +52,9 @@ Plan: 1 of 2
 - [Phase 81-data-integrity-port]: Version mismatch detection placed in worker-already-running branch so it fires only when a live worker is present
 - [Phase 81-data-integrity-port]: DINT-02: upsertRepo queries SELECT id FROM repos WHERE path after run() — lastInsertRowid is 0 on ON CONFLICT UPDATE
 - [Phase 81-data-integrity-port]: DINT-01: endScan schema pre-cleanup uses scan_version_id = ? only (no OR IS NULL) so NULL-versioned connection schemas are deleted before the connections themselves
+- [Phase 82-reliability-hardening]: parseAgentOutput fallback chain: fenced block match with bad JSON fails immediately — do not attempt strategies 2/3 to prevent false positives
+- [Phase 82-reliability-hardening]: collectScanFiles walks full repo tree recursively (not fixed SCAN_DIRS) within depth/exclusion limits
+- [Phase 82-reliability-hardening]: MAX_FILE_SIZE guard placed at read time in detectAuth/detectDbFromSources, not at file collection time
 
 ### Pending Todos
 
@@ -63,6 +66,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:45:25.297Z
-Stopped at: Completed 81-01-PLAN.md
+Last session: 2026-03-22T20:58:01Z
+Stopped at: Completed 82-01-PLAN.md
 Resume file: None
