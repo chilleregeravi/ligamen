@@ -439,14 +439,17 @@ export async function runDiscoveryPass(repoPath, discoveryPromptTemplate, agentR
  */
 
 /**
- * Scan one or more repos by dispatching agents sequentially in the foreground.
- * Background agents cannot access MCP tools (Claude Code issue #13254) — foreground only.
+ * Scan one or more repos by dispatching agents in parallel via Promise.allSettled,
+ * with retry-once on agentRunner throw. DB writes remain sequential after all
+ * agent calls resolve.
  *
  * Each non-skip, non-noop repo is wrapped in a scan version bracket:
  *   beginScan() is called before agent invocation.
  *   persistFindings() is called on success with the scan version ID.
  *   endScan() is called after persistFindings on the success path only.
  *   On parse failure, endScan is NOT called — prior scan data remains intact.
+ *   On agentRunner throw (after retry), endScan is NOT called — bracket stays open,
+ *   prior data is preserved.
  *
  * SREL-01: Incremental scans inject a changed-files constraint into the prompt.
  *   When modified.length === 0, the scan is a no-op (no agent, no bracket).
@@ -481,11 +484,17 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
   // Discovery prompt for Phase 1 structure analysis (SARC-01)
   const promptDiscovery = readFileSync(join(__dirname, "agent-prompt-discovery.md"), "utf8");
 
-  /** @type {ScanResult[]} */
-  const results = [];
+  const promptComponents = { commonRules, schemaJson, promptService, promptLibrary, promptInfra, promptDiscovery };
 
-  // Sequential — for...of (never Promise.all — foreground-only requirement)
-  for (const repoPath of repoPaths) {
+  /**
+   * Scan a single repo: discovery pass + deep agent invocation with retry-once.
+   * Returns a result object carrying DB-write data on success, or a skip/error result.
+   * Internal _writeDb flag signals Phase B to perform DB writes for this result.
+   *
+   * @param {string} repoPath
+   * @returns {Promise<object>} Internal result object (cleaned before output)
+   */
+  async function scanOneRepo(repoPath) {
     // 1. Ensure repo row exists
     const repo = queryEngine.upsertRepo({
       path: repoPath,
@@ -499,21 +508,19 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     // 3. Skip — no scan needed (no bracket for no-op scans)
     if (ctx.mode === "skip") {
       slog('DEBUG', 'scan skipped — no changes', { repoPath });
-      results.push({ repoPath, mode: "skip", findings: null });
-      continue;
+      return { repoPath, mode: "skip", findings: null };
     }
 
     // 3b. Incremental no-op — diff returned empty modified list (SREL-01 / THE-933)
     //     Check BEFORE beginScan — no bracket should be opened for a no-op.
     if (ctx.mode === "incremental" && ctx.files !== null && ctx.files.modified.length === 0) {
       slog('DEBUG', 'incremental-noop — no changed files', { repoPath });
-      results.push({ repoPath, mode: "incremental-noop", findings: null });
-      continue;
+      return { repoPath, mode: "incremental-noop", findings: null };
     }
 
     // 4. Discovery pass — Phase 1: structure analysis (SARC-01)
     // Runs BEFORE beginScan — does not open a scan bracket.
-    const discoveryContext = await runDiscoveryPass(repoPath, promptDiscovery, agentRunner, slog);
+    const discoveryContext = await runDiscoveryPass(repoPath, promptComponents.promptDiscovery, agentRunner, slog);
 
     // 5. Open scan version bracket — records scan start in scan_versions table
     const scanVersionId = queryEngine.beginScan(repo.id);
@@ -524,15 +531,15 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
 
     // Deep scan — Phase 2: use type-specific prompt with discovery context (SARC-03)
     const discoveryJson = JSON.stringify(discoveryContext, null, 2);
-    const typePrompt = repoType === "library" ? promptLibrary
-      : repoType === "infra" ? promptInfra
-      : promptService;
+    const typePrompt = repoType === "library" ? promptComponents.promptLibrary
+      : repoType === "infra" ? promptComponents.promptInfra
+      : promptComponents.promptService;
     const interpolatedPrompt = typePrompt
       .replaceAll("{{REPO_PATH}}", repoPath)
       .replaceAll("{{DISCOVERY_JSON}}", discoveryJson)
       .replaceAll("{{SERVICE_HINT}}", basename(repoPath))
-      .replaceAll("{{COMMON_RULES}}", commonRules.replaceAll("{{REPO_PATH}}", repoPath))
-      .replaceAll("{{SCHEMA_JSON}}", schemaJson);
+      .replaceAll("{{COMMON_RULES}}", promptComponents.commonRules.replaceAll("{{REPO_PATH}}", repoPath))
+      .replaceAll("{{SCHEMA_JSON}}", promptComponents.schemaJson);
 
     // 7. Inject changed-files constraint for incremental scans (SREL-01 / THE-933)
     //     The constraint is a hard directive — "You MUST only examine" — not advisory.
@@ -541,9 +548,25 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
       finalPrompt = interpolatedPrompt + buildIncrementalConstraint(ctx.files.modified);
     }
 
-    // 8. Invoke agent (foreground — agentRunner injected by MCP server or test)
+    // 8. Invoke agent — with retry-once on agentRunner throw (SREL-01)
     slog('INFO', 'scan started', { repoPath, mode: ctx.mode });
-    const rawResponse = await agentRunner(finalPrompt, repoPath);
+    let rawResponse;
+    try {
+      rawResponse = await agentRunner(finalPrompt, repoPath);
+    } catch (_firstErr) {
+      // First attempt threw — retry once with same arguments
+      try {
+        rawResponse = await agentRunner(finalPrompt, repoPath);
+      } catch (retryErr) {
+        // Second attempt also threw — skip repo with WARN, bracket stays open (prior data preserved)
+        slog('WARN', 'scan failed after retry — repo skipped', {
+          repoPath,
+          repoName: basename(repoPath),
+          error: retryErr.message,
+        });
+        return { repoPath, mode: ctx.mode, findings: null, error: retryErr.message, skipped: true };
+      }
+    }
 
     // 9. Parse and validate agent output
     const result = parseAgentOutput(rawResponse);
@@ -551,13 +574,13 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     if (result.valid === false) {
       slog('WARN', 'scan failed — preserving prior data', { repoPath, error: result.error });
       // endScan is NOT called — prior scan data remains intact
-      results.push({
+      // No retry for parse failures — only agentRunner throws trigger retry
+      return {
         repoPath,
         mode: ctx.mode,
         findings: null,
         error: result.error,
-      });
-      continue;
+      };
     }
 
     // 9b. Log validation warnings (e.g., skipped services from SVAL-01)
@@ -565,10 +588,55 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
       slog('WARN', 'findings validation warning', { repoPath, warning: w });
     }
 
+    // Return all data needed for Phase B (sequential DB writes)
+    return {
+      repoPath,
+      mode: ctx.mode,
+      findings: result.findings,
+      repoId: repo.id,
+      scanVersionId,
+      currentHead: getCurrentHead(repoPath),
+      _writeDb: true,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase A — Parallel agent invocation via Promise.allSettled fan-out
+  // ---------------------------------------------------------------------------
+  const settled = await Promise.allSettled(repoPaths.map((rp) => scanOneRepo(rp)));
+
+  // Collect results — rejected promises become skip results (scanOneRepo catches
+  // all throws internally, but handle defensively in case of unexpected rejection)
+  const agentResults = settled.map((s) => {
+    if (s.status === 'fulfilled') return s.value;
+    return {
+      repoPath: 'unknown',
+      mode: 'full',
+      findings: null,
+      error: String(s.reason),
+      skipped: true,
+    };
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase B — Sequential DB writes and enrichment
+  // DB writes are sequential — SQLite/better-sqlite3 gets SQLITE_BUSY if parallelized.
+  // Enrichment is sequential — uses the same DB handle.
+  // ---------------------------------------------------------------------------
+  /** @type {ScanResult[]} */
+  const results = [];
+
+  for (const r of agentResults) {
+    if (!r._writeDb) {
+      // Skip/noop/error result — push as-is (remove internal flag if present)
+      const { _writeDb: _ignored, ...output } = r;
+      results.push(output);
+      continue;
+    }
+
     // 10. Persist findings and close scan bracket — success path only
-    const currentHead = getCurrentHead(repoPath);
-    queryEngine.persistFindings(repo.id, result.findings, currentHead, scanVersionId);
-    queryEngine.endScan(repo.id, scanVersionId);
+    queryEngine.persistFindings(r.repoId, r.findings, r.currentHead, r.scanVersionId);
+    queryEngine.endScan(r.repoId, r.scanVersionId);
 
     // 11. Run enrichment pass per service — post-scan, after bracket closes
     // ENRICH-01: enrichment runs after core scan. Bracket is already closed above.
@@ -576,16 +644,16 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     try {
       const services = queryEngine._db
         .prepare('SELECT id, root_path, language, boundary_entry FROM services WHERE repo_id = ?')
-        .all(repo.id);
+        .all(r.repoId);
       for (const service of services) {
-        await runEnrichmentPass(service, queryEngine._db, _logger, repoPath);
+        await runEnrichmentPass(service, queryEngine._db, _logger, r.repoPath);
       }
     } catch (err) {
-      slog('WARN', 'enrichment pass error', { repoPath, error: err.message });
+      slog('WARN', 'enrichment pass error', { repoPath: r.repoPath, error: err.message });
     }
 
-    slog('INFO', 'scan complete', { repoPath, mode: ctx.mode });
-    results.push({ repoPath, mode: ctx.mode, findings: result.findings });
+    slog('INFO', 'scan complete', { repoPath: r.repoPath, mode: r.mode });
+    results.push({ repoPath: r.repoPath, mode: r.mode, findings: r.findings });
   }
 
   return results;
