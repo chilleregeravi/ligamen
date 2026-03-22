@@ -9,9 +9,9 @@ Requirements for Scan Pipeline Hardening milestone. Each maps to roadmap phases.
 
 ### Scan Bugs
 
-- [ ] **SBUG-01**: persistFindings checks target against known services before creating actor — eliminates phantom actor hexagons in graph UI (THE-945)
+- [x] **SBUG-01**: persistFindings checks target against known services before creating actor — eliminates phantom actor hexagons in graph UI (THE-945)
 - [ ] **SBUG-02**: detectRepoType correctly classifies service repos that have docker-compose.yml for local dev, with expanded Go/Java/Poetry library detection (THE-955)
-- [ ] **SBUG-03**: CODEOWNERS enricher passes relative service root_path to findOwners instead of absolute repo path — ownership patterns now match correctly (THE-956)
+- [x] **SBUG-03**: CODEOWNERS enricher passes relative service root_path to findOwners instead of absolute repo path — ownership patterns now match correctly (THE-956)
 
 ### Scan Architecture
 
@@ -53,9 +53,9 @@ Requirements for Scan Pipeline Hardening milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SBUG-01 | Phase 74 | Pending |
+| SBUG-01 | Phase 74 | Complete |
 | SBUG-02 | Phase 74 | Pending |
-| SBUG-03 | Phase 74 | Pending |
+| SBUG-03 | Phase 74 | Complete |
 | SVAL-01 | Phase 75 | Complete |
 | SVAL-02 | Phase 75 | Complete |
 | SARC-01 | Phase 76 | Pending |

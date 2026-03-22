@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 75-02-PLAN.md
-last_updated: "2026-03-22T17:46:47.041Z"
+stopped_at: Completed 74-scan-bug-fixes 74-01-PLAN.md
+last_updated: "2026-03-22T17:50:32.320Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 9
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -41,6 +41,7 @@ Plan: 1 of 1 (COMPLETE)
 
 *Updated after each plan completion*
 | Phase 75-validation-hardening P02 | 10 | 2 tasks | 2 files |
+| Phase 74-scan-bug-fixes P01 | 15 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -54,6 +55,8 @@ Plan: 1 of 1 (COMPLETE)
 - v5.4.0 SVAL-01: Warn-and-skip (not hard-fail) for service type/root_path/language in validateFindings; absent type field passes; warnings array initialized before services loop
 - [Phase 75-02]: execFileSync (not shell variant) for all git subprocess invocations in manager.js — eliminates shell injection surface for user-controlled repo paths
 - [Phase 75-02]: Validation warnings from parseAgentOutput logged immediately after valid parse, before persistFindings — operators can see skipped services in logs
+- [Phase 74-scan-bug-fixes]: SBUG-01: _stmtCheckKnownService guard prevents phantom actor hexagons — checks services table before creating actor row in persistFindings
+- [Phase 74-scan-bug-fixes]: SBUG-03: enricher ctx carries repoAbsPath (absolute repo root, filesystem probe) separate from repoPath (relative service path, pattern matching)
 
 ### Pending Todos
 
@@ -65,6 +68,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T17:46:47.039Z
-Stopped at: Completed 75-02-PLAN.md
+Last session: 2026-03-22T17:50:32.318Z
+Stopped at: Completed 74-scan-bug-fixes 74-01-PLAN.md
 Resume file: None
