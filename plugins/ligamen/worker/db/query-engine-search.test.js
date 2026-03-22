@@ -7,6 +7,7 @@
  *   - search() with skipChroma=true falls through to FTS5 or SQL
  *   - search() result shape: [{id, name, type, score}]
  *   - Each tier returns results when appropriate data exists
+ *   - prepared statement cache (REL-04): reuse and LRU eviction
  *
  * Uses node:test + node:assert/strict — zero external dependencies.
  * Uses better-sqlite3 directly for isolation (per Phase 14-02 decision).
@@ -20,7 +21,7 @@ import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
-import { search } from "./query-engine.js";
+import { search, _stmtCache, StmtCache } from "./query-engine.js";
 
 // ---------------------------------------------------------------------------
 // Test DB setup — use project root that maps to a temp dir
@@ -234,5 +235,75 @@ describe("search() — Tier 1 (ChromaDB fallback when unavailable)", () => {
     );
     // Falls through to FTS5 or SQL
     assert.ok(results.length > 0, "must find results via fallback tiers");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// prepared statement cache (REL-04)
+// ---------------------------------------------------------------------------
+
+describe("search() -- prepared statement cache (REL-04)", () => {
+  test("reuses prepared statements for identical queries", async () => {
+    // Clear the cache so we start from a known state
+    _stmtCache.clear();
+    assert.equal(_stmtCache.size, 0, "cache must start empty after clear()");
+
+    // Run 100 consecutive identical FTS5 searches
+    for (let i = 0; i < 100; i++) {
+      await search("auth", { skipChroma: true });
+    }
+
+    // The FTS5 tier uses 1 SQL template; SQL fallback tier uses 1 SQL template.
+    // At most 2 entries should be in the cache — not 100.
+    assert.ok(
+      _stmtCache.size <= 2,
+      `cache should have at most 2 entries after 100 identical searches, got ${_stmtCache.size}`,
+    );
+    assert.ok(
+      _stmtCache.size >= 1,
+      "cache must have at least 1 entry after searches",
+    );
+  });
+
+  test("LRU eviction at capacity", () => {
+    // Create a fresh cache with capacity 3 to test eviction directly
+    const cache = new StmtCache(3);
+    // Use the shared in-memory db (already has the services table)
+    const sql1 = "SELECT 1 AS n FROM services";
+    const sql2 = "SELECT 2 AS n FROM services";
+    const sql3 = "SELECT 3 AS n FROM services";
+    const sql4 = "SELECT 4 AS n FROM services";
+
+    cache.get(sql1, db);
+    cache.get(sql2, db);
+    cache.get(sql3, db);
+    assert.equal(cache.size, 3, "cache should be at capacity after 3 inserts");
+
+    // Insert 4th entry — should evict sql1 (oldest / least-recently-used)
+    cache.get(sql4, db);
+    assert.equal(cache.size, 3, "cache must not exceed capacity after eviction");
+
+    // Re-request sql1: it was evicted, so a fresh prepare must occur.
+    // The cache still stays at 3 (sql2 is now the oldest and gets evicted).
+    cache.get(sql1, db);
+    assert.equal(cache.size, 3, "cache size must remain 3 after re-inserting evicted key");
+  });
+
+  test("same SQL with different parameter values reuses the statement", async () => {
+    _stmtCache.clear();
+
+    // Call search with two different queries — both flow through the same SQL templates
+    await search("auth", { skipChroma: true });
+    const sizeAfterFirst = _stmtCache.size;
+
+    await search("payment", { skipChroma: true });
+    const sizeAfterSecond = _stmtCache.size;
+
+    // Size must not have grown — same SQL templates are reused for different param values
+    assert.equal(
+      sizeAfterSecond,
+      sizeAfterFirst,
+      "different parameter values must reuse the same prepared statement (size unchanged)",
+    );
   });
 });

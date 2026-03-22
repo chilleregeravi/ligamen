@@ -24,6 +24,74 @@ import crypto from "crypto";
 import { chromaSearch, isChromaAvailable } from "../server/chroma.js";
 
 // ---------------------------------------------------------------------------
+// LRU prepared statement cache (REL-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Simple LRU cache for better-sqlite3 prepared statements.
+ *
+ * Uses a Map (which preserves insertion order) as the backing store.
+ * On a cache hit, the entry is deleted and re-inserted to move it to the
+ * "most recently used" end. On capacity overflow, the first (oldest) entry
+ * is evicted.
+ *
+ * Cache key: the SQL template string (with ? placeholders).
+ * Parameters are NOT part of the key — they are passed to .all()/.get()
+ * on the returned statement just as with a directly-prepared statement.
+ */
+export class StmtCache {
+  /**
+   * @param {number} [capacity=50] - Maximum number of prepared statements to keep.
+   */
+  constructor(capacity = 50) {
+    this._capacity = capacity;
+    this._cache = new Map();
+  }
+
+  /**
+   * Return a prepared statement for the given SQL, creating it if necessary.
+   * Evicts the least-recently-used entry when capacity is exceeded.
+   *
+   * @param {string} sql - SQL template string (with ? placeholders).
+   * @param {import('better-sqlite3').Database} db - Database instance to prepare on.
+   * @returns {import('better-sqlite3').Statement}
+   */
+  get(sql, db) {
+    if (this._cache.has(sql)) {
+      // Move to end (most recently used)
+      const stmt = this._cache.get(sql);
+      this._cache.delete(sql);
+      this._cache.set(sql, stmt);
+      return stmt;
+    }
+
+    const stmt = db.prepare(sql);
+
+    // Evict oldest (first) entry if at capacity
+    if (this._cache.size >= this._capacity) {
+      const oldestKey = this._cache.keys().next().value;
+      this._cache.delete(oldestKey);
+    }
+
+    this._cache.set(sql, stmt);
+    return stmt;
+  }
+
+  /** Remove all cached statements. */
+  clear() {
+    this._cache.clear();
+  }
+
+  /** Number of cached statements. */
+  get size() {
+    return this._cache.size;
+  }
+}
+
+/** Module-level LRU prepared statement cache instance (capacity 50). */
+export const _stmtCache = new StmtCache(50);
+
+// ---------------------------------------------------------------------------
 // Module-level db handle for standalone search() export
 // (injected via setSearchDb for testing; production uses getDb())
 // ---------------------------------------------------------------------------
@@ -85,16 +153,13 @@ export async function search(query, options = {}) {
     try {
       const perTable = Math.ceil(limit / 3);
       const ftsQuery = '"' + query.replace(/"/g, '""') + '"';
-      const ftsServices = db
-        .prepare(
-          `
+      const ftsSql = `
         SELECT rowid AS id, name
         FROM services_fts
         WHERE services_fts MATCH ?
         LIMIT ?
-      `,
-        )
-        .all(ftsQuery, perTable);
+      `;
+      const ftsServices = _stmtCache.get(ftsSql, db).all(ftsQuery, perTable);
 
       if (ftsServices.length > 0) {
         process.stderr.write(
@@ -116,16 +181,16 @@ export async function search(query, options = {}) {
 
   // Tier 3: Direct SQL LIKE filter (always available)
   if (db) {
-    const sqlResults = db
-      .prepare(
-        `
+    const sqlLikeSql = `
       SELECT id, name, language AS type
       FROM services
       WHERE name LIKE ?
       LIMIT ?
-    `,
-      )
-      .all("%" + query + "%", limit);
+    `;
+    const sqlResults = _stmtCache.get(sqlLikeSql, db).all(
+      "%" + query + "%",
+      limit,
+    );
     process.stderr.write(
       "[search] tier=sql results=" + sqlResults.length + "\n",
     );
