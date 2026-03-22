@@ -470,7 +470,9 @@ Plans:
   2. A Node.js or Python service repo that includes docker-compose.yml for local development is classified as its correct type (service/library), not misclassified as infra
   3. A Go or Java project containing only library-type files is classified as a library, not misidentified as a service
   4. After scanning a repo with a CODEOWNERS file, team ownership is populated correctly for services whose paths use relative (not absolute) patterns
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
 
 ### Phase 75: Validation Hardening
 **Goal**: findings.js rejects agent output with invalid service types or missing required fields before it reaches the database, and file-based shell operations use argument arrays eliminating the shell injection surface
@@ -481,7 +483,9 @@ Plans:
   2. When the agent emits a service with a missing or empty `root_path`, findings.js logs a validation warning and skips that service
   3. When the agent emits a service with a missing or empty `language`, findings.js logs a validation warning and skips that service
   4. `getChangedFiles()` and `getCurrentHead()` use execFileSync with argument arrays — no user-controlled string is ever interpolated into a shell command string
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
 
 ### Phase 76: Discovery Phase Wiring
 **Goal**: A discovery agent runs before the deep scan agent for each repo, producing structured language/framework/entry-point context that is injected into the deep scan prompt as {{DISCOVERY_JSON}}
@@ -492,7 +496,9 @@ Plans:
   2. The deep scan agent prompt received by the agent contains a populated {{DISCOVERY_JSON}} block with at least one detected language when scanning a non-empty repo
   3. If the discovery agent fails or times out, the deep scan still runs using a fallback empty discovery context — the scan is not aborted
   4. Discovery output is not persisted to the database — it is ephemeral prompt context only
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
 
 ### Phase 77: Prompt Debiasing & Dead Code Removal
 **Goal**: Active agent prompts use discovery context for language-specific guidance instead of hardcoded Python/JS examples; the unused agent-prompt-deep.md file and promptDeep variable are deleted after any unique content is migrated
@@ -503,7 +509,9 @@ Plans:
   2. Scanning a Java repo produces scan output where the agent correctly identifies Java entry points (e.g., @RestController, Application.java) — not Python or JS patterns
   3. The file `plugins/ligamen/worker/scan/agent-prompt-deep.md` does not exist in the repository
   4. The variable `promptDeep` does not appear in `plugins/ligamen/worker/scan/manager.js`
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
 
 ### Phase 78: Scan Reliability
 **Goal**: Discovery and deep-scan agents run in parallel across repos where possible, failed agents retry once before being skipped with a user-visible warning, and the graph UI filters stale actor data as a defense-in-depth layer
@@ -514,7 +522,9 @@ Plans:
   2. When a deep scan agent call fails on first attempt, a single retry is automatically issued before the repo is skipped — the user sees a warning identifying the skipped repo by name
   3. A skipped repo (after retry failure) does not cause the entire `/ligamen:map` command to error out — remaining repos complete normally
   4. When the /graph endpoint returns an actor whose name exactly matches a known service name, the actor node is absent from the rendered graph and its connections point to the service node instead
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
 
 ### Phase 79: Version Bump
 **Goal**: All manifest files reflect version 5.4.0 so the marketplace and plugin install surfaces present the correct version
@@ -524,7 +534,9 @@ Plans:
   1. `plugins/ligamen/package.json`, `plugins/ligamen/.claude-plugin/marketplace.json`, and `plugins/ligamen/.claude-plugin/plugin.json` all contain `"version": "5.4.0"`
   2. Running `make check` (version sync check) passes with all three files at 5.4.0
   3. `claude plugin marketplace add` offers version 5.4.0 of the ligamen plugin
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 79-01-PLAN.md — Bump all manifest version fields to 5.4.0
 
 ## Progress
 
