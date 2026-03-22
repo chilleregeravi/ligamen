@@ -552,12 +552,15 @@ export class QueryEngine {
    * @returns {number} Row id
    */
   upsertRepo(repoData) {
-    const result = this._stmtUpsertRepo.run({
+    this._stmtUpsertRepo.run({
       last_commit: null,
       scanned_at: null,
       ...repoData,
     });
-    return { id: result.lastInsertRowid };
+    // lastInsertRowid is 0 when ON CONFLICT triggers an UPDATE (no insert).
+    // Always query for the actual id by path to get the correct value.
+    const row = this._db.prepare("SELECT id FROM repos WHERE path = ?").get(repoData.path);
+    return { id: row.id };
   }
 
   /**
@@ -707,21 +710,21 @@ export class QueryEngine {
 
     // Clean up orphaned schema rows BEFORE deleting stale connections
     // (schemas FK references connections — must delete child rows first to avoid FK violation)
+    //
+    // Only keep schemas for connections belonging to the CURRENT scan version.
+    // Both stale (scan_version_id != current) AND legacy NULL scan_version_id
+    // connections will be deleted below, so their schemas must go first.
     try {
-      // Determine which connection ids are about to be deleted (stale or null scan_version_id)
-      // and delete their schemas/fields first
       this._db.prepare(`
         DELETE FROM fields WHERE schema_id IN (
           SELECT id FROM schemas WHERE connection_id NOT IN (
-            SELECT id FROM connections
-            WHERE scan_version_id = ? OR scan_version_id IS NULL
+            SELECT id FROM connections WHERE scan_version_id = ?
           )
         )
       `).run(scanVersionId);
       this._db.prepare(`
         DELETE FROM schemas WHERE connection_id NOT IN (
-          SELECT id FROM connections
-          WHERE scan_version_id = ? OR scan_version_id IS NULL
+          SELECT id FROM connections WHERE scan_version_id = ?
         )
       `).run(scanVersionId);
     } catch { /* schemas/fields tables may not exist */ }
