@@ -578,7 +578,10 @@ Plans:
   2. Calling upsertRepo() for an existing repo returns the correct existing row ID, not zero — callers that chain the returned ID for further inserts do not create orphaned rows
   3. node_metadata enrichment tests reference the view names `ownership`, `security`, and `infra` matching the production query — no test failures from mismatched view key strings
   4. When session-start.sh runs and the worker is already running with an older version, the worker is restarted before the session proceeds — stale compiled code does not serve the new session
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 81-01-PLAN.md — Port DINT-01 endScan FK fix + DINT-02 upsertRepo ID fix
+- [ ] 81-02-PLAN.md — Port DINT-03 test view names + DINT-04 worker version restart
 
 ### Phase 82: Reliability Hardening
 **Goal**: Agent output parsing survives malformed responses, transitive impact queries cannot run unbounded, and the auth-db extractor cannot be driven into deep or large-file traversal
@@ -590,7 +593,10 @@ Plans:
   3. A transitive impact query that would traverse more than 7 hops is terminated at the depth limit and returns results found so far with a truncation notice
   4. A transitive impact query running longer than 30 seconds is cancelled and returns a timeout error rather than hanging indefinitely
   5. The auth-db extractor skips directories in its exclusion list (node_modules, .git, vendor, etc.) without descending into them, and stops reading any single file after 1MB
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 81-01-PLAN.md — Port DINT-01 endScan FK fix + DINT-02 upsertRepo ID fix
+- [ ] 81-02-PLAN.md — Port DINT-03 test view names + DINT-04 worker version restart
 
 ### Phase 83: Performance & Quality
 **Goal**: FTS5 search uses cached prepared statements for lower per-query overhead, journal mode pragma ordering is explicitly tested, and `/ligamen:map` captures the project name before saving the first scan
@@ -601,7 +607,10 @@ Plans:
   2. A unit test explicitly verifies that the `journal_mode=WAL` pragma is applied before any read-write operations on a new connection, and that readonly connections use `journal_mode=DELETE`
   3. Running `/ligamen:map` on a project with no existing `ligamen.config.json` prompts the user for a project name before the scan begins
   4. The project name entered during `/ligamen:map` is written to `ligamen.config.json` and reused on subsequent invocations without prompting again
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 81-01-PLAN.md — Port DINT-01 endScan FK fix + DINT-02 upsertRepo ID fix
+- [ ] 81-02-PLAN.md — Port DINT-03 test view names + DINT-04 worker version restart
 
 ## Progress
 
