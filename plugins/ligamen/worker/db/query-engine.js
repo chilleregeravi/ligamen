@@ -1159,7 +1159,89 @@ export function enrichImpactResult(db, serviceName, results) {
     }
   } catch { /* best-effort */ }
 
+  // Annotate each result item with owner/auth_mechanism/db_backend from node_metadata
+  try {
+    if (results.length > 0) {
+      const serviceNames = results.map(r => r.service).filter(Boolean);
+      if (serviceNames.length > 0) {
+        const placeholders = serviceNames.map(() => '?').join(',');
+        const metaRows = db.prepare(`
+          SELECT nm.key, nm.value, s.name as service_name
+          FROM node_metadata nm
+          JOIN services s ON s.id = nm.service_id
+          WHERE nm.view = 'scan'
+            AND nm.key IN ('owner', 'auth_mechanism', 'db_backend')
+            AND s.name IN (${placeholders})
+        `).all(...serviceNames);
+
+        const metaByService = {};
+        for (const row of metaRows) {
+          if (!metaByService[row.service_name]) metaByService[row.service_name] = {};
+          metaByService[row.service_name][row.key] = row.value;
+        }
+
+        results = results.map(r => {
+          const meta = metaByService[r.service] || {};
+          return {
+            ...r,
+            owner: meta.owner ?? null,
+            auth_mechanism: meta.auth_mechanism ?? null,
+            db_backend: meta.db_backend ?? null,
+          };
+        });
+      }
+    }
+  } catch { /* node_metadata absent — skip enrichment */ }
+
   return { results, summary };
+}
+
+/**
+ * Annotate each affected service in queryChanged results with owner/auth_mechanism/db_backend
+ * from node_metadata. Best-effort — never throws.
+ *
+ * @param {import('better-sqlite3').Database|null} db
+ * @param {Array<{service: string, connection_count: number}>} affected
+ * @returns {Array<{service: string, connection_count: number, owner: string|null, auth_mechanism: string|null, db_backend: string|null}>}
+ */
+export function enrichAffectedResult(db, affected) {
+  if (!db || affected.length === 0) {
+    return affected.map(r => ({ ...r, owner: null, auth_mechanism: null, db_backend: null }));
+  }
+  try {
+    const serviceNames = affected.map(r => r.service).filter(Boolean);
+    if (serviceNames.length === 0) {
+      return affected.map(r => ({ ...r, owner: null, auth_mechanism: null, db_backend: null }));
+    }
+
+    const placeholders = serviceNames.map(() => '?').join(',');
+    const metaRows = db.prepare(`
+      SELECT nm.key, nm.value, s.name as service_name
+      FROM node_metadata nm
+      JOIN services s ON s.id = nm.service_id
+      WHERE nm.view = 'scan'
+        AND nm.key IN ('owner', 'auth_mechanism', 'db_backend')
+        AND s.name IN (${placeholders})
+    `).all(...serviceNames);
+
+    const metaByService = {};
+    for (const row of metaRows) {
+      if (!metaByService[row.service_name]) metaByService[row.service_name] = {};
+      metaByService[row.service_name][row.key] = row.value;
+    }
+
+    return affected.map(r => {
+      const meta = metaByService[r.service] || {};
+      return {
+        ...r,
+        owner: meta.owner ?? null,
+        auth_mechanism: meta.auth_mechanism ?? null,
+        db_backend: meta.db_backend ?? null,
+      };
+    });
+  } catch {
+    return affected.map(r => ({ ...r, owner: null, auth_mechanism: null, db_backend: null }));
+  }
 }
 
 /**
