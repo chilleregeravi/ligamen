@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.4.0
-milestone_name: Scan Pipeline Hardening
-status: ready_to_plan
-stopped_at: Phase 74
-last_updated: "2026-03-22T00:00:00.000Z"
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+stopped_at: Completed 75-01-PLAN.md (validation-hardening, SVAL-01)
+last_updated: "2026-03-22T17:45:11Z"
 progress:
-  total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 28
+  completed_phases: 21
+  total_plans: 44
+  completed_plans: 34
 ---
 
 # Project State
@@ -19,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** v5.4.0 Scan Pipeline Hardening — Phase 74: Scan Bug Fixes
+**Current focus:** Phase 75 — validation-hardening
 
 ## Current Position
 
-Phase: 74 of 79 (Scan Bug Fixes)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-22 — Roadmap created for v5.4.0
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 75 (validation-hardening) — EXECUTING
+Plan: 1 of 1 (COMPLETE)
 
 ## Performance Metrics
 
@@ -54,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - v5.3.0: picomatch ^4.0.3 for CODEOWNERS glob matching; import via createRequire(import.meta.url) in ESM context
 - v5.4.0: Discovery output is ephemeral prompt context only — not persisted to DB
 - v5.4.0: Phase 75 (validation) can run in parallel with Phase 74 (bug fixes); Phase 76 depends on Phase 74
+- v5.4.0 SVAL-01: Warn-and-skip (not hard-fail) for service type/root_path/language in validateFindings; absent type field passes; warnings array initialized before services loop
 
 ### Pending Todos
 
@@ -65,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T00:00:00.000Z
-Stopped at: Roadmap created — ready to plan Phase 74
+Last session: 2026-03-22T17:45:11Z
+Stopped at: Completed 75-01-PLAN.md (validation-hardening, SVAL-01)
 Resume file: None
