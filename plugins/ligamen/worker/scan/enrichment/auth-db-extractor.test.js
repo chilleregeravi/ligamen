@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { extractAuthAndDb, shannonEntropy, setExtractorLogger } from './auth-db-extractor.js';
+import { extractAuthAndDb, shannonEntropy, setExtractorLogger, EXCLUDED_DIRS, MAX_TRAVERSAL_DEPTH, MAX_FILE_SIZE } from './auth-db-extractor.js';
 
 // ---------------------------------------------------------------------------
 // Helper: in-memory DB with node_metadata and services tables (migration 009)
@@ -568,6 +568,163 @@ describe('Shannon entropy credential rejection (SEC-02)', () => {
     assert.ok(shannonEntropy(highEntropyStr) >= 4.0, 'high entropy rejection boundary');
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Traversal guard tests — EXCLUDED_DIRS, MAX_TRAVERSAL_DEPTH, MAX_FILE_SIZE
+// ---------------------------------------------------------------------------
+
+describe('traversal guards — exported constants', () => {
+  it('EXCLUDED_DIRS is a Set containing node_modules', () => {
+    assert.ok(EXCLUDED_DIRS instanceof Set, 'EXCLUDED_DIRS should be a Set');
+    assert.ok(EXCLUDED_DIRS.has('node_modules'), 'EXCLUDED_DIRS should contain node_modules');
+  });
+
+  it('EXCLUDED_DIRS contains .git', () => {
+    assert.ok(EXCLUDED_DIRS.has('.git'), 'EXCLUDED_DIRS should contain .git');
+  });
+
+  it('EXCLUDED_DIRS contains vendor, dist, build, __pycache__', () => {
+    for (const dir of ['vendor', 'dist', 'build', '__pycache__']) {
+      assert.ok(EXCLUDED_DIRS.has(dir), `EXCLUDED_DIRS should contain '${dir}'`);
+    }
+  });
+
+  it('MAX_TRAVERSAL_DEPTH is 8', () => {
+    assert.equal(MAX_TRAVERSAL_DEPTH, 8);
+  });
+
+  it('MAX_FILE_SIZE is 1_048_576 (1MB)', () => {
+    assert.equal(MAX_FILE_SIZE, 1_048_576);
+  });
+});
+
+describe('traversal guards — node_modules skipped', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'guard-nm-'));
+    writeFileSync(join(tmpDir, 'index.js'), `// entry`);
+    mkdirSync(join(tmpDir, 'node_modules', 'some-pkg'), { recursive: true });
+    writeFileSync(join(tmpDir, 'node_modules', 'some-pkg', 'index.js'),
+      `import jwt from 'jsonwebtoken'; jwt.sign({}, 'secret');`);
+    mkdirSync(join(tmpDir, 'src'), { recursive: true });
+    writeFileSync(join(tmpDir, 'src', 'app.js'), `// plain app`);
+  });
+
+  after(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it('jwt in node_modules/some-pkg/index.js is not extracted (dir excluded)', async () => {
+    const db = buildDb();
+    const ctx = buildCtx(db, tmpDir, 'javascript', 'index.js');
+    const result = await extractAuthAndDb(ctx);
+    assert.equal(result.auth_mechanism, null, 'node_modules should be excluded');
+    db.close();
+  });
+});
+
+describe('traversal guards — .git skipped', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'guard-git-'));
+    writeFileSync(join(tmpDir, 'index.js'), `// entry`);
+    mkdirSync(join(tmpDir, '.git', 'hooks'), { recursive: true });
+    writeFileSync(join(tmpDir, '.git', 'hooks', 'pre-commit.js'),
+      `import jwt from 'jsonwebtoken';`);
+  });
+
+  after(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it('jwt in .git/hooks is not extracted (dir excluded)', async () => {
+    const db = buildDb();
+    const ctx = buildCtx(db, tmpDir, 'javascript', 'index.js');
+    const result = await extractAuthAndDb(ctx);
+    assert.equal(result.auth_mechanism, null, '.git should be excluded');
+    db.close();
+  });
+});
+
+describe('traversal guards — vendor, dist, build, __pycache__ skipped', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'guard-excl-'));
+    writeFileSync(join(tmpDir, 'index.js'), `// entry`);
+    for (const dir of ['vendor', 'dist', 'build', '__pycache__']) {
+      mkdirSync(join(tmpDir, dir), { recursive: true });
+      writeFileSync(join(tmpDir, dir, 'index.js'),
+        `import jwt from 'jsonwebtoken'; jwt.sign({}, 'secret');`);
+    }
+  });
+
+  after(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it('jwt in vendor/dist/build/__pycache__ dirs is not extracted', async () => {
+    const db = buildDb();
+    const ctx = buildCtx(db, tmpDir, 'javascript', 'index.js');
+    const result = await extractAuthAndDb(ctx);
+    assert.equal(result.auth_mechanism, null, 'excluded dirs should be skipped');
+    db.close();
+  });
+});
+
+describe('traversal guards — depth limit stops at 8 levels', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'guard-depth-'));
+    writeFileSync(join(tmpDir, 'index.js'), `// entry`);
+    // Create a 10-deep nested directory under src/
+    // depth 0 = src, depth 1 = d1, ..., depth 9 = d9
+    // Files at depth 9 (past the limit of 8) should NOT be returned
+    let deepPath = join(tmpDir, 'src');
+    for (let i = 1; i <= 9; i++) {
+      deepPath = join(deepPath, `d${i}`);
+      mkdirSync(deepPath, { recursive: true });
+    }
+    // Place jwt import at depth 9 (should be excluded)
+    writeFileSync(join(deepPath, 'deep.js'),
+      `import jwt from 'jsonwebtoken'; jwt.sign({}, 'secret');`);
+    // Place jwt import at depth 5 (should be included)
+    let shallowPath = join(tmpDir, 'src', 'd1', 'd2', 'd3', 'd4', 'd5');
+    mkdirSync(shallowPath, { recursive: true });
+    writeFileSync(join(shallowPath, 'shallow.js'), `// plain file, no auth`);
+  });
+
+  after(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it('files at depth > 8 are not scanned', async () => {
+    const db = buildDb();
+    const ctx = buildCtx(db, tmpDir, 'javascript', 'index.js');
+    const result = await extractAuthAndDb(ctx);
+    // jwt is only at depth 9, which should be excluded
+    assert.equal(result.auth_mechanism, null, 'files past depth 8 should not be scanned');
+    db.close();
+  });
+});
+
+describe('traversal guards — file size cap (1MB)', () => {
+  let tmpDir;
+
+  before(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'guard-size-'));
+    writeFileSync(join(tmpDir, 'index.js'), `// entry`);
+    mkdirSync(join(tmpDir, 'src'), { recursive: true });
+    // Create a file larger than 1MB containing a jwt import
+    const bigContent = `import jwt from 'jsonwebtoken';\n` + 'x'.repeat(1_100_000);
+    writeFileSync(join(tmpDir, 'src', 'huge.js'), bigContent);
+  });
+
+  after(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it('files larger than 1MB are not read (jwt in oversized file not extracted)', async () => {
+    const db = buildDb();
+    const ctx = buildCtx(db, tmpDir, 'javascript', 'index.js');
+    const result = await extractAuthAndDb(ctx);
+    assert.equal(result.auth_mechanism, null, 'files > 1MB should be skipped');
+    db.close();
+  });
 });
 
 // ---------------------------------------------------------------------------
