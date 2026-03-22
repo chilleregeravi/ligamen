@@ -294,7 +294,11 @@ test("parseAgentOutput returns valid:false with error when no JSON block found",
     "I found some services but here is prose only.",
   );
   assert.equal(result.valid, false);
-  assert.equal(result.error, "no JSON block found in agent output");
+  // After multi-strategy, the error message includes a preview when all strategies fail
+  assert.ok(
+    result.error.includes("no parseable JSON") || result.error.includes("no JSON block"),
+    `Expected no-JSON error, got: ${result.error}`,
+  );
 });
 
 test("parseAgentOutput returns valid:false with JSON parse error for malformed JSON", () => {
@@ -337,7 +341,83 @@ test("parseAgentOutput validates the extracted JSON against the schema", () => {
 test("parseAgentOutput with empty string returns no JSON block error", () => {
   const result = parseAgentOutput("");
   assert.equal(result.valid, false);
-  assert.equal(result.error, "no JSON block found in agent output");
+  assert.ok(
+    result.error.includes("no parseable JSON") || result.error.includes("no JSON block"),
+    `Expected no-JSON error, got: ${result.error}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// parseAgentOutput multi-strategy fallback chain
+// ---------------------------------------------------------------------------
+
+describe("parseAgentOutput multi-strategy", () => {
+  test("fenced code block with extra whitespace/newlines returns valid findings", () => {
+    const findings = minimalValid();
+    // Extra blank lines around JSON inside fenced block
+    const raw = "```json\n\n" + JSON.stringify(findings) + "\n\n```";
+    const result = parseAgentOutput(raw);
+    assert.equal(result.valid, true, `Expected valid, got error: ${result.error}`);
+    assert.deepEqual(result.findings, findings);
+  });
+
+  test("raw JSON string with no fencing returns valid findings", () => {
+    const findings = minimalValid();
+    const raw = JSON.stringify(findings);
+    const result = parseAgentOutput(raw);
+    assert.equal(result.valid, true, `Expected valid from raw JSON, got: ${result.error}`);
+    assert.deepEqual(result.findings, findings);
+  });
+
+  test("JSON embedded after prose text (no fencing) returns valid findings via substring strategy", () => {
+    const findings = minimalValid();
+    const raw = "Here is the analysis result:\n" + JSON.stringify(findings) + "\nEnd of output.";
+    const result = parseAgentOutput(raw);
+    assert.equal(result.valid, true, `Expected valid from prose-wrapped JSON, got: ${result.error}`);
+    assert.deepEqual(result.findings, findings);
+  });
+
+  test("completely malformed text returns valid:false with truncated preview", () => {
+    const malformed = "This is completely malformed text with no JSON at all.";
+    const result = parseAgentOutput(malformed);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.error.includes("preview:"),
+      `Expected truncated preview in error, got: ${result.error}`,
+    );
+    // Preview should be the first 200 chars of the input
+    assert.ok(
+      result.error.includes(malformed.slice(0, 10)),
+      `Expected preview to contain beginning of input, got: ${result.error}`,
+    );
+  });
+
+  test("non-string input returns valid:false", () => {
+    const result = parseAgentOutput(42);
+    assert.equal(result.valid, false);
+  });
+
+  test("JSON inside fenced block where JSON itself is invalid returns valid:false with parse error", () => {
+    const raw = "```json\n{ not valid json: oops }\n```";
+    const result = parseAgentOutput(raw);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.error.length > 0,
+      `Expected a non-empty error, got: ${result.error}`,
+    );
+  });
+
+  test("long malformed text preview is truncated to 200 chars", () => {
+    const longMalformed = "x".repeat(500);
+    const result = parseAgentOutput(longMalformed);
+    assert.equal(result.valid, false);
+    assert.ok(result.error.includes("preview:"), `Expected preview in error`);
+    // The preview part should not exceed 200 chars of the original text
+    const previewStart = result.error.indexOf("preview: ") + "preview: ".length;
+    const previewContent = result.error.slice(previewStart);
+    // Should contain the first 200 chars of rawText plus "..."
+    assert.ok(previewContent.startsWith("x".repeat(200)), "Preview should start with 200 x's");
+  });
 });
 
 // ---------------------------------------------------------------------------
