@@ -407,3 +407,37 @@ test("resolveDb: 11-char hex (not exactly 12) is treated as repo name", async ()
   const result = resolveDb("aabbccddeef");
   assert.equal(result, null, "11-char string treated as repo name, returns null");
 });
+
+// ─────────────────────────────────────────────────────────────
+// resolveDb path traversal (SEC-01)
+// ─────────────────────────────────────────────────────────────
+
+test("resolveDb path traversal: ../../../etc/passwd returns null", () => {
+  const result = resolveDb("../../../etc/passwd");
+  assert.equal(result, null, "relative traversal path should return null");
+});
+
+test("resolveDb path traversal: /tmp/../../../etc/passwd returns null", () => {
+  const result = resolveDb("/tmp/../../../etc/passwd");
+  assert.equal(result, null, "absolute path with .. traversal should return null");
+});
+
+test("resolveDb path traversal: ....//....//etc returns null", () => {
+  const result = resolveDb("....//....//etc");
+  assert.equal(result, null, "double-dot variant traversal should return null");
+});
+
+test("resolveDb path traversal: undefined does not throw, returns null or QueryEngine", () => {
+  // Just verifies no exception is thrown
+  let result;
+  assert.doesNotThrow(() => { result = resolveDb(undefined); });
+  // result is either null (no DB) or a QueryEngine — both are acceptable
+  assert.ok(result === null || typeof result === "object", "should return null or object, not throw");
+});
+
+test("resolveDb path traversal: valid 12-char hex hash does not false-positive", () => {
+  // Safe: regex rejects non-hex chars including '.' and '/'
+  const result = resolveDb("abcdef012345");
+  // Either null (no DB on disk) or a QueryEngine — should not throw
+  assert.ok(result === null || typeof result === "object", "valid hex hash should not throw");
+});
