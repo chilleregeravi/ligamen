@@ -10,7 +10,7 @@ import { execSync } from "child_process";
 import { z } from "zod";
 import { createLogger } from '../lib/logger.js';
 import { getQueryEngine, getQueryEngineByHash, getQueryEngineByRepo } from '../db/pool.js';
-import { enrichImpactResult, enrichSearchResult } from '../db/query-engine.js';
+import { enrichImpactResult, enrichSearchResult, enrichAffectedResult } from '../db/query-engine.js';
 import { chromaSearch, isChromaAvailable } from '../server/chroma.js';
 
 const dataDir =
@@ -1283,7 +1283,11 @@ server.tool(
     if (!qe && params.project) {
       return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
     }
-    const result = await queryChanged(qe?._db ?? null, params);
+    const raw = await queryChanged(qe?._db ?? null, params);
+    const enrichedAffected = qe?._db
+      ? enrichAffectedResult(qe._db, raw.affected)
+      : raw.affected.map(r => ({ ...r, owner: null, auth_mechanism: null, db_backend: null }));
+    const result = { ...raw, affected: enrichedAffected };
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
