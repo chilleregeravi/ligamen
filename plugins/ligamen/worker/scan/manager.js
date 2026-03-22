@@ -22,7 +22,7 @@
  *   mode="incremental-noop" and findings=null.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -162,7 +162,7 @@ export function getChangedFiles(repoPath, sinceCommit) {
 
     if (sinceCommit === null) {
       // Full scan — return all tracked files as "modified"
-      output = execSync(`git -C ${JSON.stringify(repoPath)} ls-files`, {
+      output = execFileSync("git", ["-C", repoPath, "ls-files"], {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -171,8 +171,8 @@ export function getChangedFiles(repoPath, sinceCommit) {
     }
 
     // Incremental — diff since the given commit
-    output = execSync(
-      `git -C ${JSON.stringify(repoPath)} diff --name-status ${sinceCommit} HEAD`,
+    output = execFileSync(
+      "git", ["-C", repoPath, "diff", "--name-status", sinceCommit, "HEAD"],
       { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
     );
 
@@ -214,7 +214,7 @@ export function getChangedFiles(repoPath, sinceCommit) {
  * @returns {string}
  */
 function getCurrentHead(repoPath) {
-  return execSync(`git -C ${JSON.stringify(repoPath)} rev-parse HEAD`, {
+  return execFileSync("git", ["-C", repoPath, "rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();
 }
@@ -411,6 +411,11 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
         error: result.error,
       });
       continue;
+    }
+
+    // 7b. Log validation warnings (e.g., skipped services from SVAL-01)
+    for (const w of result.warnings) {
+      slog('WARN', 'findings validation warning', { repoPath, warning: w });
     }
 
     // 8. Persist findings and close scan bracket — success path only
