@@ -71,6 +71,39 @@ function renderServiceMeta(node) {
     </div>`;
 }
 
+function renderConnectionSchema(connectionId) {
+  if (connectionId == null) return '';
+  const schemaMap = state.graphData.schemas_by_connection;
+  if (!schemaMap) return '';
+  const schema = schemaMap[String(connectionId)];
+  if (!schema || !schema.fields || schema.fields.length === 0) return '';
+
+  const rows = schema.fields.map((f) => {
+    const reqBadge = f.required
+      ? `<span style="color:#48bb78;font-size:0.8em">yes</span>`
+      : `<span style="color:#718096;font-size:0.8em">no</span>`;
+    return `<tr>
+      <td style="padding:2px 6px 2px 0">${escapeHtml(f.name)}</td>
+      <td style="padding:2px 6px 2px 0;color:#a0aec0;font-family:monospace">${escapeHtml(f.type)}</td>
+      <td style="padding:2px 0">${reqBadge}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="detail-section" style="margin-top:6px">
+    <div class="detail-label">Schema: ${escapeHtml(schema.schema_name || 'fields')}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.85em;margin-top:4px">
+      <thead>
+        <tr style="color:#718096">
+          <th style="text-align:left;padding:2px 6px 2px 0;font-weight:normal">Name</th>
+          <th style="text-align:left;padding:2px 6px 2px 0;font-weight:normal">Type</th>
+          <th style="text-align:left;padding:2px 0;font-weight:normal">Req</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
 export function showDetailPanel(node) {
   const panel = document.getElementById("detail-panel");
   const content = document.getElementById("detail-content");
@@ -259,6 +292,7 @@ function renderServiceConnections(outgoing, incoming, nameById) {
         ${e.source_file ? `<div class="conn-file">${escapeHtml(e.source_file)}</div>` : ""}
         ${e.mismatch ? '<div class="conn-file" style="color:#fc8181">⚠ Endpoint handler not found in target</div>' : ""}
       </div>`;
+      html += renderConnectionSchema(e.id);
     }
     html += `</div>`;
   }
@@ -349,6 +383,7 @@ export function showBundlePanel(bundle) {
       ${e.source_file ? `<div class="conn-file">${escapeHtml(e.source_file)}</div>` : ""}
       ${e.mismatch ? '<div class="conn-file" style="color:#fc8181">⚠ Endpoint handler not found in target</div>' : ""}
     </div>`;
+    html += renderConnectionSchema(e.id);
   }
 
   html += `</div>`;
