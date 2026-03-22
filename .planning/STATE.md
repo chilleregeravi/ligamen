@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 83-02-PLAN.md
-last_updated: "2026-03-22T21:23:41.414Z"
+stopped_at: Completed 83-01-PLAN.md
+last_updated: "2026-03-22T21:28:20.013Z"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -57,6 +57,9 @@ Plan: 1 of 2
 - [Phase 82-reliability-hardening]: MAX_FILE_SIZE guard placed at read time in detectAuth/detectDbFromSources, not at file collection time
 - [Phase 82-reliability-hardening]: REL-02: MAX_TRANSITIVE_DEPTH=7 caps CTE recursion in queryImpact; truncation detected via maxFound >= MAX_TRANSITIVE_DEPTH; db.interrupt() used for 30s timeout
 - [Phase 83-performance-quality]: Step 0 inserted before repo discovery so project name is established before any I/O; AskUserQuestion used for interactive prompt; project-name written immediately after entry
+- [Phase 83-performance-quality]: StmtCache uses Map insertion order for LRU — no doubly-linked list needed; Map.keys().next().value is O(1) for eviction
+- [Phase 83-performance-quality]: SQL template strings (with ? placeholders) are the StmtCache key — parameters are never part of the key, matching better-sqlite3 prepare() semantics
+- [Phase 83-performance-quality]: pragma.test.js uses source-code regex extraction to assert pragma ordering contract without depending on module singletons
 
 ### Pending Todos
 
@@ -68,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T21:23:41.410Z
-Stopped at: Completed 83-02-PLAN.md
+Last session: 2026-03-22T21:28:20.010Z
+Stopped at: Completed 83-01-PLAN.md
 Resume file: None

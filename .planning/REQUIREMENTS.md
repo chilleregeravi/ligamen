@@ -25,11 +25,11 @@ Requirements for Security & Data Integrity Hardening. Each maps to roadmap phase
 - [x] **REL-01**: Agent output parsing uses multiple strategies (JSON block, fenced code block, raw JSON) with logged fallback
 - [x] **REL-02**: Transitive impact queries enforce configurable depth limit (default 7) with 30s query timeout
 - [x] **REL-03**: Auth-db extractor enforces depth limit (8 levels), file size cap (1MB), and pre-traversal exclusion list
-- [ ] **REL-04**: FTS5 search uses cached prepared statements with LRU eviction instead of per-call compilation
+- [x] **REL-04**: FTS5 search uses cached prepared statements with LRU eviction instead of per-call compilation
 
 ### Quality
 
-- [ ] **QUAL-01**: Journal mode pragma ordering has explicit unit tests for readonly vs read-write connection modes
+- [x] **QUAL-01**: Journal mode pragma ordering has explicit unit tests for readonly vs read-write connection modes
 - [x] **QUAL-02**: /ligamen:map asks user for project name before saving, stores in ligamen.config.json for reuse
 
 ## Future Requirements
@@ -70,8 +70,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REL-01 | Phase 82 | Complete |
 | REL-02 | Phase 82 | Complete |
 | REL-03 | Phase 82 | Complete |
-| REL-04 | Phase 83 | Pending |
-| QUAL-01 | Phase 83 | Pending |
+| REL-04 | Phase 83 | Complete |
+| QUAL-01 | Phase 83 | Complete |
 | QUAL-02 | Phase 83 | Complete |
 
 **Coverage:**
