@@ -55,7 +55,36 @@ if [[ -n "$WORKER_CLIENT_LIB" ]]; then
     if ! worker_running 2>/dev/null; then
       worker_start_background 2>/dev/null || true
     else
-      WORKER_STATUS=$(worker_status_line 2>/dev/null || echo "")
+      # INTG-02: Version mismatch check — restart worker if plugin was updated.
+      # Without this, a running old-version worker is never restarted because
+      # worker-start.sh (which has the version check) is only called when the
+      # worker is NOT running.
+      _needs_restart=false
+      _installed_version=""
+      _running_version=""
+      if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]] && [[ -f "${CLAUDE_PLUGIN_ROOT}/package.json" ]]; then
+        _installed_version=$(jq -r '.version // empty' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null || true)
+      fi
+      _data_dir="${LIGAMEN_DATA_DIR:-$HOME/.ligamen}"
+      _port_file="${_data_dir}/worker.port"
+      if [[ -f "$_port_file" ]]; then
+        _port=$(cat "$_port_file")
+        _running_version=$(curl -s --max-time 1 "http://127.0.0.1:${_port}/api/version" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)
+      fi
+      if [[ -n "$_installed_version" && -n "$_running_version" \
+          && "$_running_version" != "unknown" \
+          && "$_installed_version" != "$_running_version" ]]; then
+        _needs_restart=true
+      fi
+
+      if [[ "$_needs_restart" == "true" ]]; then
+        # Stop old worker and start new one
+        bash "${CLAUDE_PLUGIN_ROOT}/scripts/worker-stop.sh" >/dev/null 2>&1 || true
+        worker_start_background 2>/dev/null || true
+        WORKER_STATUS="Ligamen worker: restarted (${_running_version} → ${_installed_version})"
+      else
+        WORKER_STATUS=$(worker_status_line 2>/dev/null || echo "")
+      fi
     fi
   fi
 fi
