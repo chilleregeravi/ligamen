@@ -700,6 +700,28 @@ export class QueryEngine {
    */
   endScan(repoId, scanVersionId) {
     this._stmtEndScan.run(new Date().toISOString(), scanVersionId);
+
+    // Clean up orphaned schema rows BEFORE deleting stale connections
+    // (schemas FK references connections — must delete child rows first to avoid FK violation)
+    try {
+      // Determine which connection ids are about to be deleted (stale or null scan_version_id)
+      // and delete their schemas/fields first
+      this._db.prepare(`
+        DELETE FROM fields WHERE schema_id IN (
+          SELECT id FROM schemas WHERE connection_id NOT IN (
+            SELECT id FROM connections
+            WHERE scan_version_id = ? OR scan_version_id IS NULL
+          )
+        )
+      `).run(scanVersionId);
+      this._db.prepare(`
+        DELETE FROM schemas WHERE connection_id NOT IN (
+          SELECT id FROM connections
+          WHERE scan_version_id = ? OR scan_version_id IS NULL
+        )
+      `).run(scanVersionId);
+    } catch { /* schemas/fields tables may not exist */ }
+
     // Delete stale connections before stale services — no CASCADE on FK
     this._stmtDeleteStaleConnections.run(repoId, scanVersionId, repoId, scanVersionId);
     this._stmtDeleteStaleServices.run(repoId, scanVersionId);
@@ -714,6 +736,16 @@ export class QueryEngine {
         WHERE service_id NOT IN (SELECT id FROM services)
       `).run();
     } catch { /* actors table may not exist — migration 008 not applied */ }
+
+    // Clean up any remaining orphaned schema rows (belt-and-suspenders cleanup)
+    try {
+      this._db.prepare(`
+        DELETE FROM fields WHERE schema_id NOT IN (SELECT id FROM schemas)
+      `).run();
+      this._db.prepare(`
+        DELETE FROM schemas WHERE connection_id NOT IN (SELECT id FROM connections)
+      `).run();
+    } catch { /* schemas/fields tables may not exist */ }
   }
 
   /**
@@ -788,7 +820,8 @@ export class QueryEngine {
         .prepare(
           `
         SELECT c.id, c.protocol, c.method, c.path, c.source_file, c.target_file,
-               s_src.name as source, s_tgt.name as target, c.scan_version_id
+               s_src.name as source, s_tgt.name as target, c.scan_version_id,
+               null as confidence, null as evidence
         FROM connections c
         JOIN services s_src ON c.source_service_id = s_src.id
         JOIN services s_tgt ON c.target_service_id = s_tgt.id
@@ -832,7 +865,65 @@ export class QueryEngine {
       // actors table doesn't exist yet (migration 008 not applied)
     }
 
-    return { services, connections, repos, mismatches, actors, latest_scan_version_id };
+    // Fetch schemas grouped by connection_id (graceful if schemas/fields absent)
+    let schemas_by_connection = {};
+    try {
+      const schemaRows = this._db.prepare(`
+        SELECT s.id as schema_id, s.connection_id, s.name, s.role, s.file,
+               f.name as field_name, f.type as field_type, f.required as field_required
+        FROM schemas s
+        LEFT JOIN fields f ON f.schema_id = s.id
+      `).all();
+
+      const schemaMap = new Map(); // schema_id → { name, role, file, fields[] }
+      for (const row of schemaRows) {
+        const key = String(row.connection_id);
+        if (!schemas_by_connection[key]) schemas_by_connection[key] = [];
+        if (!schemaMap.has(row.schema_id)) {
+          const schemaObj = { name: row.name, role: row.role, file: row.file, fields: [] };
+          schemaMap.set(row.schema_id, schemaObj);
+          schemas_by_connection[key].push(schemaObj);
+        }
+        if (row.field_name !== null) {
+          schemaMap.get(row.schema_id).fields.push({
+            name: row.field_name,
+            type: row.field_type,
+            required: row.field_required === 1,
+          });
+        }
+      }
+    } catch {
+      // schemas/fields tables absent — return empty map
+    }
+
+    // Enrich services with owner/auth_mechanism/db_backend from node_metadata (graceful if absent)
+    try {
+      const metaRows = this._db.prepare(`
+        SELECT service_id, key, value
+        FROM node_metadata
+        WHERE view = 'scan' AND key IN ('owner', 'auth_mechanism', 'db_backend')
+      `).all();
+      const metaByService = {};
+      for (const row of metaRows) {
+        if (!metaByService[row.service_id]) metaByService[row.service_id] = {};
+        metaByService[row.service_id][row.key] = row.value;
+      }
+      for (const svc of services) {
+        const meta = metaByService[svc.id] || {};
+        svc.owner = meta.owner ?? null;
+        svc.auth_mechanism = meta.auth_mechanism ?? null;
+        svc.db_backend = meta.db_backend ?? null;
+      }
+    } catch {
+      // node_metadata table absent (pre-migration-008 DB)
+      for (const svc of services) {
+        svc.owner = null;
+        svc.auth_mechanism = null;
+        svc.db_backend = null;
+      }
+    }
+
+    return { services, connections, repos, mismatches, actors, latest_scan_version_id, schemas_by_connection };
   }
 
   /**
