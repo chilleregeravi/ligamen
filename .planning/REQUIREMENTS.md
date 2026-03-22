@@ -23,7 +23,7 @@ Requirements for Security & Data Integrity Hardening. Each maps to roadmap phase
 ### Reliability
 
 - [x] **REL-01**: Agent output parsing uses multiple strategies (JSON block, fenced code block, raw JSON) with logged fallback
-- [ ] **REL-02**: Transitive impact queries enforce configurable depth limit (default 7) with 30s query timeout
+- [x] **REL-02**: Transitive impact queries enforce configurable depth limit (default 7) with 30s query timeout
 - [x] **REL-03**: Auth-db extractor enforces depth limit (8 levels), file size cap (1MB), and pre-traversal exclusion list
 - [ ] **REL-04**: FTS5 search uses cached prepared statements with LRU eviction instead of per-call compilation
 
@@ -68,7 +68,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DINT-03 | Phase 81 | Complete |
 | DINT-04 | Phase 81 | Complete |
 | REL-01 | Phase 82 | Complete |
-| REL-02 | Phase 82 | Pending |
+| REL-02 | Phase 82 | Complete |
 | REL-03 | Phase 82 | Complete |
 | REL-04 | Phase 83 | Pending |
 | QUAL-01 | Phase 83 | Pending |

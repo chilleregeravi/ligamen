@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 82-01-PLAN.md
-last_updated: "2026-03-22T20:58:01Z"
+stopped_at: Completed 82-02-PLAN.md
+last_updated: "2026-03-22T21:04:27.429Z"
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Plan: 2 of 2
 - [Phase 82-reliability-hardening]: parseAgentOutput fallback chain: fenced block match with bad JSON fails immediately — do not attempt strategies 2/3 to prevent false positives
 - [Phase 82-reliability-hardening]: collectScanFiles walks full repo tree recursively (not fixed SCAN_DIRS) within depth/exclusion limits
 - [Phase 82-reliability-hardening]: MAX_FILE_SIZE guard placed at read time in detectAuth/detectDbFromSources, not at file collection time
+- [Phase 82-reliability-hardening]: REL-02: MAX_TRANSITIVE_DEPTH=7 caps CTE recursion in queryImpact; truncation detected via maxFound >= MAX_TRANSITIVE_DEPTH; db.interrupt() used for 30s timeout
 
 ### Pending Todos
 
@@ -66,6 +67,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:58:01Z
-Stopped at: Completed 82-01-PLAN.md
+Last session: 2026-03-22T21:04:27.426Z
+Stopped at: Completed 82-02-PLAN.md
 Resume file: None
