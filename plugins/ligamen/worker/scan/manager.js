@@ -30,10 +30,14 @@ import { fileURLToPath } from "node:url";
 import { parseAgentOutput } from "./findings.js";
 import { registerEnricher, runEnrichmentPass } from "./enrichment.js";
 import { createCodeownersEnricher } from "./codeowners.js";
+import { extractAuthAndDb } from "./enrichment/auth-db-extractor.js";
 
 // Register CODEOWNERS enricher once at module load (OWN-01).
 // Module-level registration runs before the first scan.
 registerEnricher("codeowners", createCodeownersEnricher());
+
+// Register auth/DB extractor enricher (AUTHDB-01, AUTHDB-02).
+registerEnricher("auth-db", extractAuthAndDb);
 
 // ---------------------------------------------------------------------------
 // Logger injection
