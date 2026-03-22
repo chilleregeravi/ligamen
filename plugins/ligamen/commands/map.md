@@ -34,6 +34,47 @@ Print "Graph UI opened" and stop. Do not proceed to scanning.
 
 ---
 
+## Step 0: Ensure Project Name
+
+Before scanning, ensure the project has a name stored in `ligamen.config.json`.
+
+**Read existing config:**
+
+```bash
+PROJECT_NAME=""
+if [ -f ligamen.config.json ]; then
+  PROJECT_NAME=$(node --input-type=module -e "
+    import fs from 'fs';
+    const c = JSON.parse(fs.readFileSync('ligamen.config.json', 'utf8'));
+    if (c['project-name']) console.log(c['project-name']);
+  ")
+fi
+```
+
+**If PROJECT_NAME is empty**, ask the user using `AskUserQuestion`:
+
+```
+What is this project called? (e.g., "my-platform", "acme-backend")
+```
+
+Then write the entered name to config:
+
+```bash
+node --input-type=module -e "
+  import fs from 'fs';
+  const configPath = 'ligamen.config.json';
+  const config = fs.existsSync(configPath)
+    ? JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    : {};
+  config['project-name'] = '${PROJECT_NAME}';
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+"
+```
+
+**If PROJECT_NAME already exists**, print: `Project: ${PROJECT_NAME}` and continue.
+
+---
+
 ## Step 1: Discover Linked Repos
 
 Find repos to scan from two sources:
