@@ -156,7 +156,10 @@ function commonParent(paths) {
  * @returns {QueryEngine|null}
  */
 export function getQueryEngineByHash(hash) {
-  const dir = path.join(dataDir, "projects", hash);
+  const projectsDir = path.join(dataDir, "projects");
+  const dir = path.join(projectsDir, hash);
+  // Security: validate dir resolves within the projects directory (base-dir guard)
+  if (!path.resolve(dir).startsWith(projectsDir + path.sep)) return null;
   const dbPath = path.join(dir, "impact-map.db");
 
   if (!fs.existsSync(dbPath)) return null;

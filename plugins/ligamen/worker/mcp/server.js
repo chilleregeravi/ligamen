@@ -74,13 +74,16 @@ export function resolveDb(project) {
     const root = process.env.LIGAMEN_PROJECT_ROOT || process.cwd();
     return getQueryEngine(root);
   }
-  // Absolute path → look up by project root
+  // Absolute path → validate it resolves within ~/.ligamen/projects/
   if (path.isAbsolute(project)) {
-    // Security: reject path traversal
-    if (project.includes('..')) return null;
+    const baseDir = path.join(os.homedir(), '.ligamen', 'projects');
+    const normalized = path.resolve(project);
+    // Security: reject any path that escapes the projects directory
+    if (!normalized.startsWith(baseDir + path.sep) && normalized !== baseDir) return null;
     return getQueryEngine(project);
   }
   // 12-char hex hash
+  // Safe: regex rejects non-hex chars including '.' and '/'
   if (/^[0-9a-f]{12}$/.test(project)) {
     return getQueryEngineByHash(project);
   }
