@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.3.0
-milestone_name: Scan Intelligence & Enrichment
-status: ready_to_plan
-stopped_at: null
-last_updated: "2026-03-22"
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+stopped_at: Completed 67-01-PLAN.md
+last_updated: "2026-03-22T10:34:00.663Z"
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 12
+  completed_plans: 1
 ---
 
 # Project State
@@ -19,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 67 — DB Foundation (v5.3.0)
+**Current focus:** Phase 67 — DB Foundation
 
 ## Current Position
 
-Phase: 67 of 73 (DB Foundation)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-22 — Roadmap created for v5.3.0, phases 67-73 defined
-
-Progress: [░░░░░░░░░░] 0% (0/7 phases complete)
+Phase: 67 (DB Foundation) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -47,6 +43,8 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases complete)
 - v5.3.0: "unknown" normalized at HTTP layer with `?? 'unknown'` — never stored as string in DB (NULL = not yet detected)
 - v5.3.0: picomatch ^4.0.3 for CODEOWNERS glob matching; import via createRequire(import.meta.url) in ESM context
 - v5.3.0: Auth extractor excludes *.test.*, *.example, *.sample files to prevent credential extraction
+- [Phase 67-db-foundation]: v5.3.0: Migration 009 idempotent via PRAGMA table_info guards before ALTER TABLE — safe on partial-migration DBs
+- [Phase 67-db-foundation]: v5.3.0: upsertNodeMetadata isolated from scan lifecycle — never calls beginScan/endScan, returns null gracefully on pre-migration-008 DBs
 
 ### Pending Todos
 
@@ -59,6 +57,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22
-Stopped at: Roadmap created — ready to plan Phase 67
+Last session: 2026-03-22T10:34:00.659Z
+Stopped at: Completed 67-01-PLAN.md
 Resume file: None
