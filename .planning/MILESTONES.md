@@ -1,5 +1,15 @@
 # Milestones
 
+## v5.3.0 Scan Intelligence & Enrichment (Shipped: 2026-03-22)
+
+**Phases completed:** 7 phases, 12 plans, 2 tasks
+
+**Key accomplishments:**
+
+- (none recorded)
+
+---
+
 ## v5.2.1 Scan Data Integrity (Shipped: 2026-03-21)
 
 **Phases completed:** 4 phases, 7 plans, 0 tasks

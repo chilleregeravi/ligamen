@@ -100,21 +100,18 @@ Every edit is automatically formatted and linted, every quality check runs with 
 - ✓ upsertService/upsertConnection sanitize undefined→null (THE-935) — v5.2.1
 - ✓ CLI fallback scan passes explicit project root to openDb (THE-936) — v5.2.1
 
+- ✓ Quality-gate spun out — command and skill removed from plugin (THE-937) — v5.3.0
+- ✓ Schema/field data surfaced in detail panel with escapeHtml safety (THE-938) — v5.3.0
+- ✓ Confidence/evidence persisted on connections via migration 009 (THE-939) — v5.3.0
+- ✓ CODEOWNERS team ownership extracted via enrichment pass (THE-940) — v5.3.0
+- ✓ Enrichment pass architecture with per-pass failure isolation (THE-941) — v5.3.0
+- ✓ Agent prompt makes source_file required; validation warns on null (THE-942) — v5.3.0
+- ✓ Auth mechanism and DB backend extracted via regex enrichment pass (THE-943) — v5.3.0
+- ✓ Missing metadata shows "unknown" in detail panel (THE-944) — v5.3.0
+
 ### Active
 
-## Current Milestone: v5.3.0 Scan Intelligence & Enrichment
-
-**Goal:** Add enrichment pass architecture, surface schema/field data, persist confidence/evidence, extract team ownership and auth/DB metadata, improve agent data quality, and spin out quality-gate.
-
-**Target features:**
-- Spin out quality-gate into standalone plugin (THE-937)
-- Surface schema/fields in graph UI detail panel (THE-938)
-- Persist confidence levels and evidence snippets from scans (THE-939)
-- Extract team ownership from CODEOWNERS files (THE-940)
-- Enrichment pass architecture for post-scan metadata (THE-941)
-- Agent prompt improvements for source_file/target_file (THE-942)
-- Auth mechanism and database backend extraction (THE-943)
-- Show "unknown" for missing metadata fields in UI (THE-944)
+(Defined per milestone — see REQUIREMENTS.md when next milestone starts)
 
 ### Out of Scope
 
@@ -128,7 +125,7 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ## Context
 
-Shipped v5.2.1 with ~43,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 66 phases across 12 milestones, 116 plans. Repo restructured as Claude Code marketplace — plugin source lives under `plugins/ligamen/`, installable via `claude plugin marketplace add` + `claude plugin install`. MCP server has 8 tools (5 impact + 3 drift). Runtime deps installed automatically on first session via SessionStart hook + self-healing MCP wrapper.
+Shipped v5.3.0 with ~45,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 73 phases across 13 milestones, 128 plans. Repo restructured as Claude Code marketplace — plugin source lives under `plugins/ligamen/`, installable via `claude plugin marketplace add` + `claude plugin install`. MCP server has 8 tools (5 impact + 3 drift). Runtime deps installed automatically on first session via SessionStart hook + self-healing MCP wrapper. Post-scan enrichment architecture extracts team ownership (CODEOWNERS), auth mechanisms, and database backends. Confidence/evidence on connections, schema/field data in detail panel.
 
 Architecture: commands/ for user-invoked features, skills/ for auto-invoked knowledge, hooks/ for formatting/linting/guarding, worker/ for Node.js daemon (db/, server/, scan/, mcp/, ui/ subdirectories), lib/ for shared bash/JS libraries. Agent scan prompts modularized into type-specific variants (service, library, infra) with shared common component. Graph UI uses deterministic layered layout with boundary grouping, external actor hexagons, and protocol-differentiated edges. Filter panel provides protocol, layer, boundary, language, mismatch, and isolated-node toggles.
 
@@ -191,4 +188,4 @@ Known tech debt: no log rotation, db/database.js has console.log in script-mode 
 | .mcp.json points to wrapper script not node directly | Enables self-healing path; wrapper handles dep check before exec | ✓ Good |
 
 ---
-*Last updated: 2026-03-21 after v5.3.0 milestone started*
+*Last updated: 2026-03-22 after v5.3.0 milestone*
