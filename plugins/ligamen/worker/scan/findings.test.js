@@ -7,7 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateFindings, parseAgentOutput } from "./findings.js";
+import { validateFindings, parseAgentOutput, VALID_SERVICE_TYPES } from "./findings.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -377,4 +377,84 @@ test("no warnings when source_file is non-null", () => {
   assert.equal(result.valid, true);
   assert.ok(Array.isArray(result.warnings), "warnings should be an array");
   assert.equal(result.warnings.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// validateFindings — service field validation (SVAL-01)
+// ---------------------------------------------------------------------------
+
+import { describe } from "node:test";
+
+describe("validateFindings — service field validation (SVAL-01)", () => {
+  test("skips service with invalid type enum value", () => {
+    const obj = minimalValid();
+    obj.services = [
+      { name: "bad-svc", root_path: "src/", language: "go", confidence: "high", type: "microservice" },
+    ];
+    const result = validateFindings(obj);
+    assert.equal(result.valid, true);
+    assert.equal(result.findings.services.length, 0);
+    assert.equal(result.warnings.length, 1);
+    assert.ok(
+      result.warnings[0].includes("microservice"),
+      `Expected warning to include 'microservice', got: ${result.warnings[0]}`,
+    );
+  });
+
+  test("skips service with empty root_path", () => {
+    const obj = minimalValid();
+    obj.services = [
+      { name: "bad-svc", root_path: "", language: "go", confidence: "high" },
+    ];
+    const result = validateFindings(obj);
+    assert.equal(result.valid, true);
+    assert.equal(result.findings.services.length, 0);
+    assert.equal(result.warnings.length, 1);
+    assert.ok(
+      result.warnings[0].includes("root_path"),
+      `Expected warning to include 'root_path', got: ${result.warnings[0]}`,
+    );
+  });
+
+  test("skips service with empty language", () => {
+    const obj = minimalValid();
+    obj.services = [
+      { name: "bad-svc", root_path: "src/", language: "", confidence: "high" },
+    ];
+    const result = validateFindings(obj);
+    assert.equal(result.valid, true);
+    assert.equal(result.findings.services.length, 0);
+    assert.equal(result.warnings.length, 1);
+    assert.ok(
+      result.warnings[0].includes("language"),
+      `Expected warning to include 'language', got: ${result.warnings[0]}`,
+    );
+  });
+
+  test("accepts service without type field (absent type is OK)", () => {
+    const obj = minimalValid();
+    // minimalValid() already has a service with no type field
+    const result = validateFindings(obj);
+    assert.equal(result.valid, true);
+    assert.equal(result.findings.services.length, 1);
+    assert.equal(result.warnings.length, 0);
+  });
+
+  test("filters invalid services while keeping valid ones", () => {
+    const obj = minimalValid();
+    obj.services = [
+      { name: "good-svc", root_path: "src/", language: "go", confidence: "high" },
+      { name: "bad-type-svc", root_path: "src/", language: "go", confidence: "high", type: "widget" },
+      { name: "bad-path-svc", root_path: "", language: "go", confidence: "high" },
+    ];
+    const result = validateFindings(obj);
+    assert.equal(result.valid, true);
+    assert.equal(result.findings.services.length, 1);
+    assert.equal(result.findings.services[0].name, "good-svc");
+    assert.equal(result.warnings.length, 2);
+  });
+
+  test("VALID_SERVICE_TYPES contains expected values", () => {
+    assert.deepEqual(VALID_SERVICE_TYPES, ["service", "library", "sdk", "infra"]);
+  });
 });
