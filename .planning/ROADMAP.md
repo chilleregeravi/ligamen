@@ -609,8 +609,8 @@ Plans:
   4. The project name entered during `/ligamen:map` is written to `ligamen.config.json` and reused on subsequent invocations without prompting again
 **Plans**: 2 plans
 Plans:
-- [ ] 81-01-PLAN.md — Port DINT-01 endScan FK fix + DINT-02 upsertRepo ID fix
-- [ ] 81-02-PLAN.md — Port DINT-03 test view names + DINT-04 worker version restart
+- [ ] 83-01-PLAN.md — FTS5 prepared statement LRU cache + journal mode pragma tests
+- [ ] 83-02-PLAN.md — Map command project name prompt and config persistence
 
 ## Progress
 
