@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 80-01-PLAN.md
-last_updated: "2026-03-22T20:36:49.126Z"
+stopped_at: Completed 81-02-PLAN.md
+last_updated: "2026-03-22T20:45:14.776Z"
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 80 — Security Hardening
+**Current focus:** Phase 81 — Data Integrity Port
 
 ## Current Position
 
-Phase: 80 (Security Hardening) — EXECUTING
-Plan: 3 of 3
+Phase: 81 (Data Integrity Port) — EXECUTING
+Plan: 1 of 2
 
 ## Performance Metrics
 
@@ -48,6 +48,9 @@ Plan: 3 of 3
 - v5.5.0: Shannon entropy >= 4.0 bits/char rejects (>=, not >); 'abcdefghijkl' (3.585 entropy) is the correct near-threshold test fixture
 - v5.5.0: SEC-03 scan lock scope is the full repoPaths array; lock dir is $LIGAMEN_DATA_DIR or ~/.ligamen; stale detection via process.kill(pid, 0)
 - [Phase 80-security-hardening]: SEC-01: path.resolve + startsWith base-dir guard replaces includes('..') in resolveDb() — handles all normalization variants
+- [Phase 81-data-integrity-port]: KEY_TO_VIEW in seedMeta ensures test inserts use the same view names production queries filter on
+- [Phase 81-data-integrity-port]: Version mismatch detection placed in worker-already-running branch so it fires only when a live worker is present
+- [Phase 81-data-integrity-port]: DINT-02: upsertRepo queries SELECT id FROM repos WHERE path after run() — lastInsertRowid is 0 on ON CONFLICT UPDATE
 
 ### Pending Todos
 
@@ -59,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:31:08.017Z
-Stopped at: Completed 80-01-PLAN.md
+Last session: 2026-03-22T20:45:06.309Z
+Stopped at: Completed 81-02-PLAN.md
 Resume file: None

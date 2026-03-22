@@ -17,8 +17,8 @@ Requirements for Security & Data Integrity Hardening. Each maps to roadmap phase
 
 - [ ] **DINT-01**: endScan() cleans schemas for both stale and null-versioned connections before deleting connections (FK safety)
 - [ ] **DINT-02**: upsertRepo() returns correct row ID on both insert and update (no lastInsertRowid=0 on ON CONFLICT)
-- [ ] **DINT-03**: node_metadata enrichment tests use canonical view names matching production queries (ownership/security/infra)
-- [ ] **DINT-04**: session-start.sh detects version mismatch and restarts worker when already running with stale code
+- [x] **DINT-03**: node_metadata enrichment tests use canonical view names matching production queries (ownership/security/infra)
+- [x] **DINT-04**: session-start.sh detects version mismatch and restarts worker when already running with stale code
 
 ### Reliability
 
@@ -65,8 +65,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-03 | Phase 80 | Complete |
 | DINT-01 | Phase 81 | Pending |
 | DINT-02 | Phase 81 | Pending |
-| DINT-03 | Phase 81 | Pending |
-| DINT-04 | Phase 81 | Pending |
+| DINT-03 | Phase 81 | Complete |
+| DINT-04 | Phase 81 | Complete |
 | REL-01 | Phase 82 | Pending |
 | REL-02 | Phase 82 | Pending |
 | REL-03 | Phase 82 | Pending |
