@@ -186,7 +186,48 @@ PROJECT_ROOT="$(pwd)"
 
 ---
 
-## Step 3: Confirm Findings with User
+## Step 3: Reconcile Crossing Values
+
+After all repos are scanned, run a single reconciliation pass over all collected findings to correct misclassified `external` crossings.
+
+**Build the known-services set:**
+
+Collect every `service.name` from every repo's scan findings:
+
+```javascript
+const knownServices = new Set();
+for (const finding of allFindings) {
+  for (const service of (finding.services || [])) {
+    knownServices.add(service.name);
+  }
+}
+```
+
+**Downgrade external to cross-service:**
+
+For every connection across all findings: if `crossing === "external"` AND `target` is in `knownServices`, change `crossing` to `"cross-service"`:
+
+```javascript
+for (const finding of allFindings) {
+  for (const conn of (finding.connections || [])) {
+    if (conn.crossing === 'external' && knownServices.has(conn.target)) {
+      conn.crossing = 'cross-service';
+    }
+  }
+}
+```
+
+Print a reconciliation summary if any crossings were changed:
+
+```
+Reconciliation: 3 connection(s) reclassified external → cross-service
+```
+
+If no changes, print nothing.
+
+---
+
+## Step 4: Confirm Findings with User
 
 **All findings must be confirmed before saving.**
 
@@ -214,7 +255,7 @@ Uncertain: Is user-api calling config-service at GET /config?
 
 ---
 
-## Step 4: Save to Database
+## Step 5: Save to Database
 
 First, write the confirmed findings JSON to a temp file to avoid shell escaping and ARG_MAX issues:
 
