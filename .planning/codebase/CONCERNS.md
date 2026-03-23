@@ -1,256 +1,203 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-03-22
+**Analysis Date:** 2026-03-23
 
-## Tech Debt
+## SQL Injection Risk (High Priority)
 
-**SBUG-02: Docker-Compose Repo Type Detection**
-- Issue: Docker-compose repos are classified as "infra" by default, but may actually be local dev environments for services. Currently requires explicit service entry-point detection (start/serve scripts, main.py, main.go) to avoid false classification.
-- Files: `plugins/ligamen/worker/scan/manager.js` (lines 150-156), `plugins/ligamen/worker/scan/manager.test.js` (lines 1054-1068)
-- Impact: Services with docker-compose for local development could be mislabeled as infrastructure, affecting dependency graph accuracy and scan categorization
-- Fix approach: Enhance entry-point detection to check for common service patterns in docker-compose.yml itself (exposed ports, service definitions), or make classification configurable per-repo
+**VACUUM INTO with String Interpolation:**
+- Issue: `VACUUM INTO '${snapshotFile}'` uses string interpolation to construct SQL
+- Files: `plugins/ligamen/worker/db/database.js:290`
+- Impact: If `snapshotFile` contains quotes, path traversal, or special characters, SQL injection is possible
+- Fix approach: Use parameterized path handling or validate `snapshotFile` strictly before interpolation. The snapshot filename is derived from timestamp and controlled internally, but defensive parsing recommended
 
-**SBUG-03: Dual Path Handling in CODEOWNERS Enricher**
-- Issue: CODEOWNERS enricher uses `ctx.repoAbsPath` (absolute path) for file system probing but falls back to `ctx.repoPath` (relative service path) when absolute path unavailable. This inconsistency creates maintenance burden in enrichers.
-- Files: `plugins/ligamen/worker/scan/codeowners.js` (lines 119-125), `plugins/ligamen/worker/scan/enrichment.js` (lines 34, 40)
-- Impact: Test contexts without `repoAbsPath` may fail to locate CODEOWNERS files correctly; production behavior depends on context type
-- Fix approach: Standardize enricher context to always provide `repoAbsPath`, or add a helper method to resolve absolute paths from relative service paths
+**Timestamp-based File Naming Lacks Uniqueness Guard:**
+- Issue: Snapshot filenames use `toISOString().replace(/[:.]/g, "-")` which can produce duplicates on sub-second re-execution
+- Files: `plugins/ligamen/worker/db/database.js:281-285`
+- Impact: Two snapshots created within the same second will have identical filenames, causing the second to overwrite the first silently
+- Fix approach: Add millisecond precision separator or use UUID suffix; add collision detection before VACUUM INTO
 
-**SREL-01: Incremental Scan Constraint Injection**
-- Issue: Incremental scans append a hard constraint block to agent prompts to focus on changed files. When diff is empty, scan is skipped entirely (marked as "incremental-noop"), but the mechanism is tightly coupled to prompt generation.
-- Files: `plugins/ligamen/worker/scan/manager.js` (lines 15-23)
-- Impact: Changes to agent prompt structure could break constraint injection; difficult to test constraint effectiveness independently
-- Fix approach: Extract constraint generation into a separate, testable function; document expected agent behavior for incremental scans
+## Type Safety & Assertions
 
-## Known Bugs
+**Loose Type Annotations (any types):**
+- Issue: ChromaDB collection handle typed as `@type {any | null}` without proper interface definition
+- Files: `plugins/ligamen/worker/server/chroma.js` (ChromaDB collection)
+- Impact: Loss of IDE autocomplete and type checking for ChromaDB operations; harder to catch API changes
+- Fix approach: Define explicit ChromaDB collection interface from upstream SDK or use `unknown` with explicit type narrowing
 
-**OpenDB Readonly Connection Pragma Issue**
-- Symptoms: Journal mode cannot be set on read-only database connections (WAL requires write access)
-- Files: `plugins/ligamen/worker/db/pool.js` (lines 96, 237)
-- Trigger: Calling `db.pragma("journal_mode = WAL")` on a database opened with `{ readonly: true }`
-- Workaround: Code correctly avoids setting pragmas on readonly connections (see comments at lines 96, 237), but this constraint is fragile and easy to miss
+**Unvalidated Empty Catch Blocks (49 instances):**
+- Issue: 49 try-catch blocks across the codebase use `catch { /* ignore */ }` or `catch (_) { }` without logging or error tracking
+- Files: `plugins/ligamen/worker/scan/manager.js`, `plugins/ligamen/worker/db/database.js`, `plugins/ligamen/worker/db/query-engine.js`, and others
+- Impact: Silent failures make debugging difficult; legitimate errors are hidden; security issues (e.g., file permission denials) go unnoticed
+- Fix approach: Replace empty catches with selective error handling — either log at WARN level or explicitly document why silence is safe (e.g., "optional config file absent")
 
-**ChromaDB Initialization Timing**
-- Symptoms: ChromaDB client constructor does not throw errors; errors surface on `.heartbeat()` call, which is asynchronous and can fail silently in some contexts
-- Files: `plugins/ligamen/worker/server/chroma.js` (lines 92-97)
-- Trigger: Network outage or unreachable ChromaDB host after process startup
-- Workaround: Heartbeat failure sets `_chromaAvailable = false`, but errors are only logged if logger is set; silent failures possible if logging disabled
-
-## Security Considerations
-
-**Credential Rejection in Auth/DB Extraction**
-- Risk: The auth-db enricher uses length-based and regex-based credential rejection (values >40 chars, tokens that look like JWTs). Attackers could craft mechanism names that bypass these checks.
-- Files: `plugins/ligamen/worker/scan/enrichment/auth-db-extractor.js` (lines 43-57)
-- Current mitigation: Basic heuristics reject obvious credential patterns (Bearer tokens, JWT bodies, URLs with passwords)
-- Recommendations:
-  - Add entropy-based detection (reject high-entropy strings)
-  - Log extracted values that narrowly pass rejection (e.g., 38-40 chars)
-  - Consider scanning enriched output for common secret patterns before persistence
-
-**Path Traversal Protection**
-- Risk: MCP server `resolveDb()` function uses basic path traversal guard (`project.includes('..')`) which is insufficient against sophisticated attacks
-- Files: `plugins/ligamen/worker/mcp/server.js` (lines 79-80)
-- Current mitigation: Rejects paths containing `..`, handles absolute paths via separate code path
-- Recommendations:
-  - Use `path.normalize()` and verify result starts with expected base directory
-  - Reject symlinks that could escape project root
-  - Add validation that resolved path is within `~/.ligamen/projects/`
-
-**Database WAL Mode Concurrency**
-- Risk: WAL (Write-Ahead Logging) with `busy_timeout = 5000` can still produce SQLITE_BUSY errors under high concurrent write load, but no backoff/retry mechanism exists
-- Files: `plugins/ligamen/worker/db/database.js` (lines 100-104)
-- Current mitigation: 5-second busy timeout, foreign keys enabled, NORMAL synchronous mode
-- Recommendations:
-  - Implement exponential backoff retry (3 attempts, 100-500ms) for SQLITE_BUSY in query wrapper
-  - Add metrics/logging for SQLITE_BUSY occurrences to detect contention
-  - Consider read-only query routing to avoid write lock conflicts
+**NodeId Type Coercion Issue:**
+- Issue: `if (!nodeId && nodeId !== 0) return;` in detail-panel click handler relies on JavaScript truthiness to detect 0
+- Files: `plugins/ligamen/worker/ui/modules/detail-panel.js:37`
+- Impact: If `nodeId` is `undefined` or `null`, the check works, but the pattern is fragile for TypeScript adoption
+- Fix approach: Use explicit comparison: `if (nodeId == null || isNaN(nodeId))`
 
 ## Performance Bottlenecks
 
-**Large File Scan in Auth/DB Extraction**
-- Problem: Auth/DB enricher recursively scans entire service directory without early termination. No file size limits, depth limits, or exclusion of build artifacts
-- Files: `plugins/ligamen/worker/scan/enrichment/auth-db-extractor.js` (no explicit recursion limit)
-- Cause: `readdirSync` traversal in extractAuthAndDb visits every file; excluded patterns only apply post-traversal
-- Improvement path:
-  - Add pre-traversal exclusion list (node_modules, build/, dist/, .git, vendor/)
-  - Implement depth limit (max 8 levels)
-  - Skip files larger than 1MB
-  - Cache directory traversal results per repo
+**LRU Prepared Statement Cache Underutilized:**
+- Issue: StmtCache defined with capacity=50 but only 12 unique SQL queries appear in production code
+- Files: `plugins/ligamen/worker/db/query-engine.js:42-92`
+- Impact: Minimal performance gain from caching; overhead of LRU management with minimal statements queued
+- Fix approach: Profile actual query patterns; consider increasing capacity if queries exceed 50 or shrinking to 20 with documented rationale
 
-**Transitive Dependency Traversal Depth**
-- Problem: Impact queries with `transitive=true` perform recursive SQL queries without depth limit, potentially causing full-table scans on large dependency graphs
-- Files: `plugins/ligamen/worker/db/query-engine.js` (impact/affected query methods)
-- Cause: No explicit LIMIT on recursion depth; query planner may explore exponential paths
-- Improvement path:
-  - Limit transitive traversal to depth 5-7 (configurable)
-  - Add query timeout (30s) for transitive queries
-  - Implement breadth-first instead of depth-first traversal
-  - Cache transitive closure results per service
+**Sequential DB Writes After Parallel Scan:**
+- Issue: Phase A runs parallel agent invocations (Promise.allSettled), but Phase B performs sequential DB writes and enrichment
+- Files: `plugins/ligamen/worker/scan/manager.js:728-765`
+- Impact: With 10+ repos, Phase B serializes on a single SQLite handle (better-sqlite3 blocks on SQLITE_BUSY); wall-clock time dominated by sequential writes
+- Fix approach: Consider write batching or async enrichment queue; document the SQLite concurrency constraint explicitly in code comments
 
-**ChromaDB Sync Fire-and-Forget**
-- Problem: `syncFindings()` is async but never awaited; large batches of findings could queue up during peak scan activity
-- Files: `plugins/ligamen/worker/server/chroma.js` (syncFindings export)
-- Cause: Fire-and-forget design prioritizes scan speed over sync guarantee; no backpressure mechanism
-- Improvement path:
-  - Add queue size limit with warning logs
-  - Implement batch collection (e.g., sync every 100 findings or 5s)
-  - Return a promise that resolves when ChromaDB write confirmed (optional for callers)
-  - Monitor unresolved sync promises in logs
+**File Traversal Without Size Safeguards (Auth/DB Extractor):**
+- Issue: `MAX_FILE_SIZE = 1_048_576` (1MB) cap exists, but directory traversal with `MAX_TRAVERSAL_DEPTH = 8` can still scan thousands of files
+- Files: `plugins/ligamen/worker/scan/enrichment/auth-db-extractor.js:26-27`
+- Impact: On large repos (e.g., monorepos with 50k files), extractor can consume significant CPU/memory during traversal
+- Fix approach: Add file count limit per service; add timeout guard; profile on real monorepos before scaling
 
-**FTS5 Search Query Compilation**
-- Problem: FTS5 queries are compiled per call without caching; `search()` function builds three separate prepared statements per query
-- Files: `plugins/ligamen/worker/db/query-engine.js` (lines 84-130)
-- Cause: No prepared statement cache; three-tier fallback means up to 9 statement compilations per search
-- Improvement path:
-  - Cache prepared statements using `db.prepare(...).bind()`
-  - Implement LRU cache for FTS5 normalized queries
-  - Batch multiple searches in single database transaction
+## Error Handling Gaps
+
+**Chroma Sync Fire-and-Forget without Metrics:**
+- Issue: `syncFindings().catch()` writes to stderr only; no structured logging, no retry, no metrics
+- Files: `plugins/ligamen/worker/db/database.js:246-248` and `plugins/ligamen/worker/server/chroma.js:175-177`
+- Impact: ChromaDB sync failures are invisible to monitoring; users never know if semantic search is stale
+- Fix approach: Log sync failures to structured logger with `level: WARN`; emit metrics (counter/histogram) for sync latency and error rate
+
+**Retry Logic Hardcoded to Once:**
+- Issue: Agent runner retries on throw exactly once, then gives up (lines 655-668 in manager.js)
+- Files: `plugins/ligamen/worker/scan/manager.js:655-668`
+- Impact: Transient network blips cause scan abort; no exponential backoff or jitter; scan lock remains open leaving stale lock files on failure
+- Fix approach: Implement configurable retry policy (exponential backoff, max retries); ensure scan lock is released even on final failure
+
+**Graph Loading Silent Failure:**
+- Issue: `loadProject()` catches fetch errors but only sets a message to "Cannot reach server" with no logging
+- Files: `plugins/ligamen/worker/ui/graph.js:40-45`
+- Impact: Users see generic message; no visibility into whether it's network, CORS, or server error
+- Fix approach: Parse fetch error details; emit console.error with full error stack; consider retry UI for transient failures
 
 ## Fragile Areas
 
-**Agent Output Parsing**
-- Files: `plugins/ligamen/worker/scan/findings.js`
-- Why fragile: Depends on specific JSON block markers in agent output; any variation in Claude's formatting breaks parsing. No graceful degradation if block is malformed.
-- Safe modification:
-  - Always test changes against real agent output samples (stored in test fixtures)
-  - Add multiple parsing strategies (try JSON block first, then fenced code block, then raw JSON)
-  - Log parse failures with raw output for debugging
-- Test coverage: Agent output parsing has unit tests but lacks integration tests with actual agent responses
+**Scan Bracket State Machine:**
+- Issue: `beginScan()` opens bracket, but if agent fails after retry, bracket is never closed (by design: "prior data preserved")
+- Files: `plugins/ligamen/worker/scan/manager.js:660-666`
+- Impact: Stale open bracket can accumulate if scan is aborted; no TTL on open brackets; manual cleanup required
+- Fix approach: Add metadata to scan_versions (started_at, is_open) and auto-close brackets older than 24h via maintenance job
 
-**Module-Level Enricher Registration**
-- Files: `plugins/ligamen/worker/scan/manager.js` (lines 36-41)
-- Why fragile: Enrichers are registered at module load time (OWN-01, AUTHDB-01). If registration order matters or if enrichers have initialization side effects, order dependencies are hidden.
-- Safe modification:
-  - Document enricher initialization requirements
-  - Add explicit ordering (e.g., codeowners must run before auth-db if they share metadata)
-  - Consider lazy-loading enrichers or explicit registration in scan initialization
-- Test coverage: Enricher execution order tested in manager.test.js but registration order assumed stable
+**CODEOWNERS Regex Matching Complexity:**
+- Issue: CODEOWNERS patterns support wildcards and double-asterisks, but extractor must convert Git patterns to regex
+- Files: `plugins/ligamen/worker/scan/codeowners.js:119-124` (SBUG-03 documented)
+- Impact: Edge cases in pattern matching (e.g., escaped spaces, negations) may fail silently; ownership not extracted when patterns are non-standard
+- Fix approach: Add comprehensive test suite for CODEOWNERS pattern conversion; consider using a dedicated CODEOWNERS parser library
 
-**SQLite Journal Mode Edge Cases**
-- Files: `plugins/ligamen/worker/db/pool.js` (lines 95-96, 236-237, 174-176)
-- Why fragile: Journal mode pragma cannot be set on readonly connections. Code works around this but relies on careful ordering of `new Database()` and `db.pragma()` calls.
-- Safe modification:
-  - Create a helper function `openDbReadWrite()` vs `openDbReadOnly()` to encapsulate pragma rules
-  - Document which pragmas require read-write vs read-only connections
-  - Add unit tests specifically for pragma safety on different connection modes
-- Test coverage: No explicit tests for pragma safety; only implicit coverage through integration tests
-
-**Database Pool Concurrency**
-- Files: `plugins/ligamen/worker/db/pool.js` (entire file)
-- Why fragile: Pool uses simple `Map` for caching without synchronization. Multiple projects opening DBs simultaneously could create race conditions.
-- Safe modification:
-  - Document that pool is not thread-safe (Node.js is single-threaded, but Worker threads could cause issues)
-  - Add reentrancy guard (e.g., flag to prevent concurrent getQueryEngine calls)
-  - Lock opened DB path to prevent duplicate opens
-- Test coverage: No concurrent access tests; single-threaded tests only
-
-**Query Engine Search Fallback Chain**
-- Files: `plugins/ligamen/worker/db/query-engine.js` (lines 59-140)
-- Why fragile: Three-tier search (ChromaDB -> FTS5 -> SQL) has different result formats and scoring. If one tier fails, fallback may return inconsistent results.
-- Safe modification:
-  - Normalize all result formats (score, type, metadata) at each tier
-  - Test each tier independently (skipChroma, skipFts5 options exist but untested)
-  - Document expected result order and how scores compare across tiers
-- Test coverage: Integrated tests exist but individual tier tests missing
-
-## Scaling Limits
-
-**Single Database File Per Project**
-- Current capacity: SQLite handles ~10GB files efficiently on modern hardware (test suite uses small DBs)
-- Limit: Dependency graphs for very large monorepos (1000+ services) may approach SQLite row limits (theoretically unlimited, but query performance degrades)
-- Scaling path:
-  - Shard by repo (separate DB per repo) with federation queries
-  - Implement archive/pruning strategy for old scan data
-  - Consider moving to PostgreSQL for >500 services/project
-
-**Memory Usage During Large Scans**
-- Current capacity: Agent output parsing and enrichment runs in-memory; findings array not paginated
-- Limit: Scans with 10,000+ findings could consume 100MB+ RAM during processing
-- Scaling path:
-  - Stream findings to database during discovery (write-as-you-parse)
-  - Implement pagination in enrichment pass (process 100 findings at a time)
-  - Use generator functions to defer parsing until persistence
-
-**HTTP Request Handling Under Load**
-- Current capacity: Single Fastify instance, default connection limits
-- Limit: 100+ concurrent impact queries could queue or timeout
-- Scaling path:
-  - Add rate limiting per project (e.g., 10 queries/sec per project)
-  - Implement query result caching (30-minute TTL for static queries)
-  - Spawn worker pool for CPU-intensive queries (transitive impact)
-
-## Dependencies at Risk
-
-**better-sqlite3 Native Binding**
-- Risk: Native compilation required on install; breaks on unsupported platforms (Alpine Linux, Windows ARM)
-- Impact: Plugin fails to load on platforms where native binding unavailable
-- Migration plan: Provide Docker image with pre-built bindings, or support fallback to sql.js (pure JS SQLite)
-
-**chromadb Optional Dependency**
-- Risk: @chroma-core/default-embed is optional; if installed globally but incompatible version, silent failures
-- Impact: ChromaDB may silently fail to initialize if embedding model unavailable
-- Migration plan: Make chroma truly optional with clear error messages; consider bundling embedding model
-
-## Missing Critical Features
-
-**Scan Cancellation**
-- Problem: Once started, scans cannot be interrupted. Long-running agent invocations block the UI.
-- Blocks: Users cannot stop scans that discover unexpected repos (no kill/abort tool)
-- Recommendation: Implement cancellation token in scan manager; expose `/cancel` endpoint in HTTP worker
-
-**Scan Resumption**
-- Problem: If scan crashes mid-way, entire scan must be restarted. No checkpoint/resume mechanism.
-- Blocks: Scanning large monorepos (100+ repos) may fail midway with no recovery path
-- Recommendation: Checkpoint scan state after each repo (write to DB); implement `--resume` flag in scan manager
-
-**Query Result Pagination**
-- Problem: Impact queries return all results unbounded; UI crashes on very large result sets (1000+ connections)
-- Blocks: Cannot explore dependencies in large graphs interactively
-- Recommendation: Add `limit` and `offset` parameters to all query functions; implement cursor-based pagination
-
-**Concurrent Scan Protection**
-- Problem: Two users can start scans on same project simultaneously, creating duplicate/conflicting data
-- Blocks: Multi-user environments where multiple agents access same project DB
-- Recommendation: Implement project lock (check for active scan); queue concurrent scans or reject with clear message
+**Actor Dedup Logic Relies on Exact Name Match:**
+- Issue: Graph UI dedup filter removes actor node if `actor.name === service.name` (case-sensitive exact match)
+- Files: `plugins/ligamen/worker/ui/modules/renderer.js:70-80` (defense-in-depth per Phase 78)
+- Impact: If service name is "stripe" and actor is "Stripe", they won't deduplicate; typos cause false actor nodes
+- Fix approach: Use case-insensitive comparison + semantic similarity threshold; document this as defensive layer, not primary dedup
 
 ## Test Coverage Gaps
 
-**Journal Mode Pragma Ordering**
-- What's not tested: Correct pragma ordering on readonly vs read-write connections
-- Files: `plugins/ligamen/worker/db/pool.js`, `plugins/ligamen/worker/db/database.js`
-- Risk: Changes to pragma application could silently break on readonly connections without test failure
-- Priority: High (affects all read operations)
+**UI Canvas Rendering Not Tested:**
+- Issue: `renderer.js` (463 lines) has no unit tests for canvas drawing logic, node positioning, or edge bundling
+- Files: `plugins/ligamen/worker/ui/modules/renderer.js`
+- Risk: Canvas rendering bugs (malformed edges, clipped labels, layout issues) discovered only in manual testing
+- Priority: Medium — visual bugs don't affect correctness, but impact UX
+- Fix approach: Add browser-based tests using canvas mock or headless Playwright tests
 
-**FTS5 Search Fallback Tiers**
-- What's not tested: Each search tier (ChromaDB, FTS5, SQL) individually; only integration tests exist
-- Files: `plugins/ligamen/worker/db/query-engine.js`
-- Risk: Breaking changes to one tier not caught until production
-- Priority: Medium (fallback chain well-tested overall)
+**MCP Server Auth/ACL Not Tested:**
+- Issue: `resolveDb()` performs security check `if (!normalized.startsWith(baseDir + path.sep))` but no unit test covers path traversal attempts
+- Files: `plugins/ligamen/worker/mcp/server.js:82-88`
+- Risk: Path traversal bug could escape ~/.ligamen/projects and access arbitrary DBs
+- Priority: High — security-critical
+- Fix approach: Add unit tests with crafted malicious paths (e.g., `../../../`, `..%2f..%2f`, symlinks)
 
-**Concurrent Database Access**
-- What's not tested: Multiple queries/writes to same DB simultaneously (e.g., scan write + UI read)
-- Files: `plugins/ligamen/worker/db/pool.js`, `plugins/ligamen/worker/db/database.js`
-- Risk: Race conditions in WAL mode not caught by single-threaded tests
-- Priority: High (affects production under load)
+**Concurrent Scan Lock Race Condition Not Tested:**
+- Issue: Lock file cleanup in `acquireScanLock()` checks `isProcessRunning(pid)` but doesn't handle PID reuse on Linux
+- Files: `plugins/ligamen/worker/scan/manager.js:486-503`
+- Risk: After 32-bit PID wraps, a stale lock with an old PID might be deleted, allowing concurrent scans
+- Priority: Low on modern Linux (PIDs rarely wrap in practice), but possible on embedded systems
+- Fix approach: Use OS-specific locking primitives (fcntl on Unix, LockFileEx on Windows) instead of pid-based locks
 
-**Agent Output Parsing Edge Cases**
-- What's not tested: Malformed JSON blocks, nested braces, escaped quotes in agent output
-- Files: `plugins/ligamen/worker/scan/findings.js`
-- Risk: Agent output format changes could silently fail parsing; "incremental-noop" results hide parse errors
-- Priority: High (core scanning functionality)
+**Discovery Agent Fallback Empty Context Not Tested:**
+- Issue: `runDiscoveryPass()` returns `{}` on failure, and deep scan proceeds with empty context
+- Files: `plugins/ligamen/worker/scan/manager.js:413-426`
+- Risk: Discovery failures are silent; no test verifies that scans succeed with empty discovery context
+- Priority: Medium — affects reliability but not correctness
+- Fix approach: Add test for discovery failure; verify deep scan produces findings with fallback
 
-**Enricher Failure Cascading**
-- What's not tested: Individual enricher failures and their impact on subsequent enrichers
-- Files: `plugins/ligamen/worker/scan/enrichment.js`, `plugins/ligamen/worker/scan/manager.js`
-- Risk: One enricher throwing could silently skip all downstream enrichers
-- Priority: Medium (enrichment is best-effort but data loss risk)
+## Scaling Limits
 
-**ChromaDB Initialization Failure Modes**
-- What's not tested: Network timeouts, DNS failures, authentication errors during heartbeat
-- Files: `plugins/ligamen/worker/server/chroma.js`
-- Risk: Silent failures if logging disabled; unclear why ChromaDB unavailable
-- Priority: Medium (gracefully falls back but poor observability)
+**Shannon Entropy Calculation O(n log n) in Loop:**
+- Issue: `shannonEntropy()` called per extracted string; entropy recalculation not memoized
+- Files: `plugins/ligamen/worker/scan/enrichment/auth-db-extractor.js:63-74`
+- Impact: On a service with 1000 extracted values, entropy computed 1000 times; each computation is O(charset), so ~O(1000 * charset)
+- Limit: Acceptable for current scale, but problematic if values scale to 10k+
+- Scaling path: Cache entropy results in a Set; consider probabilistic sampling for very large services
+
+**Graph Node/Edge Count No Upper Bound:**
+- Issue: `renderServiceMeta()` and detail panel render without pagination or lazy loading
+- Files: `plugins/ligamen/worker/ui/modules/detail-panel.js:48-71`
+- Impact: Rendering 1000-node graph with 10k connections can freeze the browser tab
+- Limit: Known issue for large enterprises (100+ services); UI becomes unusable
+- Scaling path: Implement virtual scrolling for connection lists; add pagination to schema field tables; implement server-side filtering
+
+**ChromaDB Embedding Sync Blocks on Large Findings:**
+- Issue: `syncFindings()` uploads entire findings set to ChromaDB; no batching or streaming
+- Files: `plugins/ligamen/worker/server/chroma.js:120-185`
+- Impact: Syncing 5000+ services in a single call can timeout or consume all available memory
+- Limit: Scale tested up to ~1000 services; unclear beyond that
+- Scaling path: Batch service uploads (100 at a time); add progress callback; consider streaming API
+
+## Missing Critical Features
+
+**No Scan Incremental Resume:**
+- Problem: If scan crashes mid-way, no mechanism to resume from failure point — user must restart full scan
+- Blocks: Scanning 100+ repos with individual failures becomes painful
+- Priority: Medium for large codebases
+
+**No Version Conflict Detection:**
+- Problem: If two scans of same repo produce conflicting connection sets, no alert or merge strategy
+- Blocks: Concurrent scans (even with lock) can produce divergent results if agents have different outputs
+- Priority: Low — lock prevents concurrency, but design weakness noted
+
+## Dependencies at Risk
+
+**better-sqlite3 Platform-Specific:**
+- Risk: `better-sqlite3` is a native module; npm install requires build tools (python, C++ compiler)
+- Impact: `npm install` fails on environments without build tools (Docker scratch images, Alpine, Windows without VS Build Tools)
+- Migration plan: Add pre-built binaries via `better-sqlite3-prebuilt` or switch to `sql.js` for pure JS (at performance cost)
+
+**chromadb Optional with Silent Failure:**
+- Risk: ChromaDB listed as optional dependency; if not installed, `import { ChromaClient }` throws at runtime
+- Impact: Feature silently disabled, but users may expect semantic search to work
+- Fix approach: Explicitly catch import error; provide clear startup message when ChromaDB unavailable
+
+**Zod Version Mismatch Risk:**
+- Risk: Package requires `zod ^3.25.0` but v4 exists with breaking changes
+- Impact: If user installs globally with conflicting Zod version, agent prompts may fail validation
+- Fix approach: Pin to exact version (e.g., `3.25.0`) or test against v4 explicitly
+
+## Security Considerations
+
+**Auth/DB Extractor Regex Entropy Check Bypassable:**
+- Risk: `ENTROPY_REJECT_THRESHOLD = 4.0` blocks high-entropy strings, but attacker can craft strings with carefully controlled entropy (e.g., repeating chars)
+- Files: `plugins/ligamen/worker/scan/enrichment/auth-db-extractor.js:76`
+- Current mitigation: Additional `CREDENTIAL_REJECT` patterns catch common secret formats (JWT, Bearer tokens, connection strings)
+- Recommendations: Add length limits (reject if > 40 chars AND entropy > 3.5); add fuzzy signature detection for known secret formats (AWS keys, GitHub tokens, etc.)
+
+**No Rate Limiting on MCP Search:**
+- Risk: `/ligamen:search` can be called without throttling; large repos with 10k+ services could cause CPU spike
+- Files: `plugins/ligamen/worker/mcp/server.js` (search tool handler)
+- Current mitigation: FTS5 is fast, but no upper bound on result set size
+- Recommendations: Add max_results parameter (default 100); add timeout guard (30s); log slow queries
+
+**Snapshot File Permissions Not Explicitly Set:**
+- Risk: `createSnapshot()` creates VACUUM INTO files with default umask; if umask is world-readable, DB copies are world-readable
+- Files: `plugins/ligamen/worker/db/database.js:290`
+- Current mitigation: None — relies on system umask
+- Recommendations: Explicitly chmod snapshot files to 0600 after creation; document in config
 
 ---
 
-*Concerns audit: 2026-03-22*
+*Concerns audit: 2026-03-23*

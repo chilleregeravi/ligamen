@@ -1,144 +1,162 @@
 # External Integrations
 
-**Analysis Date:** 2026-03-22
+**Analysis Date:** 2026-03-23
 
 ## APIs & External Services
 
 **Claude Code Integration:**
-- Claude Code Plugin System - Host for Ligamen plugin
-  - SDK: `@modelcontextprotocol/sdk` 1.27.1
-  - Integration: Plugin manifest at `plugins/ligamen/.claude-plugin/plugin.json`, hooks at `plugins/ligamen/hooks/hooks.json`
-  - Hooks: PostToolUse (format/lint), PreToolUse (file guard), SessionStart (deps install)
+- Model Context Protocol (MCP) - Stdio transport for exposing Ligamen tools
+  - SDK: `@modelcontextprotocol/sdk@1.27.1`
+  - Location: `worker/mcp/server.js` (tool definitions)
+  - Tools: impact analysis, drift detection, semantic search, OpenAPI breaking changes
 
-**Anthropic/Claude-specific:**
-- Claude Task Runner - Used by `plugins/ligamen/worker/scan/manager.js` to invoke background agents
-  - Auth: Implicit via Claude Code context
-  - Constraint: Background agents cannot access MCP tools per Claude Code limitation
+**Git Integration:**
+- Local git commands via `child_process.execFileSync()`
+- Operations: diff detection, file history, branch tracking, log queries
+- Location: `worker/scan/manager.js` (getChangedFiles, incremental scan logic)
 
 ## Data Storage
 
 **Databases:**
-- SQLite 3 - Primary persistent storage
-  - Client: `better-sqlite3` 12.8.0 (synchronous)
-  - Connection: `~/.ligamen/projects/<hash>/impact-map.db`
-  - Features: WAL mode for concurrent reads, FTS5 keyword search, VACUUM INTO snapshots
+- SQLite 3 (primary)
+  - Binding: better-sqlite3 12.8.0
+  - Connection: Per-project at `~/.ligamen/projects/<hash>/impact-map.db`
+  - Client: `QueryEngine` class in `worker/db/query-engine.js`
+  - WAL mode enabled for concurrent access
+  - Migrations: 9 schema versions in `worker/db/migrations/`
 
-**Vector Search (Optional):**
-- ChromaDB - Optional semantic search layer for service discovery
-  - Client: `chromadb` 3.3.3 (Node.js client)
-  - Connection: Configured via `LIGAMEN_CHROMA_MODE`, `LIGAMEN_CHROMA_HOST`, `LIGAMEN_CHROMA_PORT`
-  - Auth: Optional Bearer token via `LIGAMEN_CHROMA_API_KEY`
-  - Multi-tenant: Supports `LIGAMEN_CHROMA_TENANT` and `LIGAMEN_CHROMA_DATABASE`
-  - Embeddings: Optional `@chroma-core/default-embed` 1.0.0 for vector generation
-  - Fallback: Non-blocking — if ChromaDB unavailable, falls back to FTS5 then SQL
-  - Collection: `ligamen-impact` — stores service names and endpoint paths
+**Vector Database (Optional):**
+- ChromaDB 3.3.3 (semantic search enhancement)
+  - Connection modes: local or remote (configurable via env)
+  - Collection: "ligamen-impact" (embeddings for findings)
+  - Graceful degradation: Falls back to SQLite FTS5 if unavailable
+  - Status: Non-blocking initialization; availability checked once at startup
 
 **File Storage:**
 - Local filesystem only
-  - User data: `~/.ligamen/` directory (machine-wide)
-  - Per-project data: `~/.ligamen/projects/<hash>/`
-  - Logs: `~/.ligamen/logs/worker.log`
-  - PID/port files: `~/.ligamen/worker.pid`, `~/.ligamen/worker.port`
+  - Logs: `~/.ligamen/logs/worker.log` (rotated, max 10 MB per file)
+  - Projects: `~/.ligamen/projects/` (per-hash directories)
+  - Settings: `~/.ligamen/settings.json` (worker configuration)
 
 **Caching:**
-- None — SQLite handles query caching via PRAGMA cache_size
-- ChromaDB collection kept in memory after initialization
+- In-memory pool: Map-based QueryEngine cache in `worker/db/pool.js`
+  - Key: absolute project path
+  - Value: QueryEngine instance (holds open DB connection)
+  - Lifecycle: Worker lifetime (cleared on shutdown)
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Custom — No external auth provider
-- Implementation:
-  - Claude Code plugin system manages authentication implicitly
-  - MCP server access is implicit via Claude Code context
-  - Settings stored locally in `~/.ligamen/settings.json` (unencrypted JSON)
-  - Optional ChromaDB Bearer token stored in settings
+- None for internal APIs
+- Claude Code provides session authentication via MCP transport
+- No external identity provider required
 
-**Credentials:**
-- No user credentials handled
-- Optional `LIGAMEN_CHROMA_API_KEY` stored in `~/.ligamen/settings.json`
-- File guard prevents accidental writes to `.env` and credential files
+**Authorization:**
+- File path security: Project path must resolve within `~/.ligamen/projects/` (path escape prevention in `worker/mcp/server.js`)
+- Read-only database access: SQLite databases opened in read-only mode (`readonly: true` in `worker/mcp/server.js`)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None — All errors logged locally
+- None (no external service)
 
 **Logs:**
-- Structured JSON logging to `~/.ligamen/logs/worker.log`
-- Log levels: DEBUG, INFO, WARN, ERROR
-- Configurable via `LIGAMEN_LOG_LEVEL` environment variable
-- Logs include: timestamp, level, message, PID, port (if applicable), component tag (worker/http/mcp/scan)
+- Structured JSON logging with levels: DEBUG, INFO, WARN, ERROR
+- Writer: Custom logger in `worker/lib/logger.js`
+- Format: `{ts, level, msg, pid, component, port, ...extra}`
+- Rotation: Size-based (10 MB threshold), keeps 3 rotated files (.1, .2, .3)
+- Output: `~/.ligamen/logs/worker.log`
+- Components: worker, http, mcp, scan
 
-**Heartbeat & Health:**
-- Worker exposes `/api/version` HTTP endpoint for version checks
-- Worker writes PID and port files at startup for process discovery
-- ChromaDB health checked via `heartbeat()` call at initialization
-- Connection errors logged but never block worker startup
+**Diagnostics:**
+- Health check endpoint: `GET /api/readiness` (always returns 200)
+- Version endpoint: `GET /api/version` (returns worker version)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Developer's local machine running Claude Code
-- No cloud/server deployment required
-- Worker runs as background daemon (spawned by `plugins/ligamen/scripts/worker-start.sh`)
+- Claude Code plugin ecosystem
+- Runs as background worker process on developer machine
 
-**Installation:**
-- Claude Code plugin system (`claude plugin install`)
-- Marketplace registration via `ligamen.config.json` and plugin.json
-- Runtime dependencies auto-installed via `plugins/ligamen/scripts/install-deps.sh` on SessionStart hook
+**CI Pipeline:**
+- None detected (Makefile targets: test, lint, check, install, uninstall, dev)
 
-**Version Management:**
-- Package version defined in `plugins/ligamen/package.json` (5.4.0)
-- Version mismatch detection: worker checks installed vs running version and restarts if different
-- Version endpoint: `GET /api/version` returns `{ version: string }`
+**Plugin Manifest:**
+- Location: `plugins/ligamen/.claude-plugin/plugin.json`
+- Registered in Claude marketplace (name: @ligamen/cli)
+- Hooks: PostToolUse, PreToolUse, SessionStart, UserPromptSubmit
 
 ## Environment Configuration
 
-**Required Environment Variables:**
-- None (all optional with sensible defaults)
+**Required env vars for worker startup:**
+- `LIGAMEN_DATA_DIR` (default: `~/.ligamen`) - Base data directory
+- `LIGAMEN_LOG_LEVEL` (read from settings.json) - DEBUG|INFO|WARN|ERROR
+- `LIGAMEN_WORKER_PORT` (read from settings.json, default: 37888) - HTTP server port
 
-**Optional Environment Variables:**
-- `LIGAMEN_DATA_DIR` - Override `~/.ligamen` (default: `$HOME/.ligamen`)
-- `LIGAMEN_LOG_LEVEL` - Log level (default: INFO)
-- `LIGAMEN_WORKER_PORT` - Worker HTTP port (default: 37888)
-- `LIGAMEN_PROJECT_ROOT` - MCP server fallback project root
-- `LIGAMEN_DB_PATH` - MCP server fallback database path
-- `LIGAMEN_CHROMA_MODE` - Enable ChromaDB ('local' or empty)
-- `LIGAMEN_CHROMA_HOST` - ChromaDB host (default: localhost)
-- `LIGAMEN_CHROMA_PORT` - ChromaDB port (default: 8000)
-- `LIGAMEN_CHROMA_SSL` - Use HTTPS for ChromaDB ('true')
-- `LIGAMEN_CHROMA_API_KEY` - ChromaDB Bearer token
-- `LIGAMEN_CHROMA_TENANT` - ChromaDB tenant (default: default_tenant)
-- `LIGAMEN_CHROMA_DATABASE` - ChromaDB database (default: default_database)
+**ChromaDB env vars** (optional):
+- `LIGAMEN_CHROMA_MODE` - 'local' or empty (enables/disables)
+- `LIGAMEN_CHROMA_HOST` - default: localhost
+- `LIGAMEN_CHROMA_PORT` - default: 8000
+- `LIGAMEN_CHROMA_SSL` - 'true' for HTTPS
+- `LIGAMEN_CHROMA_API_KEY` - API key if required
+- `LIGAMEN_CHROMA_TENANT` - default: default_tenant
+- `LIGAMEN_CHROMA_DATABASE` - default: default_database
 
-**Secrets Location:**
-- `~/.ligamen/settings.json` - Machine-wide configuration (plaintext JSON)
-- `LIGAMEN_CHROMA_API_KEY` stored here if ChromaDB enabled
-- File guard prevents commits of `.env` and `*credentials*` files
+**Database env vars** (overrides):
+- `LIGAMEN_DB_PATH` - Override computed database path
+- `LIGAMEN_PROJECT_ROOT` - Override current working directory as project root
+
+**Secrets location:**
+- Settings: `~/.ligamen/settings.json` (not committed, contains LIGAMEN_* vars)
+- No .env files or external secret management detected
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None
+- None detected
 
 **Outgoing:**
-- None — Ligamen is read-only by design for the graph/search layer
-- Scanning phase uses Claude Task runner for agent invocation (async callback pattern)
+- None detected
 
-## External Dependencies - Detail
+## Plugin Hook System
 
-**D3.js (Graph Visualization):**
-- Version: 3.x
-- Source: CDN (cdn.jsdelivr.net/npm/d3-force@3/+esm)
-- Used in: `plugins/ligamen/worker/ui/force-worker.js`
-- Purpose: Force-directed graph layout and physics simulation
+**Post-processing Hooks** (after Write/Edit):
+- Format: `scripts/format.sh` (timeout: 10s)
+- Lint: `scripts/lint.sh` (timeout: 10s)
 
-**Node.js Built-in Modules:**
-- better-sqlite3 for synchronous database access
-- child_process module for shell command execution (format/lint)
-- fs, path, os, crypto for filesystem and utility operations
+**Pre-processing Hooks** (before Write/Edit):
+- File Guard: `scripts/file-guard.sh` (timeout: 10s)
+
+**Session Hooks:**
+- Install Dependencies: `scripts/install-deps.sh` (timeout: 120s) - SessionStart
+- Session Start: `scripts/session-start.sh` (timeout: 10s) - SessionStart + UserPromptSubmit
+
+## GraphQL/REST APIs
+
+**REST Endpoints** (internal to HTTP server):
+- `GET /api/readiness` - Health check
+- `GET /api/version` - Worker version
+- `GET /projects` - List all projects with databases
+- `GET /graph?project=/path` - Full service dependency graph (JSON)
+- `GET /search?q=query&project=/path` - Semantic search results
+- `GET /impact?service=name&project=/path` - Impact analysis
+- `GET /affected?file=path&project=/path` - Affected services
+- Multiple drift detection endpoints for OpenAPI, database schema, etc.
+- All endpoints optional: respond with error if no project DB loaded
+
+**CORS:**
+- Configured for localhost development: `http://localhost:5173`, `http://127.0.0.1:5173`, `http://127.0.0.1:*`
+
+## MCP Tool Definitions
+
+**Location:** `worker/mcp/server.js` (exported as tools)
+
+**Tool categories:**
+- Impact analysis (transitive dependency traversal, max depth 7, timeout 30s)
+- Schema drift detection (OpenAPI breaking changes via oasdiff)
+- Semantic search (optional ChromaDB, fallback to FTS5)
+- Database enrichment (auth sources, external dependencies)
 
 ---
 
-*Integration audit: 2026-03-22*
+*Integration audit: 2026-03-23*

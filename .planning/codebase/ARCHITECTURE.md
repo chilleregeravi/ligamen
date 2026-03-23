@@ -1,292 +1,195 @@
 # Architecture
 
-**Analysis Date:** 2026-03-22
+**Analysis Date:** 2026-03-23
 
 ## Pattern Overview
 
-**Overall:** Multi-layer service discovery and impact analysis platform with agent-driven scanning, persistent storage, REST API, MCP (Model Context Protocol) server, and browser-based visualization UI.
+**Overall:** Modular event-driven service dependency graph platform with agent-driven scanning, REST API workers, and MCP tool exposure.
 
 **Key Characteristics:**
-- **Agent-driven scanning**: Uses Claude agent to discover services, connections, and data models
-- **Per-project database isolation**: Each project root gets isolated SQLite DB hashed to `~/.ligamen/projects/<hash>/impact-map.db`
-- **3-tier search fallback**: ChromaDB (semantic) → FTS5 (keyword) → SQL (structured), with independent skip options
-- **Dual API layer**: Both REST (for UI) and MCP (for Claude agent integration)
-- **Incremental scanning**: Supports full and incremental (diff-based) scanning modes based on repo state
-- **Enrichment pipeline**: Post-scan enrichment via registered enricher functions (CODEOWNERS, auth/DB extraction)
-- **Transitive impact analysis**: Recursive graph traversal with cycle detection for upstream/downstream impact
+- **Agent-driven scanning:** Claude agents discover and analyze service topology via injected runners
+- **Project-agnostic worker:** Single background HTTP worker serves multiple projects via query parameters
+- **Per-project SQLite backend:** Deterministic per-repo database sharding using SHA256 hashing
+- **Layered data flow:** Scanner → Query Engine → UI/MCP consumers
+- **Pluggable enrichment:** Service-discovery findings enriched post-scan by registered enrichers (CODEOWNERS, auth/DB extraction)
 
 ## Layers
 
-**CLI & Command Entry Points:**
-- Purpose: Accept user commands (`/ligamen:map`, `/ligamen:cross-impact`, `/ligamen:drift`)
-- Location: `plugins/ligamen/commands/` (shell-based)
-- Contains: Markdown command specs defining prompts for agent
-- Depends on: MCP server for agent integration
-- Used by: Claude Code when user invokes `/ligamen:*`
+**Scanner & Agent Execution:**
+- Purpose: Discover service topology and connections via Claude agents
+- Location: `worker/scan/`
+- Contains: Discovery agent runners, findings parsers, enrichment pipelines, confirmation workflows
+- Depends on: Logger, agent injection function
+- Used by: Scan lifecycle orchestration, skill/command invocation
 
-**Worker Process:**
-- Purpose: Long-running background service exposing REST and MCP APIs
-- Location: `plugins/ligamen/worker/`
-- Contains: HTTP server, database management, query engine, scanning orchestration
-- Depends on: Fastify, better-sqlite3, Model Context Protocol SDK, ChromaDB
-- Used by: CLI commands, UI, agent invocations
+**Database Access Layer:**
+- Purpose: Manage per-project SQLite databases, run migrations, expose schema
+- Location: `worker/db/`
+- Contains: Better-sqlite3 wrapper, prepared statement cache, query engine, connection pooling
+- Depends on: Node builtins, better-sqlite3, crypto (SHA256 hashing)
+- Used by: HTTP API, MCP server, worker entry point
 
-**Database & Query Layer:**
-- Purpose: Persistent storage of service map and transitive impact calculations
-- Location: `plugins/ligamen/worker/db/`
-- Contains: Database initialization, migrations, query engine with prepared statements
-- Key files:
-  - `database.js` - DB lifecycle and migrations loader
-  - `pool.js` - Per-project DB cache and resolver
-  - `query-engine.js` - Graph queries, search, upsert operations
-  - `migrations/` - 9 numbered migration files for schema evolution
-- Depends on: better-sqlite3, filesystem
-- Used by: HTTP routes, MCP server, scanning engine
+**Query Engine:**
+- Purpose: Execute specialized graph traversal (transitive impact), search, upsert operations
+- Location: `worker/db/query-engine.js`
+- Contains: Transitive impact algorithms, FTS5 search, statement caching, ChromaDB semantic fallback
+- Depends on: Query database handle, ChromaDB client (optional)
+- Used by: HTTP endpoints, MCP tool handlers
 
-**HTTP Server & REST API:**
-- Purpose: Serve UI static files and expose graph data + scan endpoints
-- Location: `plugins/ligamen/worker/server/http.js`
-- Contains: Fastify routes for graph retrieval, impact analysis, service details, scan persistence, version history
-- Key routes:
-  - `GET /api/readiness` - Health check
-  - `GET /api/version` - Worker version
-  - `GET /projects` - List all project DBs
-  - `GET /graph?project=` - Full service dependency graph
-  - `GET /impact?change=` - Impacted services for a change
-  - `GET /service/:name` - Service details
-  - `POST /scan` - Persist scan findings
-  - `GET /versions` - Map version snapshots
-  - `GET /api/logs` - Tail worker logs
-- Depends on: Query engine, filesystem (for logs)
-- Used by: UI, scan manager
+**HTTP API Server:**
+- Purpose: Expose graph, search, and readiness via REST for UI and external clients
+- Location: `worker/server/http.js`
+- Contains: Fastify setup, project resolution per request, route handlers, CORS configuration
+- Depends on: Query Engine resolution, logger, static file serving
+- Used by: Graph UI, external tooling
 
 **MCP Server:**
-- Purpose: Integrate impact analysis into Claude agent workflows
-- Location: `plugins/ligamen/worker/mcp/server.js`
-- Contains: MCP tool definitions for impact queries, search, drift detection
-- Depends on: Model Context Protocol SDK, query engine
-- Used by: Claude agent when executing commands
+- Purpose: Expose graph analysis as MCP tools for Claude agents
+- Location: `worker/mcp/server.js`
+- Contains: Tool definitions (impact_query, impact_search, drift_versions, etc.), database resolution
+- Depends on: Query Engine resolution, findings validation schema
+- Used by: Claude sessions for impact checking, drift analysis
 
-**Scanning & Discovery Engine:**
-- Purpose: Orchestrate agent-driven discovery and incremental scanning
-- Location: `plugins/ligamen/worker/scan/`
-- Key modules:
-  - `manager.js` - Scan orchestration, mode detection, agent invocation
-  - `discovery.js` - Repo detection and configuration management
-  - `findings.js` - Findings schema validation and parsing
-  - `enrichment.js` - Post-scan enrichment pipeline
-  - `codeowners.js` - CODEOWNERS-based ownership extraction
-  - `confirmation.js` - User confirmation flow for repo lists
-  - `enrichment/auth-db-extractor.js` - Database and auth pattern extraction
-- Depends on: Query engine, findings validator, enrichers
-- Used by: Agent workflow, MCP server
+**Graph UI:**
+- Purpose: Interactive visualization of service dependency graph
+- Location: `worker/ui/`
+- Contains: Canvas-based force-directed layout, interaction handlers, detail panels, filter controls, log terminal
+- Depends on: D3 force (CDN), HTTP server for graph data
+- Used by: Users for visual exploration
 
-**Browser UI:**
-- Purpose: Visualize service dependency graph and enable impact analysis
-- Location: `plugins/ligamen/worker/ui/`
-- Contains: Canvas-based force-directed graph visualization + detail panels
-- Key modules in `ui/modules/`:
-  - `graph.js` - Entry point and project loading
-  - `renderer.js` - Canvas rendering with node/edge styling
-  - `layout.js` - Force simulation for node positioning
-  - `interactions.js` - Click/hover/drag handlers
-  - `state.js` - UI state management
-  - `detail-panel.js` - Service detail view
-  - `filter-panel.js` - Filter/search UI
-  - `project-picker.js` - Project selection
-  - `project-switcher.js` - Multi-project navigation
-  - `keyboard.js` - Keyboard shortcuts
-  - `log-terminal.js` - Real-time log viewing
-  - `export.js` - Graph export functionality
-  - `utils.js` - Shared utilities
-- Depends on: HTTP API (/graph, /impact, /service endpoints)
-- Used by: Browser when visiting worker URL
-
-**Logging & Observability:**
-- Purpose: Structured JSON logging for worker lifecycle and scans
-- Location: `plugins/ligamen/worker/lib/logger.js`
-- Contains: Level-based structured logger with JSON output
-- Depends on: Filesystem
-- Used by: All worker modules
+**Plugin Entry Points:**
+- Purpose: Hook into Claude Code session lifecycle and tool use
+- Location: `scripts/`, `hooks/`, `.claude-plugin/`
+- Contains: Shell scripts for format/lint/file-guard/session-start, hook configuration
+- Depends on: Shell environment, installed linters/formatters
+- Used by: Claude Code runtime
 
 ## Data Flow
 
-**Scanning Flow (Agent-Driven):**
+**Service Discovery & Enrichment Pipeline:**
 
-1. User invokes `/ligamen:map` command
-2. CLI loads linked repos from `ligamen.config.json` or discovers new ones
-3. Agent (via MCP server) requests scan for each repo
-4. `scanRepos()` builds scan context: determines full vs. incremental mode
-5. Agent performs discovery pass (Phase 1) — identifies services + connections
-6. Agent output parsed into structured findings via `parseAgentOutput()`
-7. `persistFindings()` upserts services/connections/fields into DB
-8. `runEnrichmentPass()` executes registered enrichers (CODEOWNERS, auth/DB)
-9. `endScan()` closes scan version bracket
-10. UI receives updated graph via REST API
+1. User invokes `/ligamen:map` command (or scan via MCP)
+2. `buildScanContext(repoPath)` determines scan mode (full vs. incremental)
+3. `runDiscoveryPass(repoPath, template, agentRunner)` executes Claude agent with prompt
+4. Agent outputs fenced JSON block with services, connections, schemas
+5. `parseAgentOutput(text)` extracts and validates findings against schema
+6. **Enrichment loop:** Registered enrichers (`registerEnricher()`) process findings:
+   - CODEOWNERS enricher reads CODEOWNERS file, adds ownership metadata
+   - Auth/DB enricher detects credentials/databases, adds integration metadata
+7. Findings are upserted to database via `QueryEngine.upsert*()` methods
+8. Query engine updates FTS5 indices for full-text search
 
-**Query Flow (Impact Analysis):**
+**Graph Query & Visualization:**
 
-1. UI requests `/graph?project=` with project path
-2. HTTP server resolves project hash → opens DB via pool
-3. QueryEngine runs recursive CTEs to compute transitive impact
-4. Graph data returned with services, connections, mismatch set
-5. UI renders force-directed graph with filters and details
+1. UI calls `GET /graph?hash=<projectHash>`
+2. HTTP server resolves query engine via `getQueryEngine(projectRoot)` or hash lookup
+3. `QueryEngine.getGraph()` executes SELECT with joins across services/connections
+4. Response includes node list (services), edge list (connections), metadata (boundaries, mismatches)
+5. UI constructs force simulation, renders on canvas, wires interactions
+6. User clicks node → detail panel populated via cached node data
+7. User searches → `QueryEngine.search(keyword)` runs FTS5 query, highlights matching nodes
 
-**Search Flow (3-Tier):**
+**Impact Query Traversal:**
 
-1. Query enters `search(text, options)`
-2. Tier 1: ChromaDB semantic search (if available and not skipped)
-3. Tier 2: FTS5 full-text search across 3 tables (if Tier 1 fails or skipped)
-4. Tier 3: SQL exact match on services/connections (fallback)
-5. Results ranked by score and returned to caller
+1. MCP tool receives `source` and `direction` parameters
+2. `impactQuery(qe, source, direction)` starts BFS/DFS from source service
+3. Transitive impact uses cycle-detection set to avoid infinite loops
+4. Each hop evaluated for breaking change severity (CRITICAL/WARN/INFO)
+5. Results collected with relationship chain (path from source to affected service)
+6. Returned to Claude for decision-making
 
-**Enrichment Flow:**
+**Drift Detection:**
 
-1. After service upsert, `runEnrichmentPass(service, db, logger, repoAbsPath)` called
-2. For each registered enricher:
-   - Enricher receives context: serviceId, repoPath, language, entryFile
-   - Enricher returns key→value map
-   - Values written to `node_metadata` table with 'enrichment' view
-   - Failures logged as warns, never abort scan
+1. Drift commands scan multiple linked repos
+2. `driftVersions()` compares package.json versions across repos
+3. `driftTypes()` compares TypeScript definitions in schema directories
+4. `driftOpenApi()` validates OpenAPI specs against recorded schemas
+5. Mismatches flagged with file locations and remediation guidance
 
 **State Management:**
 
-- **DB State**: SQLite database per project; migrations run on first openDb()
-- **In-Memory State**: Per-project QueryEngine cached in pool for request lifetime
-- **Transient State**: UI state (selected service, filters, zoom level) stored in browser
-- **Log State**: Worker logs streamed to `~/.ligamen/logs/worker.log` as JSON lines
+- **Database state:** Single SQLite file per project at `~/.ligamen/projects/<hash12>/impact-map.db`
+- **Worker state:** PID/port files in `~/.ligamen/`, logs in `~/.ligamen/logs/`
+- **UI state:** In-memory graph data, current selection, filter state (not persisted across page reload)
+- **Scan state:** Repo state tracked in `repo_state` table with last_scanned_commit/timestamp
 
 ## Key Abstractions
 
 **QueryEngine:**
-- Purpose: Encapsulates all database queries for graph operations
-- File: `plugins/ligamen/worker/db/query-engine.js`
-- Pattern: Class wrapping better-sqlite3.Database with prepared statements
-- Methods: `getGraph()`, `getImpact()`, `getService()`, `search()`, `persistFindings()`, etc.
-- Cycle detection: Transitive queries use path strings to detect cycles: `',' || id || ','`
+- Purpose: Abstract SQLite operations and graph algorithms
+- Examples: `worker/db/query-engine.js`, methods `getGraph()`, `impactQuery()`, `search()`, `upsertService()`
+- Pattern: Single class wrapping a Database handle with prepared statement cache for performance
 
-**Scan Context:**
-- Purpose: Determine scan mode (full vs. incremental) and inject constraints
-- File: `plugins/ligamen/worker/scan/manager.js`
-- Pattern: `buildScanContext(repoPath, repoId, qe, opts) → { mode, constraint?, ...}`
-- Modes: 'full', 'incremental', 'incremental-noop'
-- Constraint injection (SREL-01): When incremental, appends hard constraint block listing changed files
+**StmtCache:**
+- Purpose: LRU cache for prepared statements to reduce overhead in hot paths
+- Examples: `worker/db/query-engine.js` (lines 42-88)
+- Pattern: Map-based LRU with O(1) hit/miss via `has()` and O(n) eviction on capacity overflow
 
-**Enricher:**
-- Purpose: Register and run post-scan metadata extraction
-- File: `plugins/ligamen/worker/scan/enrichment.js`
-- Pattern: `registerEnricher(name, async (ctx) => ({ key, value }) | null)`
-- Context keys: `serviceId`, `repoPath`, `repoAbsPath`, `language`, `entryFile`, `db`, `logger`
-- Isolation: Enricher failures caught and logged; never propagate to scan abort
+**Enricher Registry:**
+- Purpose: Allow pluggable post-scan processors without modifying scan manager
+- Examples: `registerEnricher("codeowners", createCodeownersEnricher())`
+- Pattern: Module-level registry map, enrichers stored as (name, function) pairs, run sequentially in `runEnrichmentPass()`
 
-**Findings Schema:**
-- Purpose: Validate agent output structure and extract typed data
-- File: `plugins/ligamen/worker/scan/findings.js`
-- Pattern: `validateFindings(obj) → { valid, findings?, error?, warnings }`
-- Validated fields: service_name, services[], connections[], schemas[], confidence
+**Project Hash Sharding:**
+- Purpose: Deterministic per-project DB placement without requiring absolute path configuration
+- Examples: `projectHashDir(projectRoot)` used in `worker/db/database.js`, `worker/db/pool.js`, `worker/mcp/server.js`
+- Pattern: SHA256 hash of projectRoot to 12-char hex prefix, maps to `~/.ligamen/projects/<hash12>/`
 
-**DB Pool:**
-- Purpose: Cache QueryEngine per project root for request lifetime
-- File: `plugins/ligamen/worker/db/pool.js`
-- Pattern: Module-level `pool: Map<projectRoot, QueryEngine>`
-- Methods: `getQueryEngine(projectRoot)`, `getQueryEngineByHash(hash)`, `getQueryEngineByRepo(name)`, `listProjects()`
-
-**Logger:**
-- Purpose: Structured JSON logging with component tags
-- File: `plugins/ligamen/worker/lib/logger.js`
-- Pattern: `createLogger({ dataDir, port?, logLevel, component }) → { log, info, warn, error, debug }`
-- Output: JSON lines to `~/.ligamen/logs/worker.log` + stderr
-
-**Repo Discovery:**
-- Purpose: Load, discover, and deduplicate repos for scanning
-- File: `plugins/ligamen/worker/scan/discovery.js`
-- Pattern: Pure functions: `loadFromConfig()`, `discoverNew()`, `deduplicateRepos()`, `saveConfirmed()`
+**Per-Request Query Engine Resolution:**
+- Purpose: Support multi-project worker with single HTTP instance
+- Examples: `getQE(request)` in `worker/server/http.js` reads `?project=` or `?hash=` query param
+- Pattern: Query engine pool keyed by projectRoot, lazy-initialized on first access
 
 ## Entry Points
 
-**Worker Process:**
-- Location: `plugins/ligamen/worker/index.js`
-- Triggers: `node worker/index.js --port 37888 --data-dir ~/.ligamen`
-- Responsibilities:
-  1. Parse CLI args (port, data-dir)
-  2. Load settings.json for log level and port override
-  3. Initialize logger
-  4. Initialize ChromaDB if configured
-  5. Create and start HTTP server
-  6. Write PID file to enable graceful shutdown
+**HTTP Worker:**
+- Location: `worker/index.js`
+- Triggers: Shell invocation via `node worker/index.js --port 37888 --data-dir ~/.ligamen`
+- Responsibilities: CLI arg parsing, settings file loading, logger setup, Chroma initialization, HTTP server startup, graceful shutdown
 
-**CLI Command: /ligamen:map**
-- Location: `plugins/ligamen/commands/map.md`
-- Triggers: User enters `/ligamen:map` in Claude Code
-- Responsibilities:
-  1. Discover/load linked repos
-  2. Run discovery pass via agent
-  3. Run enrichment pass
-  4. Persist findings to DB
-  5. Display results
+**MCP Server:**
+- Location: `worker/mcp/server.js`
+- Triggers: MCP launcher reads `.mcp.json` and execs `node worker/mcp/server.js`
+- Responsibilities: MCP server lifecycle, tool registration, database resolution per-call, JSON-RPC message handling
 
-**HTTP GET /graph**
-- Location: `plugins/ligamen/worker/server/http.js:92`
-- Triggers: UI loads or refreshes
-- Responsibilities: Resolve project → fetch full graph → return with boundaries
+**Graph UI:**
+- Location: `worker/ui/index.html`, `worker/ui/graph.js`
+- Triggers: User navigates to `http://localhost:37888`
+- Responsibilities: Project picker, graph loading, force simulation, interaction wiring, keyboard/export handlers
 
-**HTTP POST /scan**
-- Location: `plugins/ligamen/worker/server/http.js:167`
-- Triggers: Agent completes scan findings
-- Responsibilities: Upsert repo → begin scan → persist findings → end scan
+**Scanner Entry:**
+- Location: Via `/ligamen:map` command or `impact.sh` script invoked by MCP
+- Triggers: User invokes command in Claude Code session
+- Responsibilities: Call `scanRepos(repoPaths, options, queryEngine)` with injected agent runner
 
-**MCP Tool: impact**
-- Location: `plugins/ligamen/worker/mcp/server.js`
-- Triggers: Agent or Claude requests impact analysis
-- Responsibilities: Query transitive impact graph via QueryEngine
+**Session Hooks:**
+- Location: `scripts/format.sh`, `scripts/lint.sh`, `scripts/file-guard.sh`, `scripts/install-deps.sh`
+- Triggers: Claude Code fires PostToolUse, PreToolUse, SessionStart events
+- Responsibilities: Format/lint edited files, block sensitive file writes, install node deps if needed
 
 ## Error Handling
 
-**Strategy:** Exceptions propagate up; most routes catch and return HTTP error codes. Enrichers silently fail with warning logs.
+**Strategy:** Graceful degradation with logged context. No unhandled promise rejections; errors surfaced via HTTP status codes or error fields in JSON responses.
 
 **Patterns:**
-
-1. **Route-level**: Try/catch in HTTP route handlers, return `code(500).send({ error: msg })`
-2. **Enricher-level**: Try/catch in enrichment loop; log warn and continue
-3. **DB initialization**: Return null from pool getters on file-not-found; 503 from routes
-4. **Scan validation**: `validateFindings()` returns `{ valid: false, error: msg }` — caller checks and throws
-5. **Agent invocation**: Scan manager wraps agent runner; if returns null/error, scan aborts with error result
-
-**Failure modes:**
-
-- No DB yet → 503 "No map data yet"
-- Corrupt findings JSON → 400 "Invalid findings schema"
-- Missing project param → Use fallback to test queryEngine or search env var
-- ChromaDB unavailable → Fall through to FTS5 (logged as tier switch)
+- **Database errors:** Catch and return 500 with error message to caller. Log with error context (component, stack).
+- **Missing query engine:** Return 503 "No map data yet" to signal need for initial scan.
+- **Findings validation:** Return validation error object with `{ valid: false, error: string }`. Parse errors don't crash scanner.
+- **Agent timeout:** Scan manager catches timeout, marks result as failed, continues to next repo.
+- **ChromaDB unavailable:** MCP server falls back to FTS5 search automatically; logs "ChromaDB unavailable — using FTS5 fallback".
+- **Stale PID/port files:** Worker startup detects and removes stale PID file before starting new instance.
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- Structured JSON via `createLogger()`, bound to component tag
-- All worker modules log via injected logger
-- Scan manager uses injected logger for lifecycle events
-- HTTP routes log errors to separate component: 'http'
+**Logging:** Structured JSON logging via `createLogger()` in `worker/lib/logger.js`. All components instantiate logger with component tag. Logs written to `~/.ligamen/logs/worker.log` with size-based rotation (10 MB per file, keep 3 rotated files). Levels: DEBUG, INFO, WARN, ERROR; filtered by `LIGAMEN_LOG_LEVEL` setting.
 
 **Validation:**
-- Input validation at HTTP route handler level (query params, request body)
-- Findings validation via schema in `findings.js`
-- SQL injection prevention: All DB queries use prepared statements with parameter binding
+- Findings schema validated by `validateFindings()` in `worker/scan/findings.js` using JSDoc type definitions.
+- Project paths validated in MCP server: rejected if path escapes `~/.ligamen/projects/` directory.
+- Query parameters sanitized before use (project hash validated as 12-char hex).
 
-**Authentication:**
-- No authentication in HTTP server (assumes localhost-only dev use)
-- MCP server auth: Handled by Claude agent (MCP protocol built-in)
-- File permission: PID file, port file, config files rely on OS filesystem permissions
-
-**Database Transactions:**
-- Scan lifecycle uses transaction brackets: `beginScan()` → `persistFindings()` → `endScan()`
-- If `persistFindings()` throws, `endScan()` NOT called; bracket remains open (signals incomplete scan)
-- Enrichers run after `persistFindings()` completes; failures don't roll back findings
-
-**Concurrency:**
-- Worker is single-threaded Node.js; HTTP requests processed serially
-- DB uses WAL mode for multi-reader concurrency
-- Per-project pool caching ensures single QueryEngine instance per project
+**Authentication:** None required for HTTP API (local-only CORS, localhost binding implicit). MCP server runs as direct subprocess of Claude Code (no network exposure). File-based credentials protected by `file-guard.sh` hook (blocks Write/Edit to `.env` files).
 
 ---
 
-*Architecture analysis: 2026-03-22*
+*Architecture analysis: 2026-03-23*
