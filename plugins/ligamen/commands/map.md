@@ -121,17 +121,36 @@ PROJECT_ROOT="$(pwd)"
 
 **This is the main task.** Each repo is scanned in two phases for accuracy and efficiency.
 
-**Scan mode:** If `full` subcommand is present OR this is the first scan (no existing data), scan all repos. Otherwise, only scan repos with changes since last scan — check git HEAD against the last scanned commit.
+**Scan mode determination:**
+
+- If this is the **first scan** (no existing data in the database), proceed with a full scan automatically — no confirmation needed.
+- If `full` subcommand is present AND existing scan data exists, **ask the user before proceeding**:
+
+  ```
+  Existing scan data found (N services, M connections).
+  A full re-scan will delete all existing data and rebuild from scratch.
+
+  Proceed with full re-scan? (yes / no — incremental scan instead)
+  ```
+
+  If the user says no, fall back to incremental mode (only scan repos with changes).
+
+- If `full` is NOT present, use incremental mode — only scan repos with changes since last scan.
 
 **For each repo:**
 
-1. **Check if scan is needed** (skip for `full` or first scan):
+1. **Check if scan is needed** (skip for incremental mode):
 
    ```bash
    LAST_COMMIT=$(git -C "${REPO_PATH}" rev-parse HEAD 2>/dev/null)
    ```
 
-   Compare with the repo's `last_scanned_commit` from the database. If they match and `full` is not set, skip this repo and print: "Skipping <repo> (no changes since last scan)".
+   Compare with the repo's `last_scanned_commit` from the database. If they match and mode is incremental, ask the user:
+
+   ```
+   No changes detected in <repo> since last scan.
+   Skip this repo? (yes / no — force re-scan this repo)
+   ```
 
 2. **Phase 1 — Discovery** (fast, reads only structure files):
    Read the discovery prompt template using the Read tool:
