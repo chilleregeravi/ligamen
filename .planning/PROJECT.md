@@ -144,15 +144,14 @@ Every edit is automatically formatted and linted, every quality check runs with 
 - ✓ MCP tool errors logged to structured logger with stack traces — v5.6.0
 - ✓ QueryEngine accepts injected logger (replaces console.warn) — v5.6.0
 
+- ✓ Three-value crossing semantics (external/cross-service/internal) in agent prompts (THE-949) — v5.7.0
+- ✓ Post-scan reconciliation downgrades external→cross-service for known services (THE-949) — v5.7.0
+- ✓ Mono-repo detection via multi-manifest subdirectory scanning (THE-951) — v5.7.0
+- ✓ client_files field in discovery schema for outbound HTTP call identification (THE-951) — v5.7.0
+
 ### Active
 
-## Current Milestone: v5.7.0 Scan Accuracy
-
-**Goal:** Improve scan accuracy with proper crossing semantics, cross-repo reconciliation, mono-repo detection, and client file identification.
-
-**Linear issues:**
-- THE-949: Redefine crossing semantics (external/cross-service/internal) + post-scan reconciliation step
-- THE-951: Mono-repo detection heuristic + client_files field in discovery schema
+(No active requirements — start next milestone with `/gsd:new-milestone`)
 
 ### Out of Scope
 

@@ -95,3 +95,11 @@ None - no external service configuration required.
 ---
 *Phase: 90-discovery-improvements*
 *Completed: 2026-03-23*
+
+## Self-Check: PASSED
+
+- FOUND: plugins/ligamen/worker/scan/agent-prompt-discovery.md
+- FOUND: .planning/phases/90-discovery-improvements/90-01-SUMMARY.md
+- FOUND commit fc9d7c1: feat(90-01): add mono-repo detection heuristic to discovery prompt (DISC-01)
+- FOUND commit 59ea98a: feat(90-01): add client_files field to discovery output schema (DISC-02)
+- FOUND commit 50ee993: docs(90-01): complete discovery improvements plan

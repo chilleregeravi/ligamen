@@ -1,5 +1,17 @@
 # Milestones
 
+## v5.7.0 Scan Accuracy (Shipped: 2026-03-23)
+
+**Phases completed:** 3 phases, 3 plans, 5 tasks
+
+**Key accomplishments:**
+
+- Three-value crossing enum (internal/cross-service/external) added to agent-prompt-common.md with corrected examples across all type-specific scan prompts
+- Post-scan reconciliation step added to map.md that auto-downgrades false external crossings to cross-service using the knownServices set built from all scan findings
+- Mono-repo heuristic (subdirectory manifest detection) and client_files schema field added to discovery agent prompt for THE-951
+
+---
+
 ## v5.6.0 Logging & Observability (Shipped: 2026-03-23)
 
 **Phases completed:** 0 phases, 0 plans, 0 tasks
