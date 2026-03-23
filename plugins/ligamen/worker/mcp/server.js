@@ -62,7 +62,7 @@ export function openDb() {
     db.pragma("journal_mode = WAL");
     return db;
   } catch (err) {
-    logger.error('Failed to open database', { error: err.message });
+    logger.error('Failed to open database', { error: err.message, stack: err.stack });
     return null;
   }
 }
@@ -483,7 +483,7 @@ export async function querySearch(db, { query, limit = 20 }) {
   } catch (err) {
     // If FTS5 table doesn't exist, fall through to SQL LIKE
     if (!err.message || !err.message.includes("no such table: connections_fts")) {
-      logger.error('querySearch FTS5 error', { error: err.message });
+      logger.error('querySearch FTS5 error', { error: err.message, stack: err.stack });
     }
   }
 
@@ -1217,6 +1217,7 @@ export async function queryScan({ repo, full = false } = {}) {
       }
     } catch (err) {
       clearTimeout(timeout);
+      logger.error('queryScan readiness check failed', { error: err.message, stack: err.stack });
       return {
         status: "unavailable",
         message: `Worker not responding on port ${port}.`,
@@ -1235,9 +1236,11 @@ export async function queryScan({ repo, full = false } = {}) {
         message: "Scan started. Results will be available after confirmation.",
       };
     } catch (err) {
+      logger.error('queryScan fetch failed', { error: err.message, stack: err.stack });
       return { status: "error", message: err.message };
     }
   } catch (err) {
+    logger.error('queryScan failed', { error: err.message, stack: err.stack });
     return { status: "error", message: err.message };
   }
 }
@@ -1278,16 +1281,21 @@ server.tool(
       ),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const raw = await queryImpact(qe?._db ?? null, params);
+      // Enrich with type-aware summary when db is available
+      const result = qe?._db
+        ? enrichImpactResult(qe._db, params.service, raw.results)
+        : raw;
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('impact_query failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const raw = await queryImpact(qe?._db ?? null, params);
-    // Enrich with type-aware summary when db is available
-    const result = qe?._db
-      ? enrichImpactResult(qe._db, params.service, raw.results)
-      : raw;
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 
@@ -1314,16 +1322,21 @@ server.tool(
       ),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const raw = await queryChanged(qe?._db ?? null, params);
+      const enrichedAffected = qe?._db
+        ? enrichAffectedResult(qe._db, raw.affected)
+        : raw.affected.map(r => ({ ...r, owner: null, auth_mechanism: null, db_backend: null }));
+      const result = { ...raw, affected: enrichedAffected };
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('impact_changed failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const raw = await queryChanged(qe?._db ?? null, params);
-    const enrichedAffected = qe?._db
-      ? enrichAffectedResult(qe._db, raw.affected)
-      : raw.affected.map(r => ({ ...r, owner: null, auth_mechanism: null, db_backend: null }));
-    const result = { ...raw, affected: enrichedAffected };
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 
@@ -1354,12 +1367,17 @@ server.tool(
       ),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const result = await queryGraph(qe?._db ?? null, params);
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('impact_graph failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const result = await queryGraph(qe?._db ?? null, params);
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 
@@ -1388,17 +1406,22 @@ server.tool(
       ),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const raw = await querySearch(qe?._db ?? null, params);
+      // Enrich results with actor relationship sentences
+      const enrichedResults = qe?._db
+        ? enrichSearchResult(qe._db, raw.results)
+        : raw.results;
+      const result = { ...raw, results: enrichedResults };
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('impact_search failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const raw = await querySearch(qe?._db ?? null, params);
-    // Enrich results with actor relationship sentences
-    const enrichedResults = qe?._db
-      ? enrichSearchResult(qe._db, raw.results)
-      : raw.results;
-    const result = { ...raw, results: enrichedResults };
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 
@@ -1419,8 +1442,13 @@ server.tool(
       ),
   },
   async (params) => {
-    const result = await queryScan(params);
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    try {
+      const result = await queryScan(params);
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('impact_scan failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+    }
   },
 );
 
@@ -1435,12 +1463,17 @@ server.tool(
       .describe("Absolute path to project root, 12-char project hash, or repo name. Defaults to LIGAMEN_PROJECT_ROOT or cwd."),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const result = await queryDriftVersions(qe?._db ?? null, params);
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('drift_versions failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const result = await queryDriftVersions(qe?._db ?? null, params);
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 
@@ -1455,12 +1488,17 @@ server.tool(
       .describe("Absolute path to project root, 12-char project hash, or repo name. Defaults to LIGAMEN_PROJECT_ROOT or cwd."),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const result = await queryDriftTypes(qe?._db ?? null, params);
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('drift_types failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const result = await queryDriftTypes(qe?._db ?? null, params);
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 
@@ -1475,12 +1513,17 @@ server.tool(
       .describe("Absolute path to project root, 12-char project hash, or repo name. Defaults to LIGAMEN_PROJECT_ROOT or cwd."),
   },
   async (params) => {
-    const qe = resolveDb(params.project);
-    if (!qe && params.project) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+    try {
+      const qe = resolveDb(params.project);
+      if (!qe && params.project) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "no_scan_data", project: params.project, hint: "Run /ligamen:map first in that project" }) }] };
+      }
+      const result = await queryDriftOpenapi(qe?._db ?? null, params);
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    } catch (err) {
+      logger.error('drift_openapi failed', { error: err.message, stack: err.stack });
+      return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
     }
-    const result = await queryDriftOpenapi(qe?._db ?? null, params);
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   },
 );
 

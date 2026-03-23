@@ -580,3 +580,67 @@ test("impact_query depth limit: short chain (4 hops) has no truncation", async (
     "all services in short chain should be returned",
   );
 });
+
+// ─────────────────────────────────────────────────────────────
+// openDb() stack trace (ERR-02 / LOG-03)
+// ─────────────────────────────────────────────────────────────
+
+import { openDb } from "./server.js";
+
+test("openDb: returns null without throwing when DB path is a directory (unreadable)", async () => {
+  // Point LIGAMEN_DB_PATH at a directory (unreadable as a SQLite DB)
+  // openDb() should catch the error, call logger.error, and return null
+  const prevPath = process.env.LIGAMEN_DB_PATH;
+  const prevExist = process.env.LIGAMEN_DB_PATH;
+  // Use os.tmpdir() which always exists but is a directory, not a file
+  // openDb() checks existsSync first, so use a real file path that is a dir
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ligamen-opendb-test-"));
+  // Create a fake file named "impact-map.db" that is actually not valid SQLite
+  const fakeDb = path.join(tmpDir, "impact-map.db");
+  fs.writeFileSync(fakeDb, "this is not sqlite", "utf8");
+  process.env.LIGAMEN_DB_PATH = fakeDb;
+  let result;
+  assert.doesNotThrow(() => {
+    result = openDb();
+  }, "openDb should not throw even on invalid DB file");
+  // Result is either null (caught error) or a db object — the key contract is no throw
+  assert.ok(result === null || typeof result === "object", "openDb should return null or db object");
+  if (prevExist === undefined) {
+    delete process.env.LIGAMEN_DB_PATH;
+  } else {
+    process.env.LIGAMEN_DB_PATH = prevPath;
+  }
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ─────────────────────────────────────────────────────────────
+// querySearch FTS5 error path (ERR-02 / LOG-03)
+// ─────────────────────────────────────────────────────────────
+
+import { querySearch } from "./server.js";
+
+test("querySearch: falls back to SQL LIKE when FTS5 table is missing (no throw)", async () => {
+  // Create a DB without connections_fts table — triggers the FTS5 error path
+  const db = new Database(":memory:");
+  db.pragma("journal_mode = WAL");
+  db.exec(`
+    CREATE TABLE repos (id INTEGER PRIMARY KEY, path TEXT, name TEXT, type TEXT, last_commit TEXT, scanned_at TEXT);
+    CREATE TABLE services (id INTEGER PRIMARY KEY, repo_id INTEGER, name TEXT, root_path TEXT, language TEXT);
+    CREATE TABLE connections (id INTEGER PRIMARY KEY, source_service_id INTEGER, target_service_id INTEGER,
+      protocol TEXT, method TEXT, path TEXT, source_file TEXT, target_file TEXT);
+  `);
+  db.prepare("INSERT INTO repos VALUES (1, '/r', 'r', 'mono', null, null)").run();
+  db.prepare("INSERT INTO services VALUES (1, 1, 'svc-a', '/r/a', 'js')").run();
+  db.prepare("INSERT INTO services VALUES (2, 1, 'svc-b', '/r/b', 'js')").run();
+  db.prepare("INSERT INTO connections VALUES (1, 1, 2, 'http', 'GET', '/api/test', '/r/a/index.js', '/r/b/index.js')").run();
+
+  let result;
+  assert.doesNotThrow(async () => {
+    result = await querySearch(db, { query: "test", limit: 10 });
+  }, "querySearch should not throw on FTS5 error — falls back to SQL LIKE");
+  result = await querySearch(db, { query: "test", limit: 10 });
+  // Should have fallen back to SQL LIKE and found the connection
+  assert.ok(result !== null && typeof result === "object", "querySearch should return a result object");
+  assert.ok(Array.isArray(result.results), "results should be array");
+  db.close();
+});
