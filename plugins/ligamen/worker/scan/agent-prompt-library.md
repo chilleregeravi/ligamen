@@ -96,7 +96,7 @@ If the library calls external services internally, report those connections:
       "source": "edgeworks-sdk",
       "target": "event-journal",
       "protocol": "rest",
-      "crossing": "external",
+      "crossing": "cross-service",
       "method": "POST",
       "path": "/events",
       "source_file": "src/client.ts:publishEvent",

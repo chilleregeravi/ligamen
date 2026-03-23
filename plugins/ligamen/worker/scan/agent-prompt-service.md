@@ -91,13 +91,25 @@ For `sdk` connections: the `path` must be the specific exported function(s) the 
       "source": "user-api",
       "target": "auth-service",
       "protocol": "rest",
-      "crossing": "external",
+      "crossing": "cross-service",
       "method": "POST",
       "path": "/auth/validate",
       "source_file": "src/middleware/auth.ts:validateToken",
       "target_file": null,
       "confidence": "high",
       "evidence": "const res = await fetch('/auth/validate', { method: 'POST' })"
+    },
+    {
+      "source": "user-api",
+      "target": "stripe-api",
+      "protocol": "rest",
+      "crossing": "external",
+      "method": "POST",
+      "path": "/v1/charges",
+      "source_file": "src/billing/stripe.ts:createCharge",
+      "target_file": null,
+      "confidence": "high",
+      "evidence": "await stripe.charges.create({ amount, currency, source })"
     }
   ],
   "schemas": []
