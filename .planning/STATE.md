@@ -1,15 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.7.0
-milestone_name: Scan Accuracy
-status: ready_to_plan
-stopped_at: Roadmap created — 3 phases (89-91), ready to plan Phase 89
-last_updated: "2026-03-23T12:00:00.000Z"
+milestone: v5.6.0
+milestone_name: Logging & Observability
+status: planning
+stopped_at: Completed 90-01-PLAN.md
+last_updated: "2026-03-23T11:39:06.048Z"
+last_activity: 2026-03-23 — Roadmap created for v5.7.0
 progress:
   total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 2
+  percent: 0
 ---
 
 # Project State
@@ -48,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - v5.7.0: CROSS-01/02/03 grouped into Phase 89 (all touch agent prompt + map.md, same concern)
 - v5.7.0: DISC-01/02 grouped into Phase 90 (both touch discovery prompt)
 - v5.7.0: Phase 89 and Phase 90 can execute in parallel (different files)
+- [Phase 90-discovery-improvements]: Subdirectory manifest scan limited to one level deep; client_files import scan scoped to already-opened files
 
 ### Pending Todos
 
@@ -59,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23
-Stopped at: Roadmap created — Phase 89 ready to plan
+Last session: 2026-03-23T11:39:06.044Z
+Stopped at: Completed 90-01-PLAN.md
 Resume file: None

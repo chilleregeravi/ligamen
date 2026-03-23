@@ -729,7 +729,7 @@ Plans:
   3. Scanning a repo with no client-like files produces a discovery result with an empty (or absent) client_files array — no false positives
 **Plans**: 1 plan
 Plans:
-- [ ] 90-01-PLAN.md — Add mono-repo heuristic and client_files schema to agent-prompt-discovery.md
+- [x] 90-01-PLAN.md — Add mono-repo heuristic and client_files schema to agent-prompt-discovery.md
 
 ### Phase 91: Version Bump
 **Goal**: All manifest files reflect version 5.7.0 so the marketplace and plugin install surfaces present the correct version
@@ -768,5 +768,5 @@ Phase 84 first (logger infrastructure), then 85/86/87 in any order (parallel), t
 | 87. Logger Adoption | v5.6.0 | 1/1 | Complete   | 2026-03-23 |
 | 88. Version Bump | v5.6.0 | 0/? | Not started | - |
 | 89. Crossing Semantics | v5.7.0 | 0/? | Not started | - |
-| 90. Discovery Improvements | v5.7.0 | 0/? | Not started | - |
+| 90. Discovery Improvements | v5.7.0 | 1/1 | Complete   | 2026-03-23 |
 | 91. Version Bump | v5.7.0 | 0/? | Not started | - |

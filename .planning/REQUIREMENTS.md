@@ -15,8 +15,8 @@ Requirements for Scan Accuracy milestone. Derived from Linear issues THE-949 and
 
 ### Discovery Improvements (THE-951)
 
-- [ ] **DISC-01**: Discovery prompt instructs agents to check for multiple manifest files in subdirectories (`*/package.json`, `*/pyproject.toml`, `*/Cargo.toml`, `*/go.mod`) and report mono-repos with per-subdirectory `service_hints` entries
-- [ ] **DISC-02**: Discovery output schema includes `client_files` array — files matching patterns like `*client*`, `*api*`, `*http*`, or files importing `fetch`/`requests`/`reqwest`/`httpx`
+- [x] **DISC-01**: Discovery prompt instructs agents to check for multiple manifest files in subdirectories (`*/package.json`, `*/pyproject.toml`, `*/Cargo.toml`, `*/go.mod`) and report mono-repos with per-subdirectory `service_hints` entries
+- [x] **DISC-02**: Discovery output schema includes `client_files` array — files matching patterns like `*client*`, `*api*`, `*http*`, or files importing `fetch`/`requests`/`reqwest`/`httpx`
 
 ### Release
 
@@ -41,8 +41,8 @@ Requirements for Scan Accuracy milestone. Derived from Linear issues THE-949 and
 | CROSS-01 | Phase 89 | Pending |
 | CROSS-02 | Phase 89 | Pending |
 | CROSS-03 | Phase 89 | Pending |
-| DISC-01 | Phase 90 | Pending |
-| DISC-02 | Phase 90 | Pending |
+| DISC-01 | Phase 90 | Complete |
+| DISC-02 | Phase 90 | Complete |
 | VER-01 | Phase 91 | Pending |
 
 **Coverage:**
