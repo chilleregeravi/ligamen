@@ -14,11 +14,15 @@
 
 ## v5.6.0 Logging & Observability (Shipped: 2026-03-23)
 
-**Phases completed:** 0 phases, 0 plans, 0 tasks
+**Phases completed:** 5 phases, 6 plans
 
 **Key accomplishments:**
 
-- (none recorded)
+- Size-based log rotation (10MB max, 3 rotated files) with TTY-aware stderr suppression for daemon mode
+- Structured error logging with full stack traces in all HTTP route and MCP tool handler catch blocks
+- Scan lifecycle logging (BEGIN/END with repo count/mode, per-repo discovery/deep-scan/enrichment progress)
+- Auth-db extractor entropy warnings wired to structured logger via setExtractorLogger
+- QueryEngine accepts injected logger for cross-repo name collision warnings (replaces console.warn)
 
 ---
 

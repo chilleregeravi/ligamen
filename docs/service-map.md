@@ -1,13 +1,13 @@
 # Service Dependency Map
 
-Ligamen scans your linked repositories with Claude agents to build an interactive service dependency graph. This is the core feature — it gives you a visual map of how your services connect, what they expose, and where changes might ripple.
+Arcanon scans your linked repositories with Claude agents to build an interactive service dependency graph. This is the core feature — it gives you a visual map of how your services connect, what they expose, and where changes might ripple.
 
 ## How It Works
 
-1. Run `/ligamen:map` — Ligamen discovers your linked repos (from `ligamen.config.json` or by scanning sibling directories)
+1. Run `/arcanon:map` — Arcanon discovers your linked repos (from `arcanon.config.json` or by scanning sibling directories)
 2. You confirm the repo list
 3. Claude agents scan each repo — extracting services, endpoints, connections, and schemas
-4. You review the findings — high-confidence results are shown as a batch for quick approval, while anything Ligamen is less sure about is shown individually for you to confirm or reject
+4. You review the findings — high-confidence results are shown as a batch for quick approval, while anything Arcanon is less sure about is shown individually for you to confirm or reject
 5. Data is saved and the graph is ready
 6. Open `http://localhost:37888` to explore
 
@@ -27,7 +27,7 @@ Ligamen scans your linked repositories with Claude agents to build an interactiv
 
 ## Graph UI
 
-Open with `/ligamen:map view` or navigate to `http://localhost:37888`.
+Open with `/arcanon:map view` or navigate to `http://localhost:37888`.
 
 **Node colors:**
 
@@ -93,21 +93,21 @@ Click the camera icon in the toolbar to download a screenshot of the current vie
 
 ## Incremental Scanning
 
-After the first full scan, `/ligamen:map` only re-scans repos with new commits since the last scan. Use `/ligamen:map full` to force a complete re-scan of everything.
+After the first full scan, `/arcanon:map` only re-scans repos with new commits since the last scan. Use `/arcanon:map full` to force a complete re-scan of everything.
 
 ## MCP Server
 
-After building your first map, you can add the Ligamen MCP server so that all Claude agents (not just the session where you ran the scan) can check impact before making changes.
+After building your first map, you can add the Arcanon MCP server so that all Claude agents (not just the session where you ran the scan) can check impact before making changes.
 
 Add this to your Claude Code MCP settings (typically `~/.claude/settings.json` under `"mcpServers"`):
 
 ```json
 {
   "mcpServers": {
-    "ligamen-impact": {
+    "arcanon-impact": {
       "type": "stdio",
       "command": "node",
-      "args": ["<path-to-ligamen>/worker/mcp/server.js"]
+      "args": ["<path-to-arcanon>/worker/mcp/server.js"]
     }
   }
 }

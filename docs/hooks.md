@@ -1,10 +1,10 @@
 # Automatic Behaviors
 
-Ligamen runs several things automatically in the background with zero configuration. You don't need to invoke these — they happen every time Claude edits a file or starts a session.
+Arcanon runs several things automatically in the background with zero configuration. You don't need to invoke these — they happen every time Claude edits a file or starts a session.
 
 ## Formatting After Edits
 
-Every time Claude writes or edits a file, Ligamen runs the appropriate formatter for that file type:
+Every time Claude writes or edits a file, Arcanon runs the appropriate formatter for that file type:
 
 | File type | Formatter used |
 |-----------|---------------|
@@ -18,7 +18,7 @@ If a formatter isn't installed, the step is silently skipped. If it crashes, it 
 
 ## Linting After Edits
 
-After every write or edit, Ligamen also runs your project's linter and surfaces any issues as a system message to Claude:
+After every write or edit, Arcanon also runs your project's linter and surfaces any issues as a system message to Claude:
 
 | Language | Linter used |
 |----------|-------------|
@@ -31,7 +31,7 @@ Lint output is informational only — it never blocks edits. Claude sees the war
 
 ## File Guard (Write Protection)
 
-Before Claude writes to a file, Ligamen checks if it's a sensitive file and blocks the write if so. This prevents accidental modifications to files that should be changed manually or not at all.
+Before Claude writes to a file, Arcanon checks if it's a sensitive file and blocks the write if so. This prevents accidental modifications to files that should be changed manually or not at all.
 
 **Blocked files (write prevented):**
 
@@ -49,14 +49,14 @@ You can add your own blocked patterns with the `LIGAMEN_EXTRA_BLOCKED` environme
 
 ## Session Context
 
-When you start a Claude Code session, Ligamen detects your project type and injects the available commands into context. If you've previously built a dependency map, it also starts the background worker automatically so the graph UI and MCP tools are ready.
+When you start a Claude Code session, Arcanon detects your project type and injects the available commands into context. If you've previously built a dependency map, it also starts the background worker automatically so the graph UI and MCP tools are ready.
 
 ## Auto-Triggered Skills
 
-In addition to hooks, Ligamen includes two skills that Claude automatically invokes based on context — you don't need to use a slash command:
+In addition to hooks, Arcanon includes two skills that Claude automatically invokes based on context — you don't need to use a slash command:
 
-- **Quality gate skill** — when you ask Claude to run checks, verify code quality, or prepare for a commit, it automatically uses Ligamen's quality gate.
-- **Impact skill** — when you ask Claude about service dependencies, impact mapping, or cross-repo scanning, it automatically uses Ligamen's map and impact tools. On first use, it also suggests setting up ChromaDB and the MCP server.
+- **Quality gate skill** — when you ask Claude to run checks, verify code quality, or prepare for a commit, it automatically uses Arcanon's quality gate.
+- **Impact skill** — when you ask Claude about service dependencies, impact mapping, or cross-repo scanning, it automatically uses Arcanon's map and impact tools. On first use, it also suggests setting up ChromaDB and the MCP server.
 
 ## Disabling Behaviors
 

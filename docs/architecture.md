@@ -1,6 +1,6 @@
 # Architecture
 
-> **Audience:** Contributors to the Ligamen codebase. If you're a user looking to get started, see [Commands](commands.md) and [Service Map](service-map.md).
+> **Audience:** Contributors to the Arcanon codebase. If you're a user looking to get started, see [Commands](commands.md) and [Service Map](service-map.md).
 
 ## System Overview
 
@@ -44,11 +44,11 @@
 
 ## Plugin Structure
 
-Ligamen is a Claude Code marketplace plugin. Repo root has `marketplace.json`; all source lives under `plugins/ligamen/`.
+Arcanon is a Claude Code marketplace plugin. Repo root has `marketplace.json`; all source lives under `plugins/arcanon/`.
 
 | Directory | Purpose |
 |-----------|---------|
-| `commands/` | User-invoked slash commands (`/ligamen:*`). Markdown prompts Claude follows. |
+| `commands/` | User-invoked slash commands (`/arcanon:*`). Markdown prompts Claude follows. |
 | `skills/` | Auto-invoked by Claude based on context triggers. Not user-invoked. |
 | `hooks/` | Event bindings — PostToolUse (format/lint), PreToolUse (file guard), SessionStart (context). |
 | `scripts/` | Shell implementations for hooks, drift checks, and worker lifecycle. |
@@ -75,7 +75,7 @@ Drift tools query the filesystem directly — repo paths from SQLite, actual fil
 
 ## Storage
 
-- **SQLite** with WAL mode — 8 migrations, per-project isolation via SHA256 path hashing under `~/.ligamen/projects/`
+- **SQLite** with WAL mode — 8 migrations, per-project isolation via SHA256 path hashing under `~/.arcanon/projects/`
 - **ChromaDB** (optional) — vector search with boundary/actor-enriched embeddings
 - **Search fallback chain** (same for both worker and MCP): ChromaDB → FTS5 → SQL LIKE
 

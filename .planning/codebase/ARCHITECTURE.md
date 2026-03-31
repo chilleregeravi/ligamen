@@ -1,195 +1,233 @@
 # Architecture
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-31
 
 ## Pattern Overview
 
-**Overall:** Modular event-driven service dependency graph platform with agent-driven scanning, REST API workers, and MCP tool exposure.
+**Overall:** Plugin-based event-driven architecture with a persistent background worker
+
+Ligamen is a Claude Code plugin that provides auto-format, auto-lint, file guards, cross-repo drift detection, and service dependency mapping. It runs as two independent processes:
+
+1. **Hook scripts (bash)** -- invoked synchronously by Claude Code on tool use events (PreToolUse, PostToolUse, SessionStart, UserPromptSubmit)
+2. **Background worker (Node.js)** -- a long-running Fastify HTTP server + MCP stdio server that manages per-project SQLite databases, runs agent-based scans, and serves the graph UI
 
 **Key Characteristics:**
-- **Agent-driven scanning:** Claude agents discover and analyze service topology via injected runners
-- **Project-agnostic worker:** Single background HTTP worker serves multiple projects via query parameters
-- **Per-project SQLite backend:** Deterministic per-repo database sharding using SHA256 hashing
-- **Layered data flow:** Scanner → Query Engine → UI/MCP consumers
-- **Pluggable enrichment:** Service-discovery findings enriched post-scan by registered enrichers (CODEOWNERS, auth/DB extraction)
+- Claude Code plugin contract: hooks.json declares event bindings; `.claude-plugin/plugin.json` declares metadata; `.mcp.json` declares MCP servers
+- Project-agnostic worker: a single worker process serves all projects, resolving the correct per-project DB via `?project=` query parameter or hash lookup
+- Agent-based scanning: Claude sub-agents scan repos using templated prompts and return structured JSON findings
+- Dual search: SQLite FTS5 for keyword search with optional ChromaDB vector search as a non-blocking enhancement
+- Every write operation flows through SQLite first; ChromaDB sync is fire-and-forget
 
 ## Layers
 
-**Scanner & Agent Execution:**
-- Purpose: Discover service topology and connections via Claude agents
-- Location: `worker/scan/`
-- Contains: Discovery agent runners, findings parsers, enrichment pipelines, confirmation workflows
-- Depends on: Logger, agent injection function
-- Used by: Scan lifecycle orchestration, skill/command invocation
+**Hook Layer (Bash Scripts):**
+- Purpose: Respond to Claude Code lifecycle events (file writes, session starts, prompt submissions)
+- Location: `plugins/ligamen/scripts/`
+- Contains: format.sh, lint.sh, file-guard.sh, session-start.sh, worker-start.sh, worker-stop.sh, install-deps.sh, impact.sh, drift-*.sh, mcp-wrapper.sh
+- Depends on: `plugins/ligamen/lib/` (shared bash libraries)
+- Used by: Claude Code via `plugins/ligamen/hooks/hooks.json` event bindings
 
-**Database Access Layer:**
-- Purpose: Manage per-project SQLite databases, run migrations, expose schema
-- Location: `worker/db/`
-- Contains: Better-sqlite3 wrapper, prepared statement cache, query engine, connection pooling
-- Depends on: Node builtins, better-sqlite3, crypto (SHA256 hashing)
-- Used by: HTTP API, MCP server, worker entry point
+**Shared Library Layer (Bash):**
+- Purpose: Reusable bash functions sourced by scripts
+- Location: `plugins/ligamen/lib/`
+- Contains: config.sh, detect.sh, linked-repos.sh, worker-client.sh
+- Depends on: External tools (jq, curl)
+- Used by: Hook scripts, drift scripts, command implementations
 
-**Query Engine:**
-- Purpose: Execute specialized graph traversal (transitive impact), search, upsert operations
-- Location: `worker/db/query-engine.js`
-- Contains: Transitive impact algorithms, FTS5 search, statement caching, ChromaDB semantic fallback
-- Depends on: Query database handle, ChromaDB client (optional)
-- Used by: HTTP endpoints, MCP tool handlers
+**Command Layer (Markdown Prompts):**
+- Purpose: Define slash commands available to Claude Code users
+- Location: `plugins/ligamen/commands/`
+- Contains: cross-impact.md, drift.md, map.md
+- Depends on: Hook layer scripts, worker HTTP API
+- Used by: Claude Code slash command system (`/ligamen:cross-impact`, `/ligamen:drift`, `/ligamen:map`)
 
-**HTTP API Server:**
-- Purpose: Expose graph, search, and readiness via REST for UI and external clients
-- Location: `worker/server/http.js`
-- Contains: Fastify setup, project resolution per request, route handlers, CORS configuration
-- Depends on: Query Engine resolution, logger, static file serving
-- Used by: Graph UI, external tooling
+**Worker Entry Point:**
+- Purpose: Bootstrap the background daemon process
+- Location: `plugins/ligamen/worker/index.js`
+- Contains: CLI arg parsing, settings loading, PID/port file management, HTTP server creation, signal handling
+- Depends on: server/http.js, db/pool.js, server/chroma.js, lib/logger.js, scan/manager.js
+- Used by: `plugins/ligamen/scripts/worker-start.sh` (spawns via `nohup node`)
 
-**MCP Server:**
-- Purpose: Expose graph analysis as MCP tools for Claude agents
-- Location: `worker/mcp/server.js`
-- Contains: Tool definitions (impact_query, impact_search, drift_versions, etc.), database resolution
-- Depends on: Query Engine resolution, findings validation schema
-- Used by: Claude sessions for impact checking, drift analysis
+**HTTP Server Layer:**
+- Purpose: REST API for graph queries, scan persistence, log viewing, and static UI serving
+- Location: `plugins/ligamen/worker/server/http.js`
+- Contains: Fastify routes: /api/readiness, /api/version, /projects, /graph, /impact, /service/:name, /scan, /versions, /api/logs
+- Depends on: db/pool.js (per-request DB resolution), Fastify, @fastify/cors, @fastify/static
+- Used by: worker-client.sh (bash HTTP calls), graph UI (browser fetch), MCP server, command layer
 
-**Graph UI:**
-- Purpose: Interactive visualization of service dependency graph
-- Location: `worker/ui/`
-- Contains: Canvas-based force-directed layout, interaction handlers, detail panels, filter controls, log terminal
-- Depends on: D3 force (CDN), HTTP server for graph data
-- Used by: Users for visual exploration
+**MCP Server Layer:**
+- Purpose: Model Context Protocol server providing structured tools to Claude Code
+- Location: `plugins/ligamen/worker/mcp/server.js`
+- Contains: MCP tool definitions (impact queries, search, changed-file analysis, scan orchestration)
+- Depends on: @modelcontextprotocol/sdk, db/pool.js, db/query-engine.js, server/chroma.js
+- Used by: Claude Code MCP integration via `plugins/ligamen/.mcp.json` and `plugins/ligamen/scripts/mcp-wrapper.sh`
 
-**Plugin Entry Points:**
-- Purpose: Hook into Claude Code session lifecycle and tool use
-- Location: `scripts/`, `hooks/`, `.claude-plugin/`
-- Contains: Shell scripts for format/lint/file-guard/session-start, hook configuration
-- Depends on: Shell environment, installed linters/formatters
-- Used by: Claude Code runtime
+**Database Layer:**
+- Purpose: Per-project SQLite database lifecycle, migrations, and query engine pool
+- Location: `plugins/ligamen/worker/db/`
+- Contains: database.js (open/create/migrate), pool.js (per-project caching), query-engine.js (read/write query layer), migrations/ (9 schema versions)
+- Depends on: better-sqlite3
+- Used by: HTTP server, MCP server, scan manager
+
+**Scan Layer:**
+- Purpose: Orchestrate repo scanning via Claude agents, parse findings, enrich metadata
+- Location: `plugins/ligamen/worker/scan/`
+- Contains: manager.js (scan orchestration), findings.js (schema validation), discovery.js (repo detection), confirmation.js (user confirmation flow), enrichment.js (post-scan enrichment framework), codeowners.js, enrichment/auth-db-extractor.js, agent-prompt-*.md (agent templates)
+- Depends on: Database layer (for persistence), agent-prompt templates
+- Used by: MCP server (triggers scans), `/ligamen:map` command
+
+**UI Layer:**
+- Purpose: Browser-based service dependency graph visualization
+- Location: `plugins/ligamen/worker/ui/`
+- Contains: index.html, graph.js (entry point), modules/ (state, renderer, layout, interactions, detail-panel, filter-panel, etc.)
+- Depends on: Worker HTTP API (/graph, /projects, /api/logs)
+- Used by: Users via browser (served by Fastify static file middleware)
 
 ## Data Flow
 
-**Service Discovery & Enrichment Pipeline:**
+**Hook Invocation (Format/Lint):**
 
-1. User invokes `/ligamen:map` command (or scan via MCP)
-2. `buildScanContext(repoPath)` determines scan mode (full vs. incremental)
-3. `runDiscoveryPass(repoPath, template, agentRunner)` executes Claude agent with prompt
-4. Agent outputs fenced JSON block with services, connections, schemas
-5. `parseAgentOutput(text)` extracts and validates findings against schema
-6. **Enrichment loop:** Registered enrichers (`registerEnricher()`) process findings:
-   - CODEOWNERS enricher reads CODEOWNERS file, adds ownership metadata
-   - Auth/DB enricher detects credentials/databases, adds integration metadata
-7. Findings are upserted to database via `QueryEngine.upsert*()` methods
-8. Query engine updates FTS5 indices for full-text search
+1. Claude Code writes/edits a file, triggering PostToolUse event
+2. `hooks.json` routes Write|Edit|MultiEdit to `scripts/format.sh` then `scripts/lint.sh`
+3. `format.sh` reads stdin JSON, extracts `tool_input.file_path`, detects language by extension, invokes appropriate formatter (prettier, ruff, rustfmt, gofmt)
+4. `lint.sh` reads stdin JSON, extracts file path, detects language, invokes linter (eslint, ruff, clippy, golangci-lint), outputs `systemMessage` JSON to stdout with truncated lint results
 
-**Graph Query & Visualization:**
+**File Guard (PreToolUse):**
 
-1. UI calls `GET /graph?hash=<projectHash>`
-2. HTTP server resolves query engine via `getQueryEngine(projectRoot)` or hash lookup
-3. `QueryEngine.getGraph()` executes SELECT with joins across services/connections
-4. Response includes node list (services), edge list (connections), metadata (boundaries, mismatches)
-5. UI constructs force simulation, renders on canvas, wires interactions
-6. User clicks node → detail panel populated via cached node data
-7. User searches → `QueryEngine.search(keyword)` runs FTS5 query, highlights matching nodes
+1. Claude Code attempts Write|Edit|MultiEdit, triggering PreToolUse event
+2. `hooks.json` routes to `scripts/file-guard.sh`
+3. file-guard.sh classifies the target file path against block/warn rules:
+   - Hard block (exit 2): .env files, .pem/.key, credentials, lock files, vendor directories
+   - Soft warn (exit 0 + systemMessage): migration files, generated code, CHANGELOG
+   - Allow (exit 0, no output): everything else
 
-**Impact Query Traversal:**
+**Session Initialization:**
 
-1. MCP tool receives `source` and `direction` parameters
-2. `impactQuery(qe, source, direction)` starts BFS/DFS from source service
-3. Transitive impact uses cycle-detection set to avoid infinite loops
-4. Each hop evaluated for breaking change severity (CRITICAL/WARN/INFO)
-5. Results collected with relationship chain (path from source to affected service)
-6. Returned to Claude for decision-making
+1. Claude Code starts a session, triggering SessionStart hook
+2. `install-deps.sh` runs first: checks sentinel file vs runtime-deps.json, installs npm deps if needed
+3. `session-start.sh` runs: checks worker version mismatch (restarts if needed), deduplicates via session flag file, auto-starts worker if impact-map config exists, detects project type, outputs `hookSpecificOutput.additionalContext` JSON
 
-**Drift Detection:**
+**Service Dependency Scan (`/ligamen:map`):**
 
-1. Drift commands scan multiple linked repos
-2. `driftVersions()` compares package.json versions across repos
-3. `driftTypes()` compares TypeScript definitions in schema directories
-4. `driftOpenApi()` validates OpenAPI specs against recorded schemas
-5. Mismatches flagged with file locations and remediation guidance
+1. User runs `/ligamen:map`, Claude Code executes `commands/map.md` prompt
+2. Command ensures project name in `ligamen.config.json`, starts worker if needed
+3. For each linked repo, `scan/manager.js.scanRepos()` determines scan mode (full vs incremental via git diff)
+4. Agent runner invokes Claude sub-agent with repo-type-specific prompt (discovery, service, library, or infra template from `scan/agent-prompt-*.md`)
+5. `scan/findings.js.parseAgentOutput()` extracts and validates JSON findings from agent response
+6. `scan/confirmation.js` groups findings by confidence (HIGH batched, LOW capped at 10), presents to user
+7. On confirmation, `db/query-engine.js` persists findings via upsert methods (upsertRepo, upsertService, persistFindings, beginScan/endScan)
+8. `scan/enrichment.js.runEnrichmentPass()` runs registered enrichers (CODEOWNERS, auth-db-extractor) to add metadata
+9. `db/database.js.syncFindings()` fires ChromaDB sync as fire-and-forget
+
+**Impact Query (MCP/HTTP):**
+
+1. MCP tool call or HTTP GET `/impact?project=...&change=...` arrives
+2. `db/pool.js.getQueryEngine()` resolves per-project QueryEngine from cache or opens DB
+3. `db/query-engine.js` runs transitive impact traversal (recursive CTE with cycle detection, bounded at depth 7)
+4. Results classified as CRITICAL/WARN/INFO, returned as JSON
 
 **State Management:**
-
-- **Database state:** Single SQLite file per project at `~/.ligamen/projects/<hash12>/impact-map.db`
-- **Worker state:** PID/port files in `~/.ligamen/`, logs in `~/.ligamen/logs/`
-- **UI state:** In-memory graph data, current selection, filter state (not persisted across page reload)
-- **Scan state:** Repo state tracked in `repo_state` table with last_scanned_commit/timestamp
+- Per-project SQLite databases stored at `~/.ligamen/projects/<sha256(projectRoot).slice(0,12)>/impact-map.db`
+- Worker PID file at `~/.ligamen/worker.pid`, port file at `~/.ligamen/worker.port`
+- Session dedup via `/tmp/ligamen_session_<session_id>.initialized` flag files
+- Settings at `~/.ligamen/settings.json`
+- QueryEngine pool: in-memory `Map<projectRoot, QueryEngine>` (no TTL, lives for worker lifetime)
 
 ## Key Abstractions
 
 **QueryEngine:**
-- Purpose: Abstract SQLite operations and graph algorithms
-- Examples: `worker/db/query-engine.js`, methods `getGraph()`, `impactQuery()`, `search()`, `upsertService()`
-- Pattern: Single class wrapping a Database handle with prepared statement cache for performance
+- Purpose: Read/write query layer over the Ligamen SQLite schema
+- Location: `plugins/ligamen/worker/db/query-engine.js`
+- Pattern: Class wrapping better-sqlite3 Database with LRU prepared statement cache (`StmtCache`, capacity 50)
+- Capabilities: transitive impact traversal (recursive CTE), FTS5 keyword search, upsert helpers for all domain tables, graph export, breaking change classification (CRITICAL/WARN/INFO), map version snapshots (VACUUM INTO)
 
-**StmtCache:**
-- Purpose: LRU cache for prepared statements to reduce overhead in hot paths
-- Examples: `worker/db/query-engine.js` (lines 42-88)
-- Pattern: Map-based LRU with O(1) hit/miss via `has()` and O(n) eviction on capacity overflow
+**Scan Manager:**
+- Purpose: Orchestrate multi-repo scanning with agent invocation
+- Location: `plugins/ligamen/worker/scan/manager.js`
+- Pattern: Injected agent runner (`setAgentRunner(fn)`) decouples from Claude's Task tool; supports full and incremental scan modes
+- Key exports: `scanRepos()`, `buildScanContext()`, `getChangedFiles()`, `runDiscoveryPass()`
 
-**Enricher Registry:**
-- Purpose: Allow pluggable post-scan processors without modifying scan manager
-- Examples: `registerEnricher("codeowners", createCodeownersEnricher())`
-- Pattern: Module-level registry map, enrichers stored as (name, function) pairs, run sequentially in `runEnrichmentPass()`
+**Enrichment Framework:**
+- Purpose: Extensible post-scan metadata enrichment
+- Location: `plugins/ligamen/worker/scan/enrichment.js`
+- Pattern: Registry of enricher functions (`registerEnricher(name, fn)`); each enricher receives context and writes to `node_metadata` table; failures caught and logged, never abort scan
 
-**Project Hash Sharding:**
-- Purpose: Deterministic per-project DB placement without requiring absolute path configuration
-- Examples: `projectHashDir(projectRoot)` used in `worker/db/database.js`, `worker/db/pool.js`, `worker/mcp/server.js`
-- Pattern: SHA256 hash of projectRoot to 12-char hex prefix, maps to `~/.ligamen/projects/<hash12>/`
+**Migration System:**
+- Purpose: Evolve SQLite schema across versions
+- Location: `plugins/ligamen/worker/db/database.js` + `plugins/ligamen/worker/db/migrations/`
+- Pattern: Top-level await preloads all migration modules at import time; each migration exports `version` (integer) and `up(db)` function; wrapped in transactions for atomicity; tracked in `schema_versions` table
 
-**Per-Request Query Engine Resolution:**
-- Purpose: Support multi-project worker with single HTTP instance
-- Examples: `getQE(request)` in `worker/server/http.js` reads `?project=` or `?hash=` query param
-- Pattern: Query engine pool keyed by projectRoot, lazy-initialized on first access
+**DB Pool:**
+- Purpose: Per-project database resolution and caching
+- Location: `plugins/ligamen/worker/db/pool.js`
+- Pattern: `Map<projectRoot, QueryEngine>` cache; resolution by project root path, 12-char SHA-256 hash, or repo name search across all DBs
 
 ## Entry Points
 
-**HTTP Worker:**
-- Location: `worker/index.js`
-- Triggers: Shell invocation via `node worker/index.js --port 37888 --data-dir ~/.ligamen`
-- Responsibilities: CLI arg parsing, settings file loading, logger setup, Chroma initialization, HTTP server startup, graceful shutdown
+**Plugin Registration:**
+- Location: `plugins/ligamen/.claude-plugin/plugin.json`
+- Triggers: Claude Code plugin install/load
+- Responsibilities: Declare plugin name, version, metadata
+
+**Hook Event Routing:**
+- Location: `plugins/ligamen/hooks/hooks.json`
+- Triggers: PostToolUse (Write|Edit|MultiEdit), PreToolUse (Write|Edit|MultiEdit), SessionStart, UserPromptSubmit
+- Responsibilities: Route events to bash scripts with timeouts
+
+**Worker Process:**
+- Location: `plugins/ligamen/worker/index.js`
+- Triggers: `plugins/ligamen/scripts/worker-start.sh` (spawned as nohup daemon)
+- Responsibilities: Parse CLI args, create data dir, write PID/port files, initialize logger, optionally connect ChromaDB, start Fastify HTTP server, handle graceful shutdown
 
 **MCP Server:**
-- Location: `worker/mcp/server.js`
-- Triggers: MCP launcher reads `.mcp.json` and execs `node worker/mcp/server.js`
-- Responsibilities: MCP server lifecycle, tool registration, database resolution per-call, JSON-RPC message handling
+- Location: `plugins/ligamen/worker/mcp/server.js`
+- Triggers: `plugins/ligamen/scripts/mcp-wrapper.sh` (exec'd by Claude Code MCP system)
+- Responsibilities: Expose structured tools over MCP stdio transport (impact queries, search, changed-file analysis, scan orchestration)
 
-**Graph UI:**
-- Location: `worker/ui/index.html`, `worker/ui/graph.js`
-- Triggers: User navigates to `http://localhost:37888`
-- Responsibilities: Project picker, graph loading, force simulation, interaction wiring, keyboard/export handlers
-
-**Scanner Entry:**
-- Location: Via `/ligamen:map` command or `impact.sh` script invoked by MCP
-- Triggers: User invokes command in Claude Code session
-- Responsibilities: Call `scanRepos(repoPaths, options, queryEngine)` with injected agent runner
-
-**Session Hooks:**
-- Location: `scripts/format.sh`, `scripts/lint.sh`, `scripts/file-guard.sh`, `scripts/install-deps.sh`
-- Triggers: Claude Code fires PostToolUse, PreToolUse, SessionStart events
-- Responsibilities: Format/lint edited files, block sensitive file writes, install node deps if needed
+**Slash Commands:**
+- Location: `plugins/ligamen/commands/map.md`, `plugins/ligamen/commands/cross-impact.md`, `plugins/ligamen/commands/drift.md`
+- Triggers: User types `/ligamen:map`, `/ligamen:cross-impact`, `/ligamen:drift` in Claude Code
+- Responsibilities: Prompt-driven command execution using bash scripts and worker API
 
 ## Error Handling
 
-**Strategy:** Graceful degradation with logged context. No unhandled promise rejections; errors surfaced via HTTP status codes or error fields in JSON responses.
+**Strategy:** Non-blocking by default; hooks always exit 0 (except file-guard hard blocks which exit 2)
 
 **Patterns:**
-- **Database errors:** Catch and return 500 with error message to caller. Log with error context (component, stack).
-- **Missing query engine:** Return 503 "No map data yet" to signal need for initial scan.
-- **Findings validation:** Return validation error object with `{ valid: false, error: string }`. Parse errors don't crash scanner.
-- **Agent timeout:** Scan manager catches timeout, marks result as failed, continues to next repo.
-- **ChromaDB unavailable:** MCP server falls back to FTS5 search automatically; logs "ChromaDB unavailable — using FTS5 fallback".
-- **Stale PID/port files:** Worker startup detects and removes stale PID file before starting new instance.
+- All hook scripts use `trap 'exit 0' ERR` to guarantee non-blocking behavior
+- Worker HTTP routes catch errors per-route and return structured JSON error responses with 4xx/5xx status codes
+- Scan enrichment failures are caught, logged as warnings, and skipped (never abort the scan)
+- ChromaDB sync failures are fire-and-forget via `.catch()` (never prevent SQLite persistence)
+- Database migrations wrap each migration in a transaction for atomicity
+- MCP server uses timeout guards on transitive queries (`setTimeout` + `db.interrupt()` at 30s)
+- File guard distinguishes hard blocks (exit 2 + deny JSON) from soft warnings (exit 0 + systemMessage JSON)
 
 ## Cross-Cutting Concerns
 
-**Logging:** Structured JSON logging via `createLogger()` in `worker/lib/logger.js`. All components instantiate logger with component tag. Logs written to `~/.ligamen/logs/worker.log` with size-based rotation (10 MB per file, keep 3 rotated files). Levels: DEBUG, INFO, WARN, ERROR; filtered by `LIGAMEN_LOG_LEVEL` setting.
+**Logging:**
+- Structured JSON logger at `plugins/ligamen/worker/lib/logger.js`
+- Writes to `~/.ligamen/logs/worker.log` with size-based rotation (10 MB, 3 rotated files)
+- Log levels: DEBUG, INFO, WARN, ERROR (configurable via `settings.json` key `LIGAMEN_LOG_LEVEL`)
+- Logger injected into scan manager (`setScanLogger`), auth-db extractor (`setExtractorLogger`), HTTP server
+- UI polls `/api/logs` endpoint for real-time log viewing
 
 **Validation:**
-- Findings schema validated by `validateFindings()` in `worker/scan/findings.js` using JSDoc type definitions.
-- Project paths validated in MCP server: rejected if path escapes `~/.ligamen/projects/` directory.
-- Query parameters sanitized before use (project hash validated as 12-char hex).
+- Scan findings validated by `plugins/ligamen/worker/scan/findings.js` (schema enforcement with typed validators)
+- Valid protocols: rest, grpc, kafka, rabbitmq, internal, sdk, k8s, tf, helm
+- Valid confidence levels: high, low
+- Valid service types: service, library, sdk, infra
+- Zod used in MCP server for tool input validation
 
-**Authentication:** None required for HTTP API (local-only CORS, localhost binding implicit). MCP server runs as direct subprocess of Claude Code (no network exposure). File-based credentials protected by `file-guard.sh` hook (blocks Write/Edit to `.env` files).
+**Authentication:**
+- No authentication on HTTP API (localhost-only binding on 127.0.0.1)
+- CORS restricted to localhost dev origins (5173 and 127.0.0.1)
+- MCP server runs via stdio transport (inherits Claude Code's process context)
+
+**Configuration Hierarchy:**
+1. Environment variables (LIGAMEN_DATA_DIR, LIGAMEN_WORKER_PORT, LIGAMEN_DISABLE_*)
+2. `~/.ligamen/settings.json` (machine-wide settings)
+3. `ligamen.config.json` in project root (project-specific: linked-repos, impact-map config, boundaries)
 
 ---
 
-*Architecture analysis: 2026-03-23*
+*Architecture analysis: 2026-03-31*

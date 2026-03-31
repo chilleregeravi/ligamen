@@ -1,10 +1,10 @@
 # Configuration
 
-Ligamen works with zero configuration. All features auto-detect your project type, tools, and linked repos. You only need a config file if you want to customize behavior.
+Arcanon works with zero configuration. All features auto-detect your project type, tools, and linked repos. You only need a config file if you want to customize behavior.
 
-## Project Config: `ligamen.config.json`
+## Project Config: `arcanon.config.json`
 
-Create this file in your project root and commit it to git. It tells Ligamen which repos to scan together and how to group your services.
+Create this file in your project root and commit it to git. It tells Arcanon which repos to scan together and how to group your services.
 
 ```json
 {
@@ -30,9 +30,9 @@ Create this file in your project root and commit it to git. It tells Ligamen whi
 
 ### Linked Repos
 
-The `linked-repos` array tells Ligamen which repositories to include when scanning. Use relative paths from your project root.
+The `linked-repos` array tells Arcanon which repositories to include when scanning. Use relative paths from your project root.
 
-If you don't set this, Ligamen auto-discovers repos by looking at sibling directories (other folders next to your project). This works well for typical multi-repo setups where all repos live under the same parent directory.
+If you don't set this, Arcanon auto-discovers repos by looking at sibling directories (other folders next to your project). This works well for typical multi-repo setups where all repos live under the same parent directory.
 
 ### Boundaries
 
@@ -40,13 +40,13 @@ Boundaries group services visually in the graph UI. Each boundary draws a labele
 
 - `name` — identifier used internally and in filter dropdowns
 - `label` — display text shown on the boundary box in the graph
-- `services` — array of service names (must match the names Ligamen discovers during scanning)
+- `services` — array of service names (must match the names Arcanon discovers during scanning)
 
 Services not assigned to any boundary appear ungrouped. A service can only belong to one boundary.
 
 ### Impact Map
 
-After your first `/ligamen:map` scan, Ligamen adds an `impact-map` key to your config automatically. You don't need to set this yourself. Its presence tells Ligamen to auto-start the background worker when you open a Claude Code session.
+After your first `/arcanon:map` scan, Arcanon adds an `impact-map` key to your config automatically. You don't need to set this yourself. Its presence tells Arcanon to auto-start the background worker when you open a Claude Code session.
 
 ## Disabling Features
 
@@ -63,13 +63,13 @@ Set these environment variables to turn off specific automatic behaviors:
 
 ## Advanced: Machine Settings
 
-Machine-specific settings live in `~/.ligamen/settings.json`. This file is never committed to git — it's for local overrides only.
+Machine-specific settings live in `~/.arcanon/settings.json`. This file is never committed to git — it's for local overrides only.
 
 ```json
 {
   "LIGAMEN_WORKER_PORT": "37888",
   "LIGAMEN_WORKER_HOST": "127.0.0.1",
-  "LIGAMEN_DATA_DIR": "/Users/you/.ligamen",
+  "LIGAMEN_DATA_DIR": "/Users/you/.arcanon",
   "LIGAMEN_LOG_LEVEL": "INFO"
 }
 ```
@@ -78,12 +78,12 @@ Machine-specific settings live in `~/.ligamen/settings.json`. This file is never
 |---------|---------|-------------|
 | `LIGAMEN_WORKER_PORT` | `37888` | Port for the background worker |
 | `LIGAMEN_WORKER_HOST` | `127.0.0.1` | Worker bind address |
-| `LIGAMEN_DATA_DIR` | `~/.ligamen` | Where Ligamen stores databases and logs |
+| `LIGAMEN_DATA_DIR` | `~/.arcanon` | Where Arcanon stores databases and logs |
 | `LIGAMEN_LOG_LEVEL` | `INFO` | Log verbosity (`INFO` or `DEBUG`) |
 
 ## Advanced: ChromaDB (Semantic Search)
 
-By default, Ligamen uses keyword-based search (SQLite full-text search) when you query your service graph. For smarter, semantic search — where a query like "what services handle payments" returns results even when "payments" doesn't appear literally — you can optionally connect ChromaDB.
+By default, Arcanon uses keyword-based search (SQLite full-text search) when you query your service graph. For smarter, semantic search — where a query like "what services handle payments" returns results even when "payments" doesn't appear literally — you can optionally connect ChromaDB.
 
 ### Setup
 
@@ -98,7 +98,7 @@ pip install chromadb
 chroma run --host localhost --port 8000
 ```
 
-**2. Enable in `~/.ligamen/settings.json`:**
+**2. Enable in `~/.arcanon/settings.json`:**
 
 ```json
 {
@@ -111,14 +111,14 @@ chroma run --host localhost --port 8000
 **3. Re-scan your project:**
 
 ```
-/ligamen:map
+/arcanon:map
 ```
 
-After scanning, Ligamen syncs your service data to ChromaDB automatically. MCP queries and impact checks will use semantic search when available.
+After scanning, Arcanon syncs your service data to ChromaDB automatically. MCP queries and impact checks will use semantic search when available.
 
 ### ChromaDB Settings
 
-Add these to `~/.ligamen/settings.json`:
+Add these to `~/.arcanon/settings.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -136,6 +136,6 @@ Each service becomes a searchable document containing its name, type, language, 
 
 ### Troubleshooting
 
-- **ChromaDB not running:** Ligamen logs a warning and falls back to keyword search. No data is lost.
+- **ChromaDB not running:** Arcanon logs a warning and falls back to keyword search. No data is lost.
 - **Connection refused:** Check that `LIGAMEN_CHROMA_HOST` and `LIGAMEN_CHROMA_PORT` match your ChromaDB instance.
-- **Stale data:** Re-run `/ligamen:map` to resync. ChromaDB collections are replaced on each scan.
+- **Stale data:** Re-run `/arcanon:map` to resync. ChromaDB collections are replaced on each scan.

@@ -265,13 +265,74 @@
 
 ---
 
+## Milestone: v5.6.0 — Logging & Observability
+
+**Shipped:** 2026-03-23
+**Phases:** 5 | **Plans:** 6
+
+### What Was Built
+- Size-based log rotation (10MB max, 3 rotated files) with TTY-aware stderr suppression
+- Structured error logging with full stack traces in HTTP route and MCP tool handler catch blocks
+- Scan lifecycle logging: BEGIN/END per invocation, per-repo discovery/deep-scan/enrichment progress
+- Auth-db extractor entropy warnings wired to structured logger via setExtractorLogger
+- QueryEngine logger injection replacing console.warn for cross-repo name collision warnings
+
+### What Worked
+- Clean phase dependency chain: logger infrastructure first (Phase 84), then three independent consumers (85/86/87), then version bump
+- Each phase was tightly scoped with clear success criteria — no scope creep
+- Existing logger factory pattern made adoption straightforward
+
+### What Was Inefficient
+- Version bump phases (88, 91) tracked as separate phases but are trivial one-command operations
+- SUMMARY/VERIFICATION artifacts from earlier milestones (v5.4.0, v5.5.0) had incomplete stats in MILESTONES.md
+
+### Patterns Established
+- setExtractorLogger/setScanLogger injection pattern for modules that can't self-create loggers
+- err.stack inclusion in all logger.error calls as a codebase standard
+
+### Key Lessons
+- Logger adoption is best done incrementally (one module per phase) rather than in a big-bang pass
+- Version bump phases add overhead — consider folding into the last substantive phase
+
+---
+
+## Milestone: v5.7.0 — Scan Accuracy
+
+**Shipped:** 2026-03-23
+**Phases:** 3 | **Plans:** 3
+
+### What Was Built
+- Three-value crossing semantics (external/cross-service/internal) replacing binary external/internal
+- Post-scan reconciliation step that downgrades false external crossings to cross-service using knownServices set
+- Mono-repo detection via subdirectory manifest scanning (one level deep)
+- client_files field in discovery schema for outbound HTTP call identification
+
+### What Worked
+- Linear issues (THE-949, THE-951) provided clear, well-scoped requirements
+- Phase 89 and 90 ran in parallel — different files, no conflicts
+- Prompt-level changes are low-risk and easy to verify
+
+### What Was Inefficient
+- Both milestones (v5.6.0 and v5.7.0) shipped same day — could have been a single milestone
+- Milestone completion wasn't fully automated — STATE.md, ROADMAP.md, and MILESTONES.md required manual cleanup
+
+### Patterns Established
+- Post-scan reconciliation pattern: agent does its best, then a global pass corrects with full context
+- Discovery schema extension via new fields (client_files) with no DB migration needed (prompt-only)
+
+### Key Lessons
+- Agents can't reason about cross-repo context during per-repo scanning — post-scan reconciliation is the right pattern
+- Subdirectory manifest detection should be shallow (1 level) to avoid false positives in vendor/ or test fixtures
+
+---
+
 ## Cross-Milestone Trends
 
-| Metric | v1.0 | v2.0 | v2.1 | v2.2 | v2.3 | v3.0 | v4.0 |
-|--------|------|------|------|------|------|------|------|
-| Phases | 13 | 8 | 5 | 3 | 3 | 6 | 7 |
-| Plans | 17 | 19 | 11 | 5 | 5 | 11 | 14 |
-| Requirements | 79 | 8 | 13 | 5 | 9 | 33 | 22 |
-| Tests | 150 | ~50 | ~20 | ~30 | ~30 | ~60 | 0 (rename only) |
-| LOC | 4,323 | ~7,000 | ~7,500 | ~8,000 | ~9,000 | ~12,000 | ~41,600 |
-| Timeline | 1 day | 1 day | 1 day | 1 day | 1 day | 1 day | 2 days |
+| Metric | v1.0 | v2.0 | v2.1 | v2.2 | v2.3 | v3.0 | v4.0 | v5.6.0 | v5.7.0 |
+|--------|------|------|------|------|------|------|------|--------|--------|
+| Phases | 13 | 8 | 5 | 3 | 3 | 6 | 7 | 5 | 3 |
+| Plans | 17 | 19 | 11 | 5 | 5 | 11 | 14 | 6 | 3 |
+| Requirements | 79 | 8 | 13 | 5 | 9 | 33 | 22 | 9 | 6 |
+| Tests | 150 | ~50 | ~20 | ~30 | ~30 | ~60 | 0 (rename only) | ~10 | 0 (prompt only) |
+| LOC | 4,323 | ~7,000 | ~7,500 | ~8,000 | ~9,000 | ~12,000 | ~41,600 | ~48,000 | ~48,000 |
+| Timeline | 1 day | 1 day | 1 day | 1 day | 1 day | 1 day | 2 days | 1 day | 1 day |

@@ -165,14 +165,14 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ## Context
 
-Shipped v5.5.0 with ~48,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 83 phases across 15 milestones, 146 plans. Repo restructured as Claude Code marketplace — plugin source lives under `plugins/ligamen/`, installable via `claude plugin marketplace add` + `claude plugin install`. MCP server has 8 tools (5 impact + 3 drift). Runtime deps installed automatically on first session via SessionStart hook + self-healing MCP wrapper. Post-scan enrichment architecture extracts team ownership (CODEOWNERS), auth mechanisms, and database backends. Confidence/evidence on connections, schema/field data in detail panel.
+Shipped v5.7.0 with ~48,000 LOC (Node.js worker, Canvas UI, shell scripts, bats tests). 91 phases across 18 milestones, 156 plans. Repo restructured as Claude Code marketplace — plugin source lives under `plugins/ligamen/`, installable via `claude plugin marketplace add` + `claude plugin install`. MCP server has 8 tools (5 impact + 3 drift). Runtime deps installed automatically on first session via SessionStart hook + self-healing MCP wrapper. Post-scan enrichment architecture extracts team ownership (CODEOWNERS), auth mechanisms, and database backends. Confidence/evidence on connections, schema/field data in detail panel.
 
-Architecture: commands/ for user-invoked features, skills/ for auto-invoked knowledge, hooks/ for formatting/linting/guarding, worker/ for Node.js daemon (db/, server/, scan/, mcp/, ui/ subdirectories), lib/ for shared bash/JS libraries. Two-phase scan pipeline: discovery agent (Phase 1) detects languages/frameworks/entry-points, then deep scan agent (Phase 2) receives discovery context via {{DISCOVERY_JSON}} for language-aware analysis. Agent prompts modularized into type-specific variants (service, library, infra) with shared common component and multi-language examples. Parallel scan fan-out with retry-once error handling. Graph UI uses deterministic layered layout with boundary grouping, actor dedup filter, and protocol-differentiated edges. Filter panel provides protocol, layer, boundary, language, mismatch, and isolated-node toggles.
+Architecture: commands/ for user-invoked features, skills/ for auto-invoked knowledge, hooks/ for formatting/linting/guarding, worker/ for Node.js daemon (db/, server/, scan/, mcp/, ui/ subdirectories), lib/ for shared bash/JS libraries. Two-phase scan pipeline: discovery agent (Phase 1) detects languages/frameworks/entry-points, then deep scan agent (Phase 2) receives discovery context via {{DISCOVERY_JSON}} for language-aware analysis. Agent prompts modularized into type-specific variants (service, library, infra) with shared common component and multi-language examples. Parallel scan fan-out with retry-once error handling. Three-value crossing semantics (external/cross-service/internal) with post-scan reconciliation that downgrades false externals. Graph UI uses deterministic layered layout with boundary grouping, actor dedup filter, and protocol-differentiated edges. Filter panel provides protocol, layer, boundary, language, mismatch, and isolated-node toggles. Production-grade logging with size-based rotation, structured error logging with stack traces across all modules, and scan lifecycle observability.
 
-Known tech debt: no log rotation, db/database.js has console.log in script-mode guard, getQueryEngineByHash inline migration workaround, renderLibraryConnections() unused `outgoing` parameter, node_metadata table unused (forward-looking for STRIDE/vuln views), impact-flow.bats imports stale module paths (pre-existing from v3.0 restructure), package.json bin entry references non-existent ligamen-init.js, graph-fit-to-screen.test.js has 2 stale assertions for inlined fitToScreen() (Phase 26 regression). setExtractorLogger exported but never called from production code (near-threshold entropy warnings dark — low severity).
+Known tech debt: db/database.js has console.log in script-mode guard, getQueryEngineByHash inline migration workaround, renderLibraryConnections() unused `outgoing` parameter, node_metadata table unused (forward-looking for STRIDE/vuln views), impact-flow.bats imports stale module paths (pre-existing from v3.0 restructure), package.json bin entry references non-existent ligamen-init.js, graph-fit-to-screen.test.js has 2 stale assertions for inlined fitToScreen() (Phase 26 regression).
 
 ---
-*Last updated: 2026-03-22 after v5.5.0 milestone*
+*Last updated: 2026-03-31 after v5.7.0 milestone*
 
 ## Constraints
 
@@ -229,6 +229,12 @@ Known tech debt: no log rotation, db/database.js has console.log in script-mode 
 | Self-healing MCP wrapper over hook-only approach | Covers first-session race where MCP starts before SessionStart hook completes | ✓ Good |
 | Separate install-deps.sh script (not inline in session-start.sh) | Clean separation; different timeout requirements (120s vs 10s) | ✓ Good |
 | .mcp.json points to wrapper script not node directly | Enables self-healing path; wrapper handles dep check before exec | ✓ Good |
+| Size-based log rotation over external logrotate | No external dependency; 10MB/3-file cap fits plugin use case | ✓ Good |
+| TTY-aware stderr suppression | Daemon mode writes to file only; interactive mode keeps stderr for debugging | ✓ Good |
+| Logger injection pattern for QueryEngine | Backwards-compatible optional arg; falls back to console.warn | ✓ Good |
+| Three-value crossing semantics | external/cross-service/internal captures nuance that binary external/internal missed | ✓ Good |
+| Post-scan reconciliation over prompt-only fix | Agents can't know what other repos contain; post-scan has full context | ✓ Good |
+| Mono-repo detection via subdirectory manifests | Simple heuristic (one level deep) catches common layouts without recursive scan | ✓ Good |
 
 ---
-*Last updated: 2026-03-22 after v5.4.0 milestone start*
+*Last updated: 2026-03-31 after v5.7.0 milestone*

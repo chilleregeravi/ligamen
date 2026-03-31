@@ -17,8 +17,8 @@
 - ✅ **v5.3.0 Scan Intelligence & Enrichment** — Phases 67-73 (shipped 2026-03-22)
 - ✅ **v5.4.0 Scan Pipeline Hardening** — Phases 74-79 (shipped 2026-03-22)
 - ✅ **v5.5.0 Security & Data Integrity Hardening** — Phases 80-83 (shipped 2026-03-22)
-- 🚧 **v5.6.0 Logging & Observability** — Phases 84-88 (in progress)
-- 📋 **v5.7.0 Scan Accuracy** — Phases 89-91 (planned)
+- ✅ **v5.6.0 Logging & Observability** — Phases 84-88 (shipped 2026-03-23)
+- ✅ **v5.7.0 Scan Accuracy** — Phases 89-91 (shipped 2026-03-23)
 
 ## Phases
 
@@ -157,26 +157,23 @@ Full details: see Phase Details below (archived)
 
 </details>
 
-### 🚧 v5.6.0 Logging & Observability (In Progress)
+<details>
+<summary>✅ v5.6.0 Logging & Observability (Phases 84-88) — SHIPPED 2026-03-23</summary>
 
-**Milestone Goal:** Production-grade logging infrastructure with rotation, scan lifecycle visibility, stderr dedup, and consistent structured error logging across all modules.
+- [x] Phase 84-88: 5 phases, 6 plans — size-based log rotation, TTY-aware stderr suppression, structured error logging with stack traces in HTTP/MCP handlers, scan lifecycle logging, extractor logger wiring, QueryEngine logger injection
 
-- [ ] **Phase 84: Logger Infrastructure** - Size-based log rotation and TTY-aware stderr suppression in logger.js
-- [ ] **Phase 85: Error Logging** - Structured error logging with stack traces in HTTP routes, MCP tools, and all error call sites
-- [ ] **Phase 86: Scan Observability** - Scan lifecycle logging (BEGIN/END/per-repo progress) and extractor logger wiring
-- [ ] **Phase 87: Logger Adoption** - QueryEngine accepts injected logger to replace console.warn
-- [ ] **Phase 88: Version Bump** - Bump all 5 manifest files (package.json, plugin.json, runtime-deps.json, 2x marketplace.json) to v5.6.0
+Full details: `.planning/milestones/v5.6.0-ROADMAP.md`
 
-### 📋 v5.7.0 Scan Accuracy (Planned)
+</details>
 
-**Milestone Goal:** Improve scan accuracy with proper crossing semantics, cross-repo reconciliation, mono-repo detection, and client file identification.
+<details>
+<summary>✅ v5.7.0 Scan Accuracy (Phases 89-91) — SHIPPED 2026-03-23</summary>
 
-- [ ] **Phase 89: Crossing Semantics** - Define external/cross-service/internal crossing values in agent prompts and add post-scan reconciliation in map.md
-  - **Plans:** 2 plans
-  - [x] 89-01-PLAN.md — Update agent-prompt-common.md with crossing semantics definition; fix crossing values in all three type-specific prompt examples (CROSS-01, CROSS-02)
-  - [x] 89-02-PLAN.md — Insert post-scan reconciliation step into map.md between scan and confirm (CROSS-03)
-- [ ] **Phase 90: Discovery Improvements** - Mono-repo multi-manifest detection and client_files field in discovery schema
-- [ ] **Phase 91: Version Bump** - Bump all 5 manifest files to v5.7.0
+- [x] Phase 89-91: 3 phases, 3 plans — three-value crossing semantics, post-scan reconciliation, mono-repo detection, client_files discovery schema, version bump
+
+Full details: `.planning/milestones/v5.7.0-ROADMAP.md`
+
+</details>
 
 ## Phase Details
 
@@ -640,110 +637,7 @@ Plans:
 
 </details>
 
-### 🚧 v5.6.0 Logging & Observability (In Progress)
-
-**Milestone Goal:** Production-grade logging infrastructure with rotation, scan lifecycle visibility, stderr dedup, and consistent structured error logging across all modules.
-
-### Phase 84: Logger Infrastructure
-**Goal**: logger.js supports size-based log rotation and suppresses stderr output in daemon mode, eliminating double-write when running under nohup
-**Depends on**: Phase 83 (v5.5.0 complete)
-**Requirements**: LOG-01, LOG-02
-**Success Criteria** (what must be TRUE):
-  1. After writing enough log lines to exceed 10MB, worker.log is renamed to worker.log.1 and a new worker.log is started — old content is not lost
-  2. At most 3 rotated files exist alongside the active log (worker.log.1, worker.log.2, worker.log.3) — worker.log.4 and beyond are deleted
-  3. When the worker process has no TTY (daemon mode), log lines are written only to the log file — not duplicated to stderr
-  4. When the worker is run interactively with a TTY attached, stderr output continues to work as before
-**Plans**: 1 plan
-Plans:
-- [x] 84-01-PLAN.md — Implement LOG-01 size-based rotation and LOG-02 TTY-aware stderr suppression in logger.js
-
-### Phase 85: Error Logging
-**Goal**: All catch blocks in HTTP routes and MCP tool handlers log structured errors with stack traces to the worker logger, and every error log call site across all modules includes err.stack
-**Depends on**: Phase 84 (logger must be stable before wiring new call sites)
-**Requirements**: ERR-01, ERR-02, LOG-03
-**Success Criteria** (what must be TRUE):
-  1. When an HTTP route handler throws an error, the worker log contains a structured entry with the error message and full stack trace — not just the HTTP 500 response body
-  2. When an MCP tool handler throws an error, the worker log contains a structured entry with the error message and full stack trace — not just the MCP error status response
-  3. Stack traces are visible in the log terminal's component-filtered view for both http and mcp components
-  4. All logger.error calls across worker modules include err.stack when an Error object is available — no call site logs only err.message
-**Plans**: 2 plans
-Plans:
-- [x] 85-01-PLAN.md — Add stack traces to all HTTP route catch blocks (ERR-01, LOG-03 for http.js)
-- [x] 85-02-PLAN.md — Wrap MCP tool handlers in try/catch + add err.stack to all logger.error calls (ERR-02, LOG-03)
-
-### Phase 86: Scan Observability
-**Goal**: Scan lifecycle events are logged at appropriate verbosity — BEGIN/END for each scanRepos invocation and per-repo progress for discovery, deep scan, and enrichment — and the auth-db extractor's entropy warnings reach the structured logger
-**Depends on**: Phase 84 (logger infrastructure must be in place)
-**Requirements**: SCAN-01, SCAN-02, SCAN-03
-**Success Criteria** (what must be TRUE):
-  1. Starting a scan logs a BEGIN entry that includes the number of repos being scanned and the scan mode (full vs incremental)
-  2. After a scan completes, an END entry is logged that includes the total services found, connections found, and wall-clock duration
-  3. For each repo scanned, three progress log lines appear: discovery done (with detected languages/frameworks), deep scan done (with service/connection counts), enrichment done (with enrichers applied)
-  4. When the auth-db extractor encounters a near-threshold entropy value, the warn log entry appears in the log terminal under the correct component tag — not silently discarded
-**Plans**: 2 plans
-Plans:
-- [x] 86-01-PLAN.md — manager.js: BEGIN/END lifecycle logging + per-repo discovery/deep-scan/enrichment progress (SCAN-01, SCAN-02)
-- [x] 86-02-PLAN.md — worker/index.js: wire setExtractorLogger alongside setScanLogger (SCAN-03)
-
-### Phase 87: Logger Adoption
-**Goal**: QueryEngine accepts an optional injected logger so the cross-repo name collision warning uses the structured logger instead of console.warn
-**Depends on**: Phase 84 (logger infrastructure in place; this phase is independent of Phases 85-86)
-**Requirements**: ADOPT-01
-**Success Criteria** (what must be TRUE):
-  1. When QueryEngine is constructed with an injected logger, a cross-repo service name collision produces a structured warn log entry visible in the log terminal — not a bare console.warn line
-  2. When QueryEngine is constructed without a logger (backward-compatible path), the collision warning falls back to console.warn — no TypeError or silent failure
-  3. The injected logger is used for the collision warning at line 1257 of query-engine.js — no other console.warn calls are introduced or left unreplaced in that file
-**Plans**: 1 plan
-
-Plans:
-- [x] 87-01-PLAN.md — Add optional logger to QueryEngine, replace console.warn with structured logger fallback
-
-### Phase 88: Version Bump
-**Goal**: All manifest files reflect version 5.6.0 so the marketplace and plugin install surfaces present the correct version
-**Depends on**: Phase 87 (must be last — version bump is the release gate)
-**Requirements**: (none — release task)
-**Success Criteria** (what must be TRUE):
-  1. All 5 manifest files (package.json, plugin.json, runtime-deps.json, plugins/ligamen/.claude-plugin/marketplace.json, .claude-plugin/marketplace.json) contain version "5.6.0"
-  2. Running `claude plugin marketplace add` offers version 5.6.0
-**Plans**: TBD
-
-### Phase 89: Crossing Semantics
-**Goal**: Agent prompts produce accurate crossing values and a post-scan reconciliation step downgrades false external crossings to cross-service where both endpoints are known services
-**Depends on**: Phase 88 (v5.6.0 complete)
-**Requirements**: CROSS-01, CROSS-02, CROSS-03
-**Success Criteria** (what must be TRUE):
-  1. Scanning a service that calls another known service within a linked repo produces a connection with crossing value "cross-service" — not "external"
-  2. Scanning a service that calls a third-party API produces a connection with crossing value "external" after reconciliation
-  3. Scanning a service that calls an endpoint within the same deployable unit produces a connection with crossing value "internal"
-  4. Every example connection in the agent scan prompt includes a non-null crossing field — no omissions in examples
-  5. The post-scan reconciliation step in map.md runs after all repos are scanned and before the summary is printed
-**Plans**: TBD
-
-### Phase 90: Discovery Improvements
-**Goal**: The discovery agent detects mono-repos with per-subdirectory hints and surfaces client files so the deep scan can identify outbound callers
-**Depends on**: Phase 88 (v5.6.0 complete — can run in parallel with Phase 89)
-**Requirements**: DISC-01, DISC-02
-**Success Criteria** (what must be TRUE):
-  1. Scanning a mono-repo with subdirectory manifests (package.json, pyproject.toml, Cargo.toml, go.mod) produces a discovery result with multiple service_hints entries — one per subdirectory
-  2. Scanning a repo that contains files named *client*, *api*, or *http*, or files importing fetch/requests/reqwest/httpx produces a discovery result with a non-empty client_files array
-  3. Scanning a repo with no client-like files produces a discovery result with an empty (or absent) client_files array — no false positives
-**Plans**: 1 plan
-Plans:
-- [x] 90-01-PLAN.md — Add mono-repo heuristic and client_files schema to agent-prompt-discovery.md
-
-### Phase 91: Version Bump
-**Goal**: All manifest files reflect version 5.7.0 so the marketplace and plugin install surfaces present the correct version
-**Depends on**: Phase 89, Phase 90 (must be last — version bump is the release gate)
-**Requirements**: VER-01
-**Success Criteria** (what must be TRUE):
-  1. All 5 manifest files (package.json, plugin.json, runtime-deps.json, plugins/ligamen/.claude-plugin/marketplace.json, .claude-plugin/marketplace.json) contain version "5.7.0"
-  2. Running  offers version 5.7.0
-**Plans**: TBD
-
 ## Progress
-
-**Execution Order:**
-Phase 84 first (logger infrastructure), then 85/86/87 in any order (parallel), then Phase 88 last (version bump release gate). For v5.7.0: Phase 89 (crossing semantics) and Phase 90 (discovery improvements) can run in parallel, then Phase 91 last (version bump release gate).
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -762,11 +656,5 @@ Phase 84 first (logger infrastructure), then 85/86/87 in any order (parallel), t
 | 67-73 | v5.3.0 | 12/12 | Complete | 2026-03-22 |
 | 74-79 | v5.4.0 | 9/9 | Complete | 2026-03-22 |
 | 80-83 | v5.5.0 | 9/9 | Complete | 2026-03-22 |
-| 84. Logger Infrastructure | v5.6.0 | 1/1 | Complete   | 2026-03-23 |
-| 85. Error Logging | v5.6.0 | 2/2 | Complete   | 2026-03-23 |
-| 86. Scan Observability | v5.6.0 | 2/2 | Complete   | 2026-03-23 |
-| 87. Logger Adoption | v5.6.0 | 1/1 | Complete   | 2026-03-23 |
-| 88. Version Bump | v5.6.0 | 0/? | Not started | - |
-| 89. Crossing Semantics | v5.7.0 | 2/2 | Complete   | 2026-03-23 |
-| 90. Discovery Improvements | v5.7.0 | 1/1 | Complete   | 2026-03-23 |
-| 91. Version Bump | v5.7.0 | 0/? | Not started | - |
+| 84-88 | v5.6.0 | 6/6 | Complete | 2026-03-23 |
+| 89-91 | v5.7.0 | 3/3 | Complete | 2026-03-23 |

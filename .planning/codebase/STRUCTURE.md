@@ -1,259 +1,311 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-31
 
 ## Directory Layout
 
 ```
 ligamen/
-├── .claude/                    # Claude Code session config (local)
-├── .planning/                  # GSD orchestrator planning cache
-├── .claude-plugin/             # Claude plugin descriptor directory
-│   └── plugin.json             # Plugin metadata
-├── docs/                       # User-facing documentation
+├── .claude/                          # Claude Code local settings
+│   └── settings.local.json
+├── .claude-plugin/                   # Root marketplace registration
+│   └── marketplace.json
+├── .planning/                        # GSD planning documents
+│   └── codebase/                     # This analysis
+├── docs/                             # Project documentation
+├── ligamen.config.json               # Root project config (linked-repos, project-name)
+├── Makefile                          # Top-level build/test/install targets
 ├── plugins/
-│   └── ligamen/                # Main plugin source tree
-│       ├── .claude-plugin/     # Plugin config for Claude Code
-│       │   └── plugin.json
-│       ├── commands/           # MCP slash command descriptors
-│       │   ├── map.md          # /ligamen:map — build service graph
-│       │   ├── cross-impact.md # /ligamen:cross-impact — trace blast radius
-│       │   └── drift.md        # /ligamen:drift — detect version/schema mismatches
-│       ├── hooks/              # Claude Code hook configuration
-│       │   └── hooks.json      # PostToolUse, PreToolUse, SessionStart definitions
-│       ├── lib/                # Bash utility scripts (no .js files here)
-│       │   ├── config.sh       # Configuration helpers
-│       │   ├── worker-client.sh # Worker startup/communication
-│       │   ├── linked-repos.sh # Linked repos discovery
-│       │   └── detect.sh       # Project type detection
-│       ├── scripts/            # Executable bash scripts for hooks and commands
-│       │   ├── format.sh       # Auto-format hook (called by PostToolUse)
-│       │   ├── lint.sh         # Auto-lint hook (called by PostToolUse)
-│       │   ├── file-guard.sh   # File protection (called by PreToolUse)
-│       │   ├── install-deps.sh # Install runtime dependencies
-│       │   ├── session-start.sh # Session startup hook
-│       │   ├── worker-start.sh # Start background worker daemon
-│       │   ├── worker-stop.sh  # Stop worker daemon
-│       │   ├── mcp-wrapper.sh  # MCP server launcher (self-healing)
-│       │   ├── impact.sh       # Scan orchestration entry point
-│       │   ├── drift-*.sh      # Drift detection scripts
-│       │   └── drift-common.sh # Shared drift utilities
-│       ├── skills/
-│       │   └── impact/         # Agent skills for impact analysis
-│       ├── worker/             # Background HTTP worker and MCP server (Node.js)
-│       │   ├── index.js        # Worker entry point — daemon launcher
+│   └── ligamen/                      # ** THE PLUGIN — all production code lives here **
+│       ├── .claude-plugin/
+│       │   └── plugin.json           # Plugin metadata (name, version, description)
+│       ├── .mcp.json                 # MCP server declaration
+│       ├── hooks/
+│       │   └── hooks.json            # Claude Code hook event bindings
+│       ├── commands/                 # Slash command definitions (markdown prompts)
+│       │   ├── cross-impact.md
+│       │   ├── drift.md
+│       │   └── map.md
+│       ├── lib/                      # Shared bash libraries (sourced, not executed)
+│       │   ├── config.sh
+│       │   ├── detect.sh
+│       │   ├── linked-repos.sh
+│       │   └── worker-client.sh
+│       ├── scripts/                  # Executable bash scripts (hook handlers + utilities)
+│       │   ├── format.sh
+│       │   ├── lint.sh
+│       │   ├── file-guard.sh
+│       │   ├── session-start.sh
+│       │   ├── install-deps.sh
+│       │   ├── worker-start.sh
+│       │   ├── worker-stop.sh
+│       │   ├── mcp-wrapper.sh
+│       │   ├── impact.sh
+│       │   ├── drift-common.sh
+│       │   ├── drift-versions.sh
+│       │   ├── drift-types.sh
+│       │   └── drift-openapi.sh
+│       ├── skills/                   # Skill modules (future expansion)
+│       │   └── impact/
+│       ├── worker/                   # Node.js background worker
+│       │   ├── index.js              # Worker entry point (daemon bootstrap)
 │       │   ├── lib/
-│       │   │   └── logger.js   # Structured JSON logger with rotation
-│       │   ├── db/
-│       │   │   ├── database.js # SQLite lifecycle (open, migrate, close)
-│       │   │   ├── pool.js     # Per-project DB and QueryEngine pool
-│       │   │   ├── query-engine.js # Core graph algorithms (transitive impact, search, upsert)
-│       │   │   ├── migrations/
-│       │   │   │   ├── 001_initial_schema.js
-│       │   │   │   ├── 002_service_type.js
-│       │   │   │   ├── 003_exposed_endpoints.js
-│       │   │   │   ├── 004_dedup_constraints.js
-│       │   │   │   ├── 005_scan_versions.js
-│       │   │   │   ├── 006_dedup_repos.js
-│       │   │   │   ├── 007_expose_kind.js
-│       │   │   │   ├── 008_actors_metadata.js
-│       │   │   │   └── 009_confidence_enrichment.js
-│       │   │   └── *.test.js   # Database tests
-│       │   ├── server/
-│       │   │   ├── http.js     # Fastify HTTP server, REST routes, project resolution
-│       │   │   ├── chroma.js   # ChromaDB client and semantic search
-│       │   │   └── *.test.js   # Server tests
-│       │   ├── mcp/
-│       │   │   ├── server.js   # MCP server, tool definitions, handlers
-│       │   │   └── *.test.js   # MCP tests
-│       │   ├── scan/
-│       │   │   ├── manager.js  # Scan orchestration, agent invocation
-│       │   │   ├── discovery.js # Discovery agent runner (Phase 1)
-│       │   │   ├── confirmation.js # Confirmation workflow
-│       │   │   ├── findings.js # Findings parser and validator
-│       │   │   ├── enrichment.js # Post-scan enrichment pipeline
+│       │   │   └── logger.js         # Structured JSON logger with rotation
+│       │   ├── db/                   # Database layer
+│       │   │   ├── database.js       # SQLite lifecycle (open, migrate, snapshot)
+│       │   │   ├── pool.js           # Per-project DB/QueryEngine pool
+│       │   │   ├── query-engine.js   # Read/write query layer (52K, largest file)
+│       │   │   └── migrations/       # Schema evolution (001-009)
+│       │   ├── server/               # HTTP + ChromaDB servers
+│       │   │   ├── http.js           # Fastify REST API
+│       │   │   └── chroma.js         # Optional ChromaDB vector sync
+│       │   ├── mcp/                  # MCP stdio server
+│       │   │   └── server.js         # Tool definitions for Claude Code
+│       │   ├── scan/                 # Scan orchestration
+│       │   │   ├── manager.js        # Multi-repo scan coordinator
+│       │   │   ├── findings.js       # Schema validation for agent output
+│       │   │   ├── discovery.js      # Repo discovery and config loading
+│       │   │   ├── confirmation.js   # User confirmation flow
+│       │   │   ├── enrichment.js     # Post-scan enrichment framework
+│       │   │   ├── codeowners.js     # CODEOWNERS enricher
 │       │   │   ├── enrichment/
-│       │   │   │   └── auth-db-extractor.js # Auth/DB detection enricher
-│       │   │   ├── codeowners.js # CODEOWNERS parsing enricher
-│       │   │   └── *.test.js   # Scan tests
-│       │   └── ui/             # Interactive graph visualization
-│       │       ├── index.html  # Canvas-based graph UI entry point
-│       │       ├── graph.js    # UI initialization, project loading
-│       │       ├── force-worker.js # Web Worker for D3 force simulation (offscreen)
-│       │       ├── modules/
-│       │       │   ├── state.js # Global UI state (graph data, filters, selection)
-│       │       │   ├── renderer.js # Canvas rendering, node/edge drawing
-│       │       │   ├── layout.js # Force-directed layout computation
-│       │       │   ├── interactions.js # Click/drag/hover handlers
-│       │       │   ├── detail-panel.js # Right panel service details
-│       │       │   ├── filter-panel.js # Protocol/layer/boundary filter controls
-│       │       │   ├── keyboard.js # Keyboard shortcuts
-│       │       │   ├── project-picker.js # Modal project selection
-│       │       │   ├── project-switcher.js # Project switcher UI
-│       │       │   ├── export.js # PNG export
-│       │       │   ├── log-terminal.js # Collapsible log panel
-│       │       │   ├── utils.js # UI helpers (distance, string matching, etc.)
-│       │       │   └── *.test.js # UI module tests
-│       ├── .mcp.json           # MCP server configuration (stdio transport)
-│       ├── package.json        # Node dependencies (fastify, better-sqlite3, zod, etc.)
-│       ├── package-lock.json   # Locked versions
-│       └── runtime-deps.json   # Runtime-only dependencies (for install-deps.sh)
-├── tests/                      # Test suites
-│   ├── ui/                     # UI tests
-│   └── bats/                   # Bash tests
-├── .planning/                  # GSD planning documents (generated)
-│   └── codebase/               # Codebase analysis outputs
-│       ├── ARCHITECTURE.md     # (this file)
-│       ├── STRUCTURE.md        # Directory layout and module locations
-│       ├── STACK.md            # Technology dependencies
-│       ├── INTEGRATIONS.md     # External services
-│       ├── CONVENTIONS.md      # Coding style
-│       └── TESTING.md          # Test patterns
-└── LICENSE, README.md, Makefile
+│       │   │   │   └── auth-db-extractor.js  # Auth/DB pattern extractor
+│       │   │   ├── agent-prompt-common.md     # Shared agent scan rules
+│       │   │   ├── agent-prompt-discovery.md  # Discovery pass prompt
+│       │   │   ├── agent-prompt-service.md    # Service repo prompt
+│       │   │   ├── agent-prompt-library.md    # Library repo prompt
+│       │   │   ├── agent-prompt-infra.md      # Infra repo prompt
+│       │   │   └── agent-schema.json          # Findings JSON schema
+│       │   └── ui/                   # Browser graph visualization
+│       │       ├── index.html        # Main HTML page
+│       │       ├── graph.js          # UI entry point
+│       │       ├── force-worker.js   # Web worker for force simulation
+│       │       └── modules/          # Modular UI components
+│       ├── package.json              # Plugin npm manifest
+│       ├── runtime-deps.json         # MCP runtime dependency manifest
+│       └── package-lock.json
+├── tests/                            # All tests (bats + node + UI)
+│   ├── *.bats                        # Bats shell script tests
+│   ├── bats/                         # Bats framework (git submodule)
+│   ├── fixtures/                     # Test fixtures
+│   ├── helpers/                      # Test helper scripts
+│   ├── test_helper.bash              # Bats test helper loader
+│   ├── test_helper/                  # Additional test helpers
+│   ├── storage/                      # Node.js DB/query-engine tests
+│   ├── ui/                           # UI module tests
+│   ├── worker/                       # Worker-specific tests
+│   └── integration/                  # Integration tests
+└── node_modules/                     # Root-level dev dependencies
 ```
 
 ## Directory Purposes
 
-**`plugins/ligamen/worker/`:**
-- Purpose: Background Node.js daemon and UI server running independently of Claude Code sessions
-- Contains: HTTP API, MCP server, database drivers, graph visualization, scan orchestration
-- Key files: `worker/index.js` (entry), `worker/db/query-engine.js` (core logic), `worker/server/http.js` (REST API), `worker/mcp/server.js` (MCP tools)
-
-**`plugins/ligamen/worker/db/`:**
-- Purpose: Database abstraction layer and graph query algorithms
-- Contains: SQLite lifecycle, prepared statement cache, per-project DB pooling, migration runner, transitive impact traversal
-- Key files: `database.js` (lifecycle), `query-engine.js` (algorithms), `pool.js` (pooling)
-
-**`plugins/ligamen/worker/scan/`:**
-- Purpose: Service discovery and topology enrichment
-- Contains: Agent orchestration, findings parsing/validation, enrichment pipeline (CODEOWNERS, auth/DB detection)
-- Key files: `manager.js` (orchestration), `findings.js` (parser/validator), `enrichment.js` (enricher registry)
-
-**`plugins/ligamen/worker/ui/`:**
-- Purpose: Interactive service dependency graph visualization
-- Contains: Canvas rendering, force-directed layout, filter controls, detail panels, keyboard shortcuts
-- Key files: `graph.js` (init), `modules/state.js` (state), `modules/renderer.js` (drawing), `modules/layout.js` (physics)
+**`plugins/ligamen/`:**
+- Purpose: All production plugin code -- the installable artifact
+- Contains: Bash scripts, Node.js worker, commands, hooks configuration
+- Key files: `package.json` (version 5.7.0), `.claude-plugin/plugin.json`, `hooks/hooks.json`, `.mcp.json`
 
 **`plugins/ligamen/scripts/`:**
-- Purpose: Executable entry points for hooks and commands
-- Contains: Bash scripts for format, lint, file guard, worker lifecycle, drift detection
-- Key files: `worker-start.sh` (daemon launch), `mcp-wrapper.sh` (MCP startup), `format.sh` (auto-format hook)
+- Purpose: Executable bash scripts invoked by hooks or commands
+- Contains: Hook handlers (format, lint, file-guard, session-start), worker lifecycle (start/stop), drift checkers, MCP wrapper
+- Key files: `format.sh` (PostToolUse auto-format), `lint.sh` (PostToolUse auto-lint), `file-guard.sh` (PreToolUse protection), `session-start.sh` (SessionStart context injection)
+
+**`plugins/ligamen/lib/`:**
+- Purpose: Shared bash libraries sourced by scripts (never executed directly)
+- Contains: config.sh (config file loading), detect.sh (project/language detection), linked-repos.sh (repo discovery), worker-client.sh (HTTP client helpers)
+- Key files: All four files are leaf libraries; `config.sh` is a guarded singleton, others check `BASH_SOURCE` to prevent direct execution
 
 **`plugins/ligamen/commands/`:**
-- Purpose: MCP slash command descriptors (Markdown files read by Claude Code)
-- Contains: Command help text, usage examples, parameter descriptions
-- Key files: `map.md`, `cross-impact.md`, `drift.md`
+- Purpose: Markdown prompt files defining `/ligamen:*` slash commands
+- Contains: Three command definitions with YAML frontmatter (description, allowed-tools, argument-hint)
+- Key files: `map.md` (build service dependency graph), `cross-impact.md` (query impact of changes), `drift.md` (check cross-repo consistency)
 
-**`plugins/ligamen/hooks/`:**
-- Purpose: Claude Code hook configuration (JSON)
-- Contains: PostToolUse, PreToolUse, SessionStart event handlers with matchers
-- Key files: `hooks.json`
+**`plugins/ligamen/worker/`:**
+- Purpose: Node.js background worker -- HTTP API, MCP server, database, scan orchestration, UI
+- Contains: ES module JavaScript files organized by subsystem
+- Key files: `index.js` (daemon entry point), `db/query-engine.js` (core query layer, 52K)
+
+**`plugins/ligamen/worker/db/`:**
+- Purpose: SQLite database lifecycle, connection pooling, and query engine
+- Contains: database.js (open/create/migrate/snapshot), pool.js (per-project cache), query-engine.js (full query API), migrations/ (9 migration files)
+- Key files: `query-engine.js` is the single largest file (~52KB) -- all read/write operations for the service map
+
+**`plugins/ligamen/worker/db/migrations/`:**
+- Purpose: Incremental SQLite schema evolution
+- Contains: 9 migration files (001-009), each exporting `version` (number) and `up(db)` function
+- Key files: `001_initial_schema.js` (repos, services, connections, schemas, fields, map_versions, repo_state, FTS5 tables), `008_actors_metadata.js` (actors, actor_connections, node_metadata), `009_confidence_enrichment.js`
+
+**`plugins/ligamen/worker/server/`:**
+- Purpose: HTTP REST API and ChromaDB integration
+- Contains: http.js (Fastify server with routes), chroma.js (optional vector search sync)
+- Key files: `http.js` (all REST endpoints), `chroma.js` (fire-and-forget sync, semantic search)
+
+**`plugins/ligamen/worker/mcp/`:**
+- Purpose: MCP (Model Context Protocol) stdio server for Claude Code tool integration
+- Contains: server.js (tool definitions, query functions)
+- Key files: `server.js` (~55KB) -- defines MCP tools: impact, search, changed, scan; includes pure query functions (`queryImpact`, `queryChanged`)
+
+**`plugins/ligamen/worker/scan/`:**
+- Purpose: Agent-based repo scanning, findings parsing, user confirmation, enrichment
+- Contains: manager.js (orchestration), findings.js (validation), discovery.js (repo detection), confirmation.js (UX flow), enrichment.js (framework), codeowners.js, enrichment/ (extractors), agent-prompt-*.md (templates)
+- Key files: `manager.js` (~30KB, scan lifecycle), `findings.js` (schema enforcement), `agent-prompt-common.md` (shared rules for all agent types)
+
+**`plugins/ligamen/worker/ui/`:**
+- Purpose: Browser-based service dependency graph visualization (vanilla JS, no build step)
+- Contains: index.html, graph.js (entry point), force-worker.js (web worker), modules/ (18 files)
+- Key files: `graph.js` (orchestrates project selection, data loading, rendering), `modules/renderer.js` (canvas-based graph drawing), `modules/layout.js` (force-directed layout computation)
+
+**`plugins/ligamen/worker/ui/modules/`:**
+- Purpose: Modular UI components for the graph viewer
+- Contains: state.js, renderer.js, layout.js, interactions.js, detail-panel.js, filter-panel.js, log-terminal.js, project-picker.js, project-switcher.js, keyboard.js, export.js, utils.js
+- Key files: `renderer.js` (canvas drawing), `detail-panel.js` (service detail sidebar), `layout.js` (force simulation)
+
+**`tests/`:**
+- Purpose: All test suites -- shell (bats), Node.js (node:test), UI module tests
+- Contains: 16 .bats files for bash scripts, storage/ for DB tests, ui/ for UI module tests, worker/ for worker tests
+- Key files: See TESTING.md for detailed patterns
 
 ## Key File Locations
 
 **Entry Points:**
-- `plugins/ligamen/worker/index.js`: HTTP worker daemon entry (spawned by `worker-start.sh`)
-- `plugins/ligamen/worker/mcp/server.js`: MCP server entry (spawned by `mcp-wrapper.sh`)
-- `plugins/ligamen/worker/ui/index.html`: Graph UI (served at `http://localhost:37888`)
-- `plugins/ligamen/scripts/worker-start.sh`: Start worker daemon (called by session-start hook)
-- `plugins/ligamen/scripts/mcp-wrapper.sh`: Start MCP server (referenced in `.mcp.json`)
+- `plugins/ligamen/worker/index.js`: Worker daemon bootstrap (spawned by worker-start.sh)
+- `plugins/ligamen/worker/mcp/server.js`: MCP stdio server (exec'd by mcp-wrapper.sh)
+- `plugins/ligamen/worker/ui/graph.js`: Browser UI entry point (loaded by index.html)
+- `plugins/ligamen/scripts/session-start.sh`: First code to run on every Claude Code session
 
 **Configuration:**
-- `plugins/ligamen/package.json`: Node dependencies and scripts
-- `plugins/ligamen/.mcp.json`: MCP server config (stdio transport to `worker/mcp/server.js`)
-- `plugins/ligamen/hooks/hooks.json`: Claude Code hook event handlers
-- `plugins/ligamen/.claude-plugin/plugin.json`: Plugin metadata
+- `plugins/ligamen/hooks/hooks.json`: Hook event bindings (PostToolUse, PreToolUse, SessionStart, UserPromptSubmit)
+- `plugins/ligamen/.claude-plugin/plugin.json`: Plugin metadata (name, version)
+- `plugins/ligamen/.mcp.json`: MCP server declaration (stdio transport)
+- `plugins/ligamen/package.json`: npm manifest with dependencies and version
+- `plugins/ligamen/runtime-deps.json`: Separate manifest for MCP runtime dep installation
+- `ligamen.config.json`: Project-level config (linked-repos, project-name)
+- `.claude-plugin/marketplace.json`: Root marketplace registration
 
 **Core Logic:**
-- `plugins/ligamen/worker/db/query-engine.js`: Graph algorithms (transitive impact, search), prepared statement cache, upsert methods
-- `plugins/ligamen/worker/scan/manager.js`: Scan orchestration, agent invocation, enrichment pipeline
-- `plugins/ligamen/worker/server/http.js`: REST API routes (/graph, /projects, /search, /readiness)
-- `plugins/ligamen/worker/mcp/server.js`: MCP tool definitions (impact_query, impact_search, drift_versions, etc.)
+- `plugins/ligamen/worker/db/query-engine.js`: All read/write queries against the service map (~52KB)
+- `plugins/ligamen/worker/scan/manager.js`: Scan orchestration -- mode detection, agent invocation, finding persistence (~30KB)
+- `plugins/ligamen/worker/mcp/server.js`: MCP tool definitions and query functions (~55KB)
+- `plugins/ligamen/worker/server/http.js`: REST API routes (~10KB)
+- `plugins/ligamen/worker/db/database.js`: Database lifecycle -- open, migrate, snapshot (~11KB)
+- `plugins/ligamen/worker/db/pool.js`: Per-project DB pool and resolution (~8KB)
+- `plugins/ligamen/scripts/file-guard.sh`: File protection rules (~7KB)
+- `plugins/ligamen/scripts/lint.sh`: Multi-language lint hook (~7KB)
 
 **Testing:**
-- `plugins/ligamen/worker/**/*.test.js`: Test files co-located with source (using Node.js test runner)
-- `tests/bats/`: Bash testing for shell scripts
-- `tests/ui/`: UI integration tests
+- `tests/*.bats`: Shell script tests (bats framework)
+- `plugins/ligamen/worker/db/*.test.js`: Database and query engine tests (co-located)
+- `plugins/ligamen/worker/scan/*.test.js`: Scan module tests (co-located)
+- `plugins/ligamen/worker/server/*.test.js`: HTTP server tests (co-located)
+- `plugins/ligamen/worker/mcp/*.test.js`: MCP server tests (co-located)
+- `plugins/ligamen/worker/ui/modules/*.test.js`: UI module tests (co-located)
+- `tests/storage/`: Additional storage/query-engine integration tests
 
 ## Naming Conventions
 
 **Files:**
-- `.js` files use camelCase: `queryEngine.js`, `forceWorker.js`, `detailPanel.js`
-- Migrations use zero-padded numbers: `001_initial_schema.js`, `009_confidence_enrichment.js`
-- Test files suffix with `.test.js`: `query-engine.test.js`, `state.test.js`
-- Scripts are kebab-case: `worker-start.sh`, `file-guard.sh`, `drift-types.sh`
-- Shell utilities in `lib/` are kebab-case: `worker-client.sh`, `linked-repos.sh`
+- Bash scripts: `kebab-case.sh` (e.g., `file-guard.sh`, `worker-start.sh`, `drift-versions.sh`)
+- Bash libraries: `kebab-case.sh` (e.g., `config.sh`, `linked-repos.sh`)
+- Node.js modules: `kebab-case.js` (e.g., `query-engine.js`, `auth-db-extractor.js`)
+- Node.js tests: `kebab-case.test.js` co-located with source (e.g., `query-engine-upsert.test.js`)
+- Migrations: `NNN_snake_case.js` (e.g., `001_initial_schema.js`, `009_confidence_enrichment.js`)
+- Command prompts: `kebab-case.md` (e.g., `cross-impact.md`, `map.md`)
+- Agent prompts: `agent-prompt-{type}.md` (e.g., `agent-prompt-service.md`, `agent-prompt-infra.md`)
+- Bats tests: `kebab-case.bats` (e.g., `file-guard.bats`, `session-start.bats`)
 
 **Directories:**
-- camelCase for feature areas: `queryEngine/`, `server/`, `scan/`
-- lowercase for plural collections: `migrations/`, `modules/`, `enrichment/`
+- All lowercase, hyphen-separated: `worker/`, `scan/`, `ui/`, `db/`, `mcp/`, `server/`
+- Plural for collections: `commands/`, `scripts/`, `hooks/`, `migrations/`, `modules/`, `skills/`
 
-**Functions:**
-- camelCase: `getQueryEngine()`, `createHttpServer()`, `impactQuery()`, `runEnrichmentPass()`
-- Prefix functions with verb: `get*`, `create*`, `run*`, `parse*`, `validate*`, `register*`
-
-**Classes:**
-- PascalCase: `QueryEngine`, `StmtCache`, `McpServer`
-
-**Constants:**
-- UPPER_SNAKE_CASE: `MAX_TRANSITIVE_DEPTH`, `QUERY_TIMEOUT_MS`, `VALID_PROTOCOLS`
+**Exports:**
+- Functions: camelCase (e.g., `getQueryEngine`, `parseAgentOutput`, `runEnrichmentPass`)
+- Classes: PascalCase (e.g., `QueryEngine`, `StmtCache`)
+- Constants: UPPER_SNAKE_CASE (e.g., `VALID_PROTOCOLS`, `MAX_LOW_CONFIDENCE`, `NEEDS_REPROMPT`)
 
 ## Where to Add New Code
 
-**New Feature (e.g., new graph query type):**
-- Primary code: `plugins/ligamen/worker/db/query-engine.js` — add method like `getMetrics()` or `getConnectivityMatrix()`
-- Tests: `plugins/ligamen/worker/db/query-engine.test.js` — test the new method with fixtures
-- HTTP route: `plugins/ligamen/worker/server/http.js` — add GET/POST handler that calls the query engine method
-- MCP tool (optional): `plugins/ligamen/worker/mcp/server.js` — expose as MCP tool if useful for agents
+**New Hook Script:**
+- Place the executable bash script in `plugins/ligamen/scripts/`
+- Register it in `plugins/ligamen/hooks/hooks.json` under the appropriate event (PostToolUse, PreToolUse, SessionStart, UserPromptSubmit) with a matcher regex and timeout
+- Follow the pattern: read stdin JSON, extract fields with jq, output JSON to stdout, always exit 0 (except hard blocks)
+- Add bats tests in `tests/{script-name}.bats`
 
-**New UI Module (e.g., side panel, overlay):**
-- Implementation: `plugins/ligamen/worker/ui/modules/<feature-name>.js` — export initialization function
-- Tests: `plugins/ligamen/worker/ui/modules/<feature-name>.test.js` — unit tests using jsdom
-- Integration: `plugins/ligamen/worker/ui/graph.js` — call initialization in main flow
-- Styling: Inline `<style>` block in `plugins/ligamen/worker/ui/index.html`
+**New Slash Command:**
+- Create a markdown file in `plugins/ligamen/commands/`
+- Include YAML frontmatter with `description`, `allowed-tools`, and `argument-hint`
+- The command name derives from the filename: `foo-bar.md` becomes `/ligamen:foo-bar`
 
-**New Enricher (post-scan processor):**
-- Implementation: `plugins/ligamen/worker/scan/enrichment/<enricher-name>.js` — export factory function like `createFooEnricher()`
-- Tests: Same directory with `.test.js` suffix
-- Registration: `plugins/ligamen/worker/scan/manager.js` — call `registerEnricher("foo-name", createFooEnricher())`
+**New Database Migration:**
+- Create `plugins/ligamen/worker/db/migrations/0NN_description.js`
+- Export `version` (integer, next in sequence) and `up(db)` function
+- Use `IF NOT EXISTS` for idempotency
+- Add tests as `plugins/ligamen/worker/db/migration-0NN.test.js`
 
-**New Drift Type (version/schema/API check):**
-- Implementation: `plugins/ligamen/scripts/drift-<type>.sh` — executable bash script
-- Shared utilities: Add to `plugins/ligamen/scripts/drift-common.sh` if reusable
-- Command descriptor: `plugins/ligamen/commands/drift.md` — update usage examples
+**New Worker REST Endpoint:**
+- Add the route in `plugins/ligamen/worker/server/http.js` inside `createHttpServer()`
+- Use `getQE(request)` to resolve the per-request QueryEngine
+- Follow the pattern: try/catch with 500 error response, httpLog for errors
+- Add tests in `plugins/ligamen/worker/server/http.test.js`
 
-**Utilities & Helpers:**
-- Shared JS: `plugins/ligamen/worker/lib/` — general-purpose helpers
-- Shared Bash: `plugins/ligamen/lib/` — shell utilities (config, worker-client, etc.)
+**New MCP Tool:**
+- Add the tool definition in `plugins/ligamen/worker/mcp/server.js`
+- Use Zod for input schema validation
+- Use `resolveDb(project)` to get the QueryEngine
+- Add tests in `plugins/ligamen/worker/mcp/server.test.js`
+
+**New Scan Enricher:**
+- Create the enricher function (receives `ctx` with serviceId, repoPath, db, logger)
+- Register it in `plugins/ligamen/worker/scan/manager.js` via `registerEnricher(name, fn)`
+- Enricher writes to `node_metadata` table with `view='enrichment'`
+- Return `Record<string, string|null>` of key-value pairs
+- Add tests alongside the enricher file
+
+**New UI Module:**
+- Create the module in `plugins/ligamen/worker/ui/modules/`
+- Import and wire it in `plugins/ligamen/worker/ui/graph.js`
+- Co-locate tests as `{module-name}.test.js` in the same directory
+- No build step -- vanilla ES modules loaded directly by the browser
+
+**New Shared Bash Library:**
+- Place in `plugins/ligamen/lib/`
+- Include the source guard: `[[ "${BASH_SOURCE[0]}" != "${0}" ]] || { echo "Source this file" >&2; exit 1; }`
+- Use a double-source guard variable pattern (see `config.sh`)
+- Source from scripts via `source "${CLAUDE_PLUGIN_ROOT}/lib/{name}.sh"`
 
 ## Special Directories
 
+**`~/.ligamen/` (Runtime Data -- NOT in repo):**
+- Purpose: Machine-wide runtime data directory for the worker daemon
+- Contains: `worker.pid`, `worker.port`, `settings.json`, `logs/worker.log`, `projects/<hash>/impact-map.db`
+- Generated: Yes (created by worker and scripts at runtime)
+- Committed: No (lives outside the repo on the user's machine)
+
+**`tests/bats/` (Git Submodule):**
+- Purpose: Bats testing framework
+- Contains: Bats core framework files
+- Generated: No (git submodule)
+- Committed: Yes (via .gitmodules)
+
+**`node_modules/` (Root):**
+- Purpose: Root-level development dependencies
+- Generated: Yes
+- Committed: No (.gitignore)
+
+**`plugins/ligamen/node_modules/`:**
+- Purpose: Plugin runtime dependencies (better-sqlite3, fastify, chromadb, MCP SDK, zod)
+- Generated: Yes (installed by install-deps.sh or mcp-wrapper.sh)
+- Committed: No (.gitignore)
+
+**`.planning/`:**
+- Purpose: GSD planning and codebase analysis documents
+- Generated: Yes (by GSD mapping commands)
+- Committed: Yes
+
 **`plugins/ligamen/worker/db/migrations/`:**
-- Purpose: Database versioning and schema evolution
-- Generated: No (manually written)
+- Purpose: SQLite schema migration files -- append-only, never modify existing migrations
+- Generated: No (hand-written)
 - Committed: Yes
-- Pattern: Sequential numbered files (001-009), each exports `version` number and `up(db)` function
-- Used: Loaded via top-level await in `database.js`, executed on DB open if version exceeds current schema_version
-
-**`plugins/ligamen/worker/ui/modules/`:**
-- Purpose: Feature modules for graph UI (logically separated concerns)
-- Generated: No
-- Committed: Yes
-- Pattern: Each module exports initialization functions, manages its own DOM state
-- Usage: Imported by `graph.js`, called in initialization sequence
-
-**`.planning/codebase/`:**
-- Purpose: Codebase documentation for GSD orchestrator
-- Generated: Yes (by GSD mapper agent)
-- Committed: Yes (checked in for reference)
-- Pattern: ARCHITECTURE.md, STRUCTURE.md, STACK.md, INTEGRATIONS.md, CONVENTIONS.md, TESTING.md, CONCERNS.md
-
-**`~/.ligamen/` (external data directory):**
-- Purpose: User data (databases, logs, settings)
-- Generated: Yes (at runtime)
-- Committed: No
-- Layout: `~/.ligamen/projects/<hash12>/impact-map.db`, `~/.ligamen/logs/worker.log`, `~/.ligamen/settings.json`, `~/.ligamen/worker.pid`, `~/.ligamen/worker.port`
 
 ---
 
-*Structure analysis: 2026-03-23*
+*Structure analysis: 2026-03-31*

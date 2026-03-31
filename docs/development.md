@@ -1,6 +1,6 @@
 # Development
 
-> **Audience:** Contributors to the Ligamen codebase. If you just want to use Ligamen, see [Commands](commands.md).
+> **Audience:** Contributors to the Arcanon codebase. If you just want to use Arcanon, see [Commands](commands.md).
 
 ## Prerequisites
 
@@ -11,8 +11,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/chilleregeravi/ligamen.git
-cd ligamen
+git clone https://github.com/chilleregeravi/arcanon.git
+cd arcanon
 git submodule update --init --recursive
 npm install
 ```
@@ -41,7 +41,7 @@ npm run test:storage         # query engine unit tests (node:test)
 ## Quick Test (no install)
 
 ```bash
-claude --plugin-dir /path/to/ligamen
+claude --plugin-dir /path/to/arcanon
 ```
 
 ## Quality Gate
@@ -52,4 +52,4 @@ Run all checks before committing:
 make lint && make check && make test
 ```
 
-Or use Ligamen itself: `/ligamen:quality-gate`
+Or use Arcanon itself: `/arcanon:quality-gate`

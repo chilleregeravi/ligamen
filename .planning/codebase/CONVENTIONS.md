@@ -1,182 +1,310 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-03-23
+**Analysis Date:** 2026-03-31
+
+## Languages
+
+**Dual-language codebase:**
+- **Bash** (`.sh`) -- Hook scripts, utility libraries, session lifecycle (`plugins/ligamen/scripts/`, `plugins/ligamen/lib/`)
+- **JavaScript** (ESM `.js`) -- Worker process, MCP server, query engine, UI modules (`plugins/ligamen/worker/`)
+
+All JavaScript uses **ES Modules** (`"type": "module"` in `plugins/ligamen/package.json`). Use `import`/`export`, never `require()`.
 
 ## Naming Patterns
 
 **Files:**
-- All lowercase with hyphens for multi-word names: `query-engine.js`, `auth-db-extractor.js`
-- Test files use `.test.js` suffix (not `.spec.js`): `manager.test.js`, `http.test.js`
-- Shell scripts use `.sh` extension: `config.sh`, `detect.sh`
+- Shell scripts: `kebab-case.sh` (e.g., `plugins/ligamen/scripts/file-guard.sh`, `plugins/ligamen/scripts/drift-versions.sh`)
+- Shell libraries: `kebab-case.sh` in `plugins/ligamen/lib/` (e.g., `lib/detect.sh`, `lib/config.sh`, `lib/linked-repos.sh`)
+- JavaScript modules: `kebab-case.js` (e.g., `worker/db/query-engine.js`, `worker/scan/manager.js`, `worker/lib/logger.js`)
+- JavaScript tests: `{module-name}.test.js` co-located with source (e.g., `worker/db/query-engine-enrich.test.js`)
+- Bats tests: `kebab-case.bats` in `tests/` (e.g., `tests/detect.bats`, `tests/file-guard.bats`)
+- Migration files: `NNN_snake_case.js` (e.g., `worker/db/migrations/001_initial_schema.js`, `worker/db/migrations/009_confidence_enrichment.js`)
+- Command definitions: `kebab-case.md` (e.g., `plugins/ligamen/commands/cross-impact.md`, `plugins/ligamen/commands/drift.md`, `plugins/ligamen/commands/map.md`)
 
-**Functions:**
-- camelCase for all functions: `createHttpServer`, `getChangedFiles`, `buildScanContext`, `sanitizeBindings`
-- Private/internal functions prefix with underscore: `_hasServiceEntryPoint`, `_sortServicesForBoundaries`, `_onConnTargetClick`
-- Higher-order functions (factories, setup) use verb-noun pattern: `createHttpServer`, `makeServer`, `createLogger`
+**Functions (JavaScript):**
+- Use `camelCase` for all functions: `createHttpServer()`, `getChangedFiles()`, `buildScanContext()`, `sanitizeBindings()`
+- Factory functions: `create*` prefix: `createLogger()`, `createHttpServer()`, `createCodeownersEnricher()`
+- Setter injections: `set*` prefix: `setScanLogger()`, `setAgentRunner()`, `setExtractorLogger()`
+- Boolean checks: `is*` prefix: `isChromaAvailable()`, `isViewOnlyMode()`
+- Private/internal functions: `_` prefix: `_hasServiceEntryPoint()`, `_sortServicesForBoundaries()`
 
-**Variables:**
-- camelCase for all variables: `queryEngine`, `repoPath`, `graphData`, `activeProtocols`
-- Constants in camelCase (not UPPER_CASE): `NODE_RADIUS`, `LABEL_MAX_CHARS`, `COLORS`, `PROTOCOL_COLORS`
-- State object properties use camelCase: `graphData`, `selectedNodeId`, `blastNodeId`, `isDragging`
-- Temporary/loop variables: standard short names (`i`, `col`, `row`, `dir`, `file`)
+**Functions (Bash):**
+- Use `snake_case`: `detect_project_type()`, `detect_language()`, `block_file()`, `warn_file()`
 
-**Types:**
-- JSDoc typedef declarations for complex types: `@typedef {{ name: string, root_path: string, ... }} Service`
-- Type references in JSDoc: `@type {Object}`, `@type {number|null}`, `@type {Set<number>}`
+**Variables (JavaScript):**
+- Constants: `UPPER_SNAKE_CASE` (e.g., `MAX_LOG_BYTES`, `VALID_PROTOCOLS`, `VALID_CONFIDENCE`, `NODE_RADIUS`, `MAX_TRANSITIVE_DEPTH`, `QUERY_TIMEOUT_MS`)
+- Module-level private state: `_` prefix (e.g., `_logger`, `_capacity`, `_cache`, `_mcpLogLevel`)
+- Local variables: `camelCase` (e.g., `logPath`, `lineObj`, `repoState`, `projectRoot`, `scanVersionId`)
+- State object properties: `camelCase` (e.g., `graphData`, `selectedNodeId`, `blastNodeId`)
+
+**Variables (Bash):**
+- Environment variables: `UPPER_SNAKE_CASE` with `LIGAMEN_` prefix (e.g., `LIGAMEN_DISABLE_LINT`, `LIGAMEN_CONFIG_FILE`, `LIGAMEN_LINT_THROTTLE`)
+- Local script variables: `UPPER_SNAKE_CASE` (e.g., `FILE`, `LINT_OUTPUT`, `LINTER_NAME`)
+- Private/guard variables: `_` prefix (e.g., `_LIGAMEN_CONFIG_LOADED`, `_linked_repo_path`, `_extra_patterns`)
+
+**Types/Classes:**
+- `PascalCase`: `QueryEngine`, `StmtCache`
 
 **Database/Schema:**
-- snake_case for SQL column names: `source_service_id`, `target_service_id`, `root_path`, `auth_mechanism`
-- camelCase for JavaScript object properties mapping from DB: `sourceName`, `targetName`, `confidence`
+- `snake_case` for SQL column names: `source_service_id`, `target_service_id`, `root_path`, `auth_mechanism`, `scan_version_id`
+- Foreign keys named `{entity}_id`: `repo_id`, `actor_id`, `service_id`
+
+**Environment Variables:**
+- All custom env vars use `LIGAMEN_` prefix
+- Disable toggles follow `LIGAMEN_DISABLE_{FEATURE}=1` pattern: `LIGAMEN_DISABLE_FORMAT`, `LIGAMEN_DISABLE_LINT`, `LIGAMEN_DISABLE_GUARD`
+- Configuration overrides: `LIGAMEN_LINT_THROTTLE`, `LIGAMEN_DATA_DIR`, `LIGAMEN_LOG_LEVEL`, `LIGAMEN_WORKER_PORT`
+- Extra patterns: `LIGAMEN_EXTRA_BLOCKED` (colon-separated glob patterns)
 
 ## Code Style
 
 **Formatting:**
-- No explicit formatter configured (no .eslintrc, .prettierrc found)
-- Consistent 2-space indentation observed throughout
-- Lines generally under 100 characters (observed in http.js, layout.js, detail-panel.js)
-- No semicolons policy observed in many files
+- The `plugins/ligamen/scripts/format.sh` hook auto-formats on every file write via PostToolUse
+- JavaScript/TypeScript: prettier (preferred) or eslint --fix
+- Python: ruff format (preferred) or black
+- Rust: rustfmt
+- Go: gofmt
+- JSON/YAML: prettier
+- Format hook always exits 0 (non-blocking) per FMTH-10 convention
+- No project-level `.eslintrc` or `.prettierrc` config files (formatting delegated to hook + tool defaults)
 
 **Linting:**
-- No ESLint or Prettier config files detected
-- Code follows implicit conventions only (consistency via team practice)
+- The `plugins/ligamen/scripts/lint.sh` hook runs language-specific linters on PostToolUse
+- JavaScript/TypeScript: eslint (local resolution preferred: `node_modules/.bin/eslint`)
+- Python: ruff check
+- Rust: cargo clippy (with configurable throttle, default 30 seconds per project)
+- Go: golangci-lint
+- Shell scripts: shellcheck (run via `make lint` with `-x -e SC1091` flags)
+- Lint hook always exits 0 per LNTH-07 convention; output truncated to 30 lines per LNTH-06
+
+**Indentation:**
+- JavaScript: 2 spaces
+- Shell: 2 spaces
+- SQL in JavaScript: 2 spaces inside template literals, indented relative to surrounding code
+
+**String Quoting (JavaScript):**
+- Double quotes for strings consistently: `"node:test"`, `"INFO"`, `"rest"`
+- Template literals for interpolation: `` `received ${signal}, shutting down` ``
+- Trailing commas in multi-line function arguments and object literals
+
+**Module System:**
+- ES modules exclusively (`"type": "module"` in `plugins/ligamen/package.json`)
+- All imports include `.js` extension (required for ESM resolution)
+- Use `node:` protocol prefix for built-in modules: `"node:fs"`, `"node:path"`, `"node:os"`, `"node:test"`, `"node:assert/strict"`
 
 ## Import Organization
 
-**Order:**
-1. Node.js builtins: `import { test } from "node:test"`, `import fs from "node:fs"`
-2. Third-party packages: `import Database from "better-sqlite3"`, `import { z } from "zod"`
-3. Relative imports: `import { state } from "./state.js"`, `import { getQueryEngine } from "../db/pool.js"`
+**Order (JavaScript ES modules):**
+1. Node.js builtins with `node:` protocol prefix (e.g., `import fs from "node:fs"`, `import path from "node:path"`)
+2. Third-party packages (e.g., `import Database from "better-sqlite3"`, `import Fastify from "fastify"`)
+3. Local project imports using relative paths (e.g., `import { QueryEngine } from "./query-engine.js"`)
 
 **Path Aliases:**
-- No path aliases detected (`tsconfig.json`, path mappings not used)
-- Relative imports use explicit `../` or `./`: `../db/pool.js`, `./modules/state.js`
+- None. All imports use relative paths with explicit `.js` extensions.
 
-**File extensions:**
-- All imports include `.js` extension (required for ES modules): `import { state } from "./state.js"`
+**Shell Sourcing:**
+- Guard against direct execution: `[[ "${BASH_SOURCE[0]}" != "${0}" ]] || { echo "Source this file; do not execute directly." >&2; exit 1; }`
+- Use `$CLAUDE_PLUGIN_ROOT` for cross-file references from hooks to lib
+- Source guard pattern to prevent double-loading: `_LIGAMEN_CONFIG_LOADED` variable
+- Use `source` (not `.`) for clarity
 
 ## Error Handling
 
-**Patterns:**
-- Throw Error for programmer errors: `throw new Error("agentRunner not initialized — call setAgentRunner first")`
-- Throw descriptive error messages with context: `throw new Error("Scan already in progress for this project (PID ${lock.pid}, started ${lock.startedAt})")`
-- Catch and log errors, then re-throw or handle gracefully:
+**JavaScript Patterns:**
+- Try/catch with empty catch for optional operations (settings not available, file not found):
   ```javascript
-  try {
-    const result = await chromaSearch(query, limit);
-  } catch (err) {
-    process.stderr.write("[search] chroma failed: " + err.message + "\n");
-    // fall back to next tier
+  try { /* operation */ } catch { /* File does not exist yet -- use defaults */ }
+  ```
+- Functions return `null` or empty arrays on failure, not exceptions:
+  ```javascript
+  export function getQueryEngine(projectRoot) {
+    if (!projectRoot) return null;
+    // ...
+    if (!fs.existsSync(dbPath)) return null;
   }
   ```
-- Lock files validated with try-catch on JSON parse, corrupted locks removed silently
+- Validation functions return result objects: `{ valid: true, findings, warnings }` or `{ valid: false, error }`
+- Database operations use transactions for atomicity: `db.transaction(() => { ... })()`
+- Throw `Error` for programmer errors only: `throw new Error("agentRunner not initialized")`
+- Lock files validated with try-catch on JSON parse; corrupted locks removed silently
 
-**Assertions:**
-- Node.js strict assertions used in tests: `import assert from "node:assert/strict"`
-- `assert.equal()`, `assert.ok()`, `assert.strictEqual()` for test verification
-- No assertion library (no chai, no jest expect)
+**HTTP Error Responses:**
+- Structured `{ error: message }` JSON with appropriate status codes
+- 400 for missing/invalid parameters
+- 404 for not-found resources
+- 500 for internal errors (log error, return `{ error: err.message }`)
+- 503 for "data not yet available" (e.g., no scan data)
+
+**Shell Patterns:**
+- `set -euo pipefail` at top of executable scripts (not sourced libraries)
+- Sourced libraries intentionally omit `set -e`: "sourcing context owns error handling"
+- `|| true` suffix for non-critical commands that might fail
+- Exit code conventions: 0 = success/allow, 2 = hard block (PreToolUse deny)
+- `2>/dev/null` redirects for optional command checks
+
+**Hook Error Handling:**
+- Format hook: always exits 0 (non-blocking, FMTH-10)
+- Lint hook: always exits 0 (LNTH-07), lint output delivered as systemMessage JSON
+- File guard: exits 0 for allow/warn, exits 2 for hard block with hookSpecificOutput JSON
+- Example safe format call: `ruff format "$FILE" >/dev/null 2>&1 || true`
 
 ## Logging
 
-**Framework:**
-- Structured logger with `createLogger()` in `worker/lib/logger.js`
-- Logger signature: `{ log(level, msg, extra = {}) }`
-- Log levels: `INFO`, `WARN`, `ERROR`, `DEBUG`
+**Framework:** Custom structured logger at `plugins/ligamen/worker/lib/logger.js`
 
 **Patterns:**
-- Scan lifecycle events logged with context: `slog('INFO', 'scan started', { repoPath, mode: ctx.mode })`
-- HTTP layer logs: `httpLog('ERROR', err.message, { route: '/projects', stack: err.stack })`
-- Silent no-op when logger not injected: `if (_logger) _logger.log(...)`
-- Structured data as third parameter: `log(level, msg, { component: 'http', extra: {} })`
+- JSON-structured log lines written to `{dataDir}/logs/worker.log`
+- Each line contains: `ts`, `level`, `msg`, `pid`, `port` (optional), `component`
+- Four log levels: `DEBUG < INFO < WARN < ERROR`
+- Log level filtering at creation time via `logLevel` parameter (default: `"INFO"`)
+- Extra fields merged via `Object.assign(lineObj, extra)` pattern
+- Size-based rotation at 10 MB threshold, keeping at most 3 rotated files (.1, .2, .3)
+- TTY-aware: writes to stderr only when `process.stderr.isTTY` is truthy
+- Component tag pattern: each module gets its own component (e.g., `'worker'`, `'http'`, `'scan'`, `'mcp'`)
 
-**Stderr/stdout:**
-- Direct `process.stderr.write()` for search tier fallback logging
-- JSON log lines (one per line) written to `logs/worker.log`
+**Logger Usage:**
+```javascript
+const logger = createLogger({ dataDir, port, logLevel, component: 'worker' });
+logger.log("INFO", "worker started", { port });
+logger.info("ChromaDB connected");
+logger.error("query failed", { route: '/graph', stack: err.stack });
+```
+
+**Logger Injection:**
+- Setter functions: `setScanLogger(logger)`, `setExtractorLogger(logger)`
+- Silent no-op when logger not injected: `if (_logger) _logger.log(...)`
+
+**Shell Logging:**
+- Stderr for warnings/errors: `echo "message" >&2`
+- Stdout reserved for machine-readable JSON output (especially in hook scripts)
+
+**Critical Rule:** Never use `console.log` in MCP server code (`plugins/ligamen/worker/mcp/server.js`). The lint hook enforces this -- `console.log` in the MCP server corrupts the JSON-RPC session. Use `console.error()` for MCP server debugging.
 
 ## Comments
 
-**When to Comment:**
-- Block comments for major sections (with visual separators): `// ───────────────────────────────────`
-- Inline comments for non-obvious logic, constraints, workarounds
-- Implementation notes from tickets/PRs: `// SREL-01`, `// OWN-01`, `// AUTHDB-02`
-- No comments on obvious code
+**Section Headers:**
+- Use `// ---------------------------------------------------------------------------` (75 dashes) separator lines in both JS and Bash
+- Number major sections: `// 1. Parse CLI args`, `// 2. Read settings.json`, etc.
+- Use `# -- Section Title ----...` for bash sub-sections
 
-**JSDoc/TSDoc:**
-- Full JSDoc for all exported functions with `@param`, `@returns`, `@throws`
-- Type annotations with `@type`, `@typedef` (zero TypeScript, pure JavaScript + JSDoc)
-- Example:
+**File-Level Documentation:**
+- Every JavaScript module starts with a JSDoc comment describing purpose, exports, and usage
+- Shell scripts include header comments with purpose, event triggers, and exit code contracts
+
+**Requirement Tags:**
+- Every test file starts with a comment block listing which requirements it covers
+- Use ticket-style tags: `TEST-01`, `FMTH-07`, `CONF-02`, `LNTH-06`, `GRDH-03`, etc.
+- Example: `# Covers: FMTH-07 (silent success), FMTH-09 (skip generated directories)`
+- Use inline tags for individual rules: `// SREL-01 (THE-933):`, `// OWN-01`
+
+**JSDoc:**
+- Full JSDoc for all exported functions with `@param`, `@returns`
+- Type annotations reference external types: `@param {import('better-sqlite3').Database} db`
+- `@typedef` for complex object shapes:
   ```javascript
-  /**
-   * Create and start a Fastify HTTP server exposing the query engine over REST.
-   *
-   * @param {object|null} queryEngine - Static query engine (for tests). Null in production.
-   * @param {object} options - Server options
-   * @param {number} [options.port=37888] - Port to bind
-   * @returns {Promise<FastifyInstance>}
-   */
-  export async function createHttpServer(queryEngine, options = {}) { ... }
+  /** @typedef {{ name: string, root_path: string, language: string, confidence: string }} Service */
   ```
-- Complex types documented with `@typedef`: `@typedef {{ id: number, name: string }} Service`
 
 ## Function Design
 
-**Size:**
-- Small functions preferred; largest observed is ~1700 lines but mostly test setup
-- Core logic functions typically 50-200 lines
-- Test helper functions 10-50 lines
+**Size:** Functions are focused and typically 10-50 lines. Core logic functions may be 50-200 lines.
 
 **Parameters:**
 - Positional params for required args, options object for optional config
 - Pattern: `function(required1, required2, options = {})`
-- Options destructured inside when needed: `const { limit = 20, skipChroma = false } = options`
+- Options destructured: `const { limit = 20, skipChroma = false } = options`
+- Query engine methods take plain objects: `upsertService({ repo_id, name, root_path, language })`
 
 **Return Values:**
-- Explicit returns with meaningful values (no silent undefined)
-- Objects with `{ valid: true, findings: ... }` or `{ valid: false, error: "..." }` for validation results
-- Generators and async functions used where appropriate: `async function scanRepos(...)`
-
-**Callbacks/Higher-order:**
-- Agent runner injected via `setAgentRunner(fn)` to decouple from MCP tools
-- Logger injected via `setScanLogger(logger)` for optional structured logging
-- Enrichers registered via `registerEnricher(name, fn)` for extensibility
+- Upsert methods return objects with `id` property: `upsertRepo() => { id }`
+- Query methods return arrays: `transitiveImpact() => [{ name, depth, ... }]`
+- Classification returns sorted arrays: `classifyImpact() => [{ severity, ... }]`
+- Search returns typed arrays: `search() => [{ kind, ... }]`
+- Validation: `{ valid: true, findings, warnings }` or `{ valid: false, error }`
+- Always return arrays (never null/undefined) for list operations -- use `[]` for empty
 
 ## Module Design
 
 **Exports:**
-- Named exports for all functions: `export function getQueryEngine(...)`
-- Named exports for constants: `export const NODE_RADIUS = 18`
-- No default exports observed
-- Module-level state in private variables: `let _logger = null`, `let _db = null`
+- Named exports only (`export function`, `export class`, `export const`)
+- No default exports
+- Test helpers exported with `_` prefix for testability: `export function _resetForTest()`
+- Migration modules export `version` (number) and `up(db)` function
 
 **Barrel Files:**
-- No index.js or barrel files detected
-- Direct imports from specific modules: `import { state } from "./modules/state.js"`
+- Not used. Each module is imported directly by path.
 
 **Singletons:**
-- Database instance cached in `_db` variable, returned via `getDb()` and `openDb()`
-- Logger instance injected, cached in `_logger`
-- Query engine instance per project in `pool.js` mapping
+- Database instance cached and returned via `openDb()` / `getDb()`
+- Logger instance injected via setter, cached in `_logger`
+- Query engine per project in `plugins/ligamen/worker/db/pool.js` Map
 
-## Transaction & Atomicity Patterns
+**Dependency Injection for Testability:**
+- `setAgentRunner(fn)` -- inject mock agent runner for scan tests
+- `setScanLogger(logger)` -- inject/suppress logging in tests
+- `_resetForTest()` -- reset module-level state between test runs
+- `initChromaSync(settings, mockClient)` -- accepts mock ChromaDB client
+- This pattern eliminates the need for mocking/stubbing libraries
 
-**Database Transactions:**
-- SQLite transactions wrapped via `db.transaction(() => { ... })()`
-- Used for atomic multi-statement operations: migrations, scan writes
-- Example: `db.transaction(() => { migration.up(db); db.prepare(...).run(...); })()`
+## Commit Message Conventions
 
-**Lock Management:**
-- File-based locks for scan coordination: `./ligamen-lock-{hash}.json`
-- Lock contains `{ pid, startedAt }`
-- Stale lock detection (PID gone → remove and retry)
-- Error thrown if lock held by active process
+**Format:** Conventional Commits with scope
+- `feat(scope): description` for new features
+- `fix: description` for bug fixes
+- `chore: description` for maintenance tasks, version bumps
+- `docs(scope): description` for documentation
+- `refactor: description` for code restructuring
 
-## Testing Patterns (related to conventions)
+**Scope patterns:**
+- Phase number: `feat(89-01):`, `docs(phase-91):`
+- Phase sub-plan: `docs(89-01/02):`
+- Feature area: `docs(89-crossing-semantics):`
 
-**Module injection for testability:**
-- `setAgentRunner(fn)` allows tests to inject mock agent
-- `setScanLogger(logger)` allows tests to suppress logging
-- `setSearchDb(db)` for standalone search tests
-- This pattern reduces need for mocking/stubbing libraries
+**Message style:**
+- Lowercase after prefix
+- Imperative mood: "add", "fix", "complete", "create", "bump"
+- Optional em-dash for detail: `docs(89-01/02): complete crossing-semantics plans -- CROSS-01, CROSS-02`
+- Milestone bumps: `chore: bump all manifests to vX.Y.Z`
+- Milestone completion: `chore: complete vX.Y.Z {Milestone Name} milestone`
+
+## Shell Script Conventions
+
+**Shebang:** `#!/usr/bin/env bash` for all shell scripts
+
+**Header pattern for executable scripts:**
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+**Header pattern for sourced libraries:**
+```bash
+#!/usr/bin/env bash
+# No set -e here -- sourcing context owns error handling.
+```
+
+**JSON handling in hooks:**
+- Read stdin once: `INPUT=$(cat)`
+- Parse with jq using null-coalescing: `jq -r '.tool_input.file_path // empty'`
+- Emit JSON output via jq for safe escaping: `printf '%s' "$MSG" | jq -Rs .`
+- Hook output schemas:
+  - SystemMessage: `{"systemMessage": "..."}`
+  - PreToolUse deny: `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}`
+
+**macOS Compatibility:**
+- Avoid `mapfile` (not available in bash 3.2); use `while IFS= read -r` instead
+- Avoid GNU-specific flags (e.g., `realpath -m`); provide BSD fallbacks
+- Use `cksum` instead of `md5sum` for portability
+- Path normalization with BSD-compatible fallback (see `plugins/ligamen/scripts/file-guard.sh` lines 33-41)
+
+## JSON Configuration Convention
+
+**Config file:** `ligamen.config.json` in project root
+- Key naming: `kebab-case` for top-level keys: `"linked-repos"`, `"impact-map"`, `"project-name"`
+- Example: `{"linked-repos":["../api"],"impact-map":{"history":true},"project-name":"ligamen"}`
+
+**Settings file:** `~/.ligamen/settings.json` for user-level settings
+- Key naming: `LIGAMEN_UPPER_SNAKE_CASE` keys: `"LIGAMEN_LOG_LEVEL"`, `"LIGAMEN_WORKER_PORT"`, `"LIGAMEN_CHROMA_MODE"`
 
 ---
 
-*Convention analysis: 2026-03-23*
+*Convention analysis: 2026-03-31*
