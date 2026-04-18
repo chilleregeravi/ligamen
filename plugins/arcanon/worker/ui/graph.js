@@ -1,22 +1,49 @@
 /**
- * graph.js — Entry point for Ligamen service dependency graph UI.
+ * graph.js — Entry point for Arcanon service dependency graph UI.
  *
  * Orchestrates: project selection → data loading → force simulation → rendering.
  * All logic is in modules/ — this file is just the init flow.
  */
 
-import { state } from "./modules/state.js";
+import { state, refreshColors } from "./modules/state.js";
 import { render } from "./modules/renderer.js";
 import { computeLayout } from "./modules/layout.js";
 import { setupInteractions, teardownInteractions, setupControls } from "./modules/interactions.js";
 import { hideDetailPanel } from "./modules/detail-panel.js";
 import { showProjectPicker } from "./modules/project-picker.js";
 import { initLogTerminal } from "./modules/log-terminal.js";
-// Stub — will be implemented in Plan 02
 import { initProjectSwitcher } from "./modules/project-switcher.js";
 import { populateFilterDropdowns } from "./modules/filter-panel.js";
 import { initKeyboard } from "./modules/keyboard.js";
 import { initExport } from "./modules/export.js";
+import { toggleTheme } from "./styles/theme.js";
+import { renderSkeleton, renderEmpty, renderError, hideOverlay } from "./modules/graph-states.js";
+
+// Theme: read color tokens on first paint and whenever the theme changes.
+refreshColors();
+document.addEventListener("arcanon:theme", () => {
+  refreshColors();
+  // Trigger a re-render so the canvas picks up the new palette.
+  const canvas = document.getElementById("graph-canvas");
+  if (canvas && state.graphData.nodes.length > 0) render(canvas);
+});
+
+// Wire the theme toggle button once at module load.
+document.getElementById("theme-btn")?.addEventListener("click", toggleTheme);
+
+// Help modal — opened by the toolbar button or the "?" keyboard shortcut.
+const _helpModal = document.getElementById("help-modal");
+document.getElementById("help-btn")?.addEventListener("click", () => {
+  if (!_helpModal) return;
+  _helpModal.hidden = false;
+  _helpModal.querySelector("[data-autofocus]")?.focus();
+});
+_helpModal?.addEventListener("click", (e) => {
+  if (e.target instanceof HTMLElement && e.target.dataset.closeModal !== undefined) {
+    _helpModal.hidden = true;
+    document.getElementById("graph-canvas")?.focus();
+  }
+});
 
 // Guard: detail-close listener is wired once across multiple loadProject calls
 let _detailCloseWired = false;
@@ -35,22 +62,42 @@ export async function loadProject(hash, canvas) {
   const projectParam = `?hash=${encodeURIComponent(hash)}`;
   state.currentProject = hash;
 
+  // State machine entry: render the skeleton while we wait.
+  renderSkeleton();
+  const nodeInfo = document.getElementById("node-info");
+  if (nodeInfo) nodeInfo.textContent = "Loading…";
+
   // Load graph data
   let resp;
   try {
     resp = await fetch(`/graph${projectParam}`);
-  } catch {
-    document.getElementById("node-info").textContent = "Cannot reach server.";
+  } catch (err) {
+    renderError(err, () => loadProject(hash, canvas));
+    if (nodeInfo) nodeInfo.textContent = "Cannot reach server.";
     return;
   }
 
   if (!resp.ok) {
-    document.getElementById("node-info").textContent =
-      "No map data yet. Run /ligamen:map first.";
+    // Surface 4xx/5xx through the state machine with a retry button.
+    const err = new Error(`HTTP ${resp.status}`);
+    err.status = resp.status;
+    renderError(err, () => loadProject(hash, canvas));
+    if (nodeInfo) {
+      nodeInfo.textContent =
+        resp.status === 404
+          ? "No map data yet. Run /arcanon:map first."
+          : `Server returned ${resp.status}.`;
+    }
     return;
   }
 
   const raw = await resp.json();
+  if (!raw || !Array.isArray(raw.services) || raw.services.length === 0) {
+    renderEmpty("no-scan-yet");
+    if (nodeInfo) nodeInfo.textContent = "No services indexed yet.";
+    return;
+  }
+  hideOverlay();
   // Store latest scan version for "what changed" overlay (Phase 56)
   state.latestScanVersionId = raw.latest_scan_version_id ?? null;
 

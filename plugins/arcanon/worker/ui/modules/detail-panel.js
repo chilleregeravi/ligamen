@@ -111,7 +111,7 @@ export function showDetailPanel(node) {
   // Actor detail panel — different data shape from services
   if (node._isActor) {
     content.innerHTML = renderActorDetail(node);
-    panel.style.display = "block";
+    panel.style.display = "block"; panel.setAttribute("aria-hidden", "false");
     attachConnTargetListeners();
     return;
   }
@@ -164,7 +164,7 @@ export function showDetailPanel(node) {
   }
 
   content.innerHTML = html;
-  panel.style.display = "block";
+  panel.style.display = "block"; panel.setAttribute("aria-hidden", "false");
   attachConnTargetListeners();
 }
 
@@ -388,9 +388,23 @@ export function showBundlePanel(bundle) {
 
   html += `</div>`;
   content.innerHTML = html;
-  panel.style.display = "block";
+  panel.style.display = "block"; panel.setAttribute("aria-hidden", "false");
 }
 
 export function hideDetailPanel() {
-  document.getElementById("detail-panel").style.display = "none";
+  const panel = document.getElementById("detail-panel");
+  if (!panel) return;
+  panel.style.display = "none";
+  panel.setAttribute("aria-hidden", "true");
+}
+
+/**
+ * Compute the detail panel display mode given a viewport width.
+ * Pure function, used by tests; CSS media queries do the real layout work.
+ *
+ * @param {number} width  viewport width in CSS px
+ * @returns {"side" | "drawer"}
+ */
+export function panelModeForWidth(width) {
+  return typeof width === "number" && width <= 900 ? "drawer" : "side";
 }
