@@ -617,7 +617,7 @@ export class QueryEngine {
   /**
    * Inserts or replaces a repo row.
    * @param {{ path: string, name: string, type: string, last_commit?: string, scanned_at?: string }} repoData
-   * @returns {{id: number}} Returns an object — destructure with `const {id} = qe.upsertRepo(...)` or use `.id` directly. Do **not** pass the return value as a row id to other methods (#8).
+   * @returns {number} The repo row id. Pass it directly to beginScan / endScan.
    */
   upsertRepo(repoData) {
     this._stmtUpsertRepo.run({
@@ -628,7 +628,7 @@ export class QueryEngine {
     // lastInsertRowid is 0 when ON CONFLICT triggers an UPDATE (no insert).
     // Always query for the actual id by path to get the correct value.
     const row = this._db.prepare("SELECT id FROM repos WHERE path = ?").get(repoData.path);
-    return { id: row.id };
+    return row.id;
   }
 
   /**
@@ -755,13 +755,11 @@ export class QueryEngine {
    */
   beginScan(repoId) {
     // Pre-guard: better-sqlite3 throws "Too few parameter values were provided"
-    // when handed an undefined / non-integer bind value. Callers that misread
-    // upsertRepo's `{id: number}` return as a plain id used to land here with
-    // a confusing trace. Fail with a clear message instead. (#8)
+    // when handed an undefined / non-integer bind value. Catch it here with
+    // a clearer message. (#8)
     if (!Number.isInteger(repoId)) {
       throw new TypeError(
-        `beginScan: repoId must be an integer, got ${typeof repoId} (${JSON.stringify(repoId)}). ` +
-          `If you have an upsertRepo() result, pass the .id property: qe.beginScan(repo.id).`,
+        `beginScan: repoId must be an integer, got ${typeof repoId} (${JSON.stringify(repoId)}).`,
       );
     }
     const result = this._stmtBeginScan.run(repoId, new Date().toISOString());

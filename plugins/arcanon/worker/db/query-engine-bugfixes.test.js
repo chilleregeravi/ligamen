@@ -177,13 +177,12 @@ test("beginScan throws TypeError with a clear message when repoId is undefined",
     (err) => {
       assert.ok(err instanceof TypeError, `expected TypeError, got ${err.constructor.name}`);
       assert.match(err.message, /repoId must be an integer/);
-      assert.match(err.message, /upsertRepo/, "should hint at the most common cause");
       return true;
     },
   );
 });
 
-test("beginScan throws TypeError when repoId is the upsertRepo {id} object", async () => {
+test("beginScan throws TypeError when repoId is an object (not an integer)", async () => {
   const db = await buildTestDb();
   const qe = new QueryEngine(db);
   assert.throws(
@@ -211,13 +210,16 @@ test("endScan throws TypeError when scanVersionId is undefined", async () => {
   );
 });
 
-test("upsertRepo returns {id} — the documented shape", async () => {
+test("upsertRepo returns the integer row id (Option B — feeds beginScan directly)", async () => {
   const db = await buildTestDb();
   const qe = new QueryEngine(db);
-  const result = qe.upsertRepo({ path: "/tmp/r", name: "r", type: "single" });
-  assert.equal(typeof result, "object");
-  assert.equal(typeof result.id, "number");
-  assert.ok(result.id > 0);
+  const repoId = qe.upsertRepo({ path: "/tmp/r", name: "r", type: "single" });
+  assert.equal(typeof repoId, "number");
+  assert.ok(Number.isInteger(repoId));
+  assert.ok(repoId > 0);
+  // The whole point of Option B — the round-trip works without .id ceremony.
+  const scanVersionId = qe.beginScan(qe.upsertRepo({ path: "/tmp/r2", name: "r2", type: "single" }));
+  assert.ok(Number.isInteger(scanVersionId));
 });
 
 // #9 — persistFindings creates an actor for external targets

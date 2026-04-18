@@ -290,7 +290,7 @@ test("POST /scan persists findings and returns 200", async () => {
   const persisted = [];
   const server = await makeServer({
     ...mockQE,
-    upsertRepo: () => ({ id: 1 }),
+    upsertRepo: () => 1,
     beginScan: () => 1,
     endScan: () => {},
     persistFindings: (repoId, findings, commit, scanVersionId) => persisted.push({ repoId, findings, commit, scanVersionId }),
@@ -316,7 +316,7 @@ test("POST /scan applies beginScan/endScan bracket with correct scanVersionId", 
   const FAKE_SCAN_ID = 42;
   const server = await makeServer({
     ...mockQE,
-    upsertRepo: () => ({ id: 1 }),
+    upsertRepo: () => 1,
     beginScan: (repoId) => { calls.beginScan.push(repoId); return FAKE_SCAN_ID; },
     persistFindings: (repoId, findings, commit, scanVersionId) => {
       calls.persistFindings.push({ repoId, findings, commit, scanVersionId });
@@ -345,7 +345,7 @@ test("POST /scan does not call endScan when persistFindings throws", async () =>
   const endScanCalls = [];
   const server = await makeServer({
     ...mockQE,
-    upsertRepo: () => ({ id: 1 }),
+    upsertRepo: () => 1,
     beginScan: () => 99,
     persistFindings: () => { throw new Error("db write failed"); },
     endScan: (repoId, scanVersionId) => { endScanCalls.push({ repoId, scanVersionId }); },
@@ -542,7 +542,7 @@ test("POST /scan 500 — logger.error called with stack when persistFindings thr
   const mockLogger = { log: (level, msg, extra) => calls.push({ level, msg, extra }) };
   const throwingQE = {
     ...mockQE,
-    upsertRepo: () => ({ id: 1 }),
+    upsertRepo: () => 1,
     beginScan: () => 1,
     persistFindings: () => { throw new Error("persist exploded"); },
     endScan: () => {},
