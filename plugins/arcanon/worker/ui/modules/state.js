@@ -48,6 +48,11 @@ export const LABEL_MAX_CHARS = 24;
  * used when tokens aren't available (SSR-ish paths, tests, missing <link>).
  */
 const DEFAULTS = {
+  canvas:   "#0b0d12",          // background of the drawing surface itself
+  boundary: "#63b3ed",          // boundary box fill/stroke/label
+  layer:    "#a0aec0",          // layer (services / libraries / infra) container
+  badge:    "#1a202c",          // small badge backdrops drawn on top of nodes
+  mismatch: "#fc8181",          // edges flagged as schema mismatches
   node: {
     default:  "#4299e1",
     selected: "#f6ad55",
@@ -74,11 +79,29 @@ const DEFAULTS = {
     library: "#9f7aea", sdk: "#9f7aea", frontend: "#f6ad55",
     service: "#4299e1", infra: "#68d391", actor: "#e06060",
   },
+  // Subtle backgrounds layered behind the node fill — matches
+  // arcanon-hub's tint approach. Defaults are the dark-mode values.
+  nodeTint: {
+    database: "#1e293b",
+    broker:   "#292017",
+    external: "#1f2937",
+    frontend: "#2d2640",
+  },
 };
 
-export const COLORS = { node: { ...DEFAULTS.node }, edge: { ...DEFAULTS.edge }, label: { ...DEFAULTS.label } };
+export const COLORS = {
+  canvas:   DEFAULTS.canvas,
+  boundary: DEFAULTS.boundary,
+  layer:    DEFAULTS.layer,
+  badge:    DEFAULTS.badge,
+  mismatch: DEFAULTS.mismatch,
+  node:     { ...DEFAULTS.node },
+  edge:     { ...DEFAULTS.edge },
+  label:    { ...DEFAULTS.label },
+};
 export const PROTOCOL_COLORS = { ...DEFAULTS.protocol };
 export const NODE_TYPE_COLORS = { ...DEFAULTS.nodeType };
+export const NODE_TINT_COLORS = { ...DEFAULTS.nodeTint };
 
 function readCssVar(name, fallback) {
   if (typeof document === "undefined") return fallback;
@@ -92,6 +115,14 @@ function readCssVar(name, fallback) {
  * on each `arcanon:theme` event.
  */
 export function refreshColors() {
+  // Surfaces drawn directly on the canvas — must follow the theme so the
+  // graph background matches the rest of the UI in both light and dark.
+  COLORS.canvas    = readCssVar("--color-canvas",            DEFAULTS.canvas);
+  COLORS.boundary  = readCssVar("--color-accent",            DEFAULTS.boundary);
+  COLORS.layer     = readCssVar("--color-text-secondary",    DEFAULTS.layer);
+  COLORS.badge     = readCssVar("--color-surface-elevated",  DEFAULTS.badge);
+  COLORS.mismatch  = readCssVar("--color-error",             DEFAULTS.mismatch);
+
   COLORS.node.default   = readCssVar("--color-node-service",  DEFAULTS.node.default);
   COLORS.node.selected  = readCssVar("--color-node-selected", DEFAULTS.node.selected);
   COLORS.node.blast     = readCssVar("--color-error",         DEFAULTS.node.blast);
@@ -114,10 +145,17 @@ export function refreshColors() {
 
   NODE_TYPE_COLORS.library  = readCssVar("--color-node-library",  DEFAULTS.nodeType.library);
   NODE_TYPE_COLORS.sdk      = readCssVar("--color-node-library",  DEFAULTS.nodeType.sdk);
-  NODE_TYPE_COLORS.frontend = readCssVar("--color-node-selected", DEFAULTS.nodeType.frontend);
+  NODE_TYPE_COLORS.frontend = readCssVar("--color-warn",          DEFAULTS.nodeType.frontend);
   NODE_TYPE_COLORS.service  = readCssVar("--color-node-service",  DEFAULTS.nodeType.service);
   NODE_TYPE_COLORS.infra    = readCssVar("--color-node-infra",    DEFAULTS.nodeType.infra);
   NODE_TYPE_COLORS.actor    = readCssVar("--color-node-actor",    DEFAULTS.nodeType.actor);
+
+  // Hub-style tints — drawn behind the node fill to give type scannability
+  // without changing shape. (Shape-per-type taxonomy is a separate change.)
+  NODE_TINT_COLORS.database = readCssVar("--color-node-tint-database", DEFAULTS.nodeTint.database);
+  NODE_TINT_COLORS.broker   = readCssVar("--color-node-tint-broker",   DEFAULTS.nodeTint.broker);
+  NODE_TINT_COLORS.external = readCssVar("--color-node-tint-external", DEFAULTS.nodeTint.external);
+  NODE_TINT_COLORS.frontend = readCssVar("--color-node-tint-frontend", DEFAULTS.nodeTint.frontend);
 }
 
 export const BUNDLE_SEVERITY = ["rest", "grpc", "events", "internal", "sdk", "import"];
@@ -127,13 +165,14 @@ export const BUNDLE_SEVERITY = ["rest", "grpc", "events", "internal", "sdk", "im
  * Values are logical pixels — caller must divide by transform.scale.
  * EDGE-01: REST  → solid
  * EDGE-02: gRPC  → dashed  [6, 4]
- * EDGE-03: events → dotted [2, 4]
- * EDGE-04: sdk/import → solid (no dash; arrowhead already drawn for all edges)
+ * Aligned with arcanon-hub (DependencyEdge.tsx): all protocols use solid lines;
+ * color alone differentiates them. The earlier per-protocol dashing pre-dated
+ * the hub's design system and contradicted it.
  */
 export const PROTOCOL_LINE_DASH = {
   rest:     [],
-  grpc:     [6, 4],
-  events:   [2, 4],
+  grpc:     [],
+  events:   [],
   internal: [],
   sdk:      [],
   import:   [],

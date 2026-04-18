@@ -26,6 +26,7 @@ import {
   PROTOCOL_COLORS,
   PROTOCOL_LINE_DASH,
   BUNDLE_SEVERITY,
+  NODE_TINT_COLORS,
 } from "./state.js";
 import {
   truncate,
@@ -33,6 +34,7 @@ import {
   getNeighborIdsNHop,
   getNodeColor,
   getNodeType,
+  getNodeTintKey,
   computeEdgeBundles,
 } from "./utils.js";
 
@@ -45,7 +47,7 @@ export function render() {
   const H = canvas.height;
 
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "#0f1117";
+  ctx.fillStyle = COLORS.canvas;
   ctx.fillRect(0, 0, W, H);
 
   if (state.graphData.nodes.length === 0) return;
@@ -108,20 +110,20 @@ export function render() {
     ctx.save();
     // Subtle fill
     ctx.globalAlpha = 0.04;
-    ctx.fillStyle = '#a0aec0';
+    ctx.fillStyle = COLORS.layer;
     ctx.beginPath();
     ctx.roundRect(box.x, box.y, box.w, box.h, 10);
     ctx.fill();
 
     // Thin solid border
     ctx.globalAlpha = 0.25;
-    ctx.strokeStyle = '#a0aec0';
+    ctx.strokeStyle = COLORS.layer;
     ctx.lineWidth = 1 / state.transform.scale;
     ctx.stroke();
 
     // Layer label at top-left
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle = '#a0aec0';
+    ctx.fillStyle = COLORS.layer;
     ctx.font = `bold ${Math.round(13 / state.transform.scale)}px system-ui, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -134,14 +136,14 @@ export function render() {
     ctx.save();
     // Semi-transparent fill
     ctx.globalAlpha = 0.08;
-    ctx.fillStyle = '#63b3ed';
+    ctx.fillStyle = COLORS.boundary;
     ctx.beginPath();
     ctx.roundRect(box.x, box.y, box.w, box.h, 8);
     ctx.fill();
 
     // Dashed border
     ctx.globalAlpha = 0.6;
-    ctx.strokeStyle = '#63b3ed';
+    ctx.strokeStyle = COLORS.boundary;
     ctx.lineWidth = 1 / state.transform.scale;
     ctx.setLineDash([6 / state.transform.scale, 4 / state.transform.scale]);
     ctx.stroke();
@@ -149,7 +151,7 @@ export function render() {
 
     // Label at top-left inside the box (above nodes due to LABEL_HEIGHT offset)
     ctx.globalAlpha = 0.9;
-    ctx.fillStyle = '#63b3ed';
+    ctx.fillStyle = COLORS.boundary;
     ctx.font = `bold ${Math.round(12 / state.transform.scale)}px system-ui, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -191,7 +193,7 @@ export function render() {
     if (isSelectedEdge) color = COLORS.edge.selected;
     else if (isBlastEdge) color = COLORS.edge.blast;
     else if (hasSelection || hasBlast) color = COLORS.edge.dimmed;
-    else if (bundle.hasMismatch) color = "#fc8181";
+    else if (bundle.hasMismatch) color = COLORS.mismatch;
     else color = PROTOCOL_COLORS[bundle.protocol] || COLORS.edge.default;
 
     // Determine lineWidth: single edges use 1px, bundles scale with count
@@ -269,7 +271,7 @@ export function render() {
       const mx = (srcPos.x + tgtPos.x) / 2;
       const my = (srcPos.y + tgtPos.y) / 2;
       const crossSize = 6 / state.transform.scale;
-      ctx.strokeStyle = "#fc8181";
+      ctx.strokeStyle = COLORS.mismatch;
       ctx.lineWidth = 2 / state.transform.scale;
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
@@ -302,13 +304,13 @@ export function render() {
       // Badge background circle
       ctx.beginPath();
       ctx.arc(bx, by, badgeRadius, 0, Math.PI * 2);
-      ctx.fillStyle = "#1a202c";
+      ctx.fillStyle = COLORS.badge;
       ctx.globalAlpha = 0.9;
       ctx.fill();
       ctx.globalAlpha = 1;
 
       // Badge text
-      ctx.fillStyle = "#e2e8f0";
+      ctx.fillStyle = COLORS.label.default;
       ctx.font = `bold ${Math.round(11 / state.transform.scale)}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -343,6 +345,20 @@ export function render() {
 
     ctx.globalAlpha = alpha;
 
+    // Tinted halo behind the node — gives types a scannable backdrop without
+    // changing shape (matches arcanon-hub's tinted-card approach within our
+    // canvas-2D constraints). Skipped for nodes with no tint key.
+    const tintKey = getNodeTintKey(node);
+    if (tintKey && NODE_TINT_COLORS[tintKey]) {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.35;
+      ctx.fillStyle = NODE_TINT_COLORS[tintKey];
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, NODE_RADIUS * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     const nodeType = getNodeType(node);
     ctx.beginPath();
     if (nodeType === "actor") {
@@ -367,7 +383,7 @@ export function render() {
       ctx.lineTo(pos.x - r, pos.y);
       ctx.closePath();
       // Dark background fill to prevent edge bleed-through
-      ctx.fillStyle = '#0f1117';
+      ctx.fillStyle = COLORS.canvas;
       ctx.fill();
       // Outline stroke only — NOT filled with nodeColor
       ctx.strokeStyle = nodeColor;
@@ -391,7 +407,7 @@ export function render() {
     }
 
     if (isSelected || isBlastNode) {
-      ctx.strokeStyle = "#fff";
+      ctx.strokeStyle = COLORS.node.selected;
       ctx.lineWidth = 2 / state.transform.scale;
       ctx.stroke();
     }
