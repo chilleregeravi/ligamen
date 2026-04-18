@@ -335,14 +335,14 @@ console.log("Test 6: upsertRepo returns correct id on insert AND update");
 
   // First call — insert
   const first = qe.upsertRepo({ path: "/tmp/test-repo-6", name: "repo-6", type: "single" });
-  assert.ok(first.id > 0, `upsertRepo insert must return id > 0, got ${first.id}`);
+  assert.ok(first > 0, `upsertRepo insert must return id > 0, got ${first}`);
 
   // Second call — same path, triggers ON CONFLICT UPDATE
   const second = qe.upsertRepo({ path: "/tmp/test-repo-6", name: "repo-6-renamed", type: "single" });
-  assert.strictEqual(second.id, first.id, `upsertRepo update must return same id (${first.id}), got ${second.id}`);
+  assert.strictEqual(second, first, `upsertRepo update must return same id (${first}), got ${second}`);
 
   // Verify beginScan works with the returned id
-  const scanId = qe.beginScan(second.id);
+  const scanId = qe.beginScan(second);
   assert.ok(scanId > 0, `beginScan must succeed with upsertRepo id, got scanId ${scanId}`);
 
   db.close();

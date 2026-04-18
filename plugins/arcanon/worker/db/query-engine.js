@@ -617,7 +617,7 @@ export class QueryEngine {
   /**
    * Inserts or replaces a repo row.
    * @param {{ path: string, name: string, type: string, last_commit?: string, scanned_at?: string }} repoData
-   * @returns {number} Row id
+   * @returns {number} The repo row id. Pass it directly to beginScan / endScan.
    */
   upsertRepo(repoData) {
     this._stmtUpsertRepo.run({
@@ -628,7 +628,7 @@ export class QueryEngine {
     // lastInsertRowid is 0 when ON CONFLICT triggers an UPDATE (no insert).
     // Always query for the actual id by path to get the correct value.
     const row = this._db.prepare("SELECT id FROM repos WHERE path = ?").get(repoData.path);
-    return { id: row.id };
+    return row.id;
   }
 
   /**
@@ -754,6 +754,14 @@ export class QueryEngine {
    * @returns {number} The new scan_versions row ID
    */
   beginScan(repoId) {
+    // Pre-guard: better-sqlite3 throws "Too few parameter values were provided"
+    // when handed an undefined / non-integer bind value. Catch it here with
+    // a clearer message. (#8)
+    if (!Number.isInteger(repoId)) {
+      throw new TypeError(
+        `beginScan: repoId must be an integer, got ${typeof repoId} (${JSON.stringify(repoId)}).`,
+      );
+    }
     const result = this._stmtBeginScan.run(repoId, new Date().toISOString());
     return result.lastInsertRowid;
   }
@@ -774,6 +782,12 @@ export class QueryEngine {
    * @param {number} scanVersionId - The ID returned by beginScan
    */
   endScan(repoId, scanVersionId) {
+    if (!Number.isInteger(repoId)) {
+      throw new TypeError(`endScan: repoId must be an integer, got ${typeof repoId} (${JSON.stringify(repoId)}).`);
+    }
+    if (!Number.isInteger(scanVersionId)) {
+      throw new TypeError(`endScan: scanVersionId must be an integer, got ${typeof scanVersionId} (${JSON.stringify(scanVersionId)}). Pass the value returned by beginScan().`);
+    }
     this._stmtEndScan.run(new Date().toISOString(), scanVersionId);
 
     // Clean up orphaned schema rows BEFORE deleting stale connections
@@ -1115,9 +1129,26 @@ export class QueryEngine {
     for (const conn of findings.connections || []) {
       const sourceId =
         serviceIdMap.get(conn.source) || this._resolveServiceId(conn.source, repoId);
+      if (!sourceId) continue; // can't link an unknown source
+
       const targetId =
         serviceIdMap.get(conn.target) || this._resolveServiceId(conn.target, repoId);
-      if (!sourceId || !targetId) continue; // skip if service not found
+
+      // External target with no matching service row → record as an actor +
+      // actor_connection instead of dropping the edge entirely. This is the
+      // primary path for crossing='external' findings. (#9)
+      if (!targetId && conn.crossing === "external") {
+        this._upsertActorEdge({
+          actorName: conn.target,
+          sourceId,
+          protocol: conn.protocol,
+          path: conn.path,
+        });
+        continue;
+      }
+
+      // Unknown internal target — still skip; we have no row to point at.
+      if (!targetId) continue;
 
       const connId = this.upsertConnection({
         source_service_id: sourceId,
@@ -1133,34 +1164,11 @@ export class QueryEngine {
         evidence: conn.evidence || null,
       });
 
-      // Detect external actors: when crossing='external', the target is an
-      // external system. Create/upsert an actor for it and link to the source
-      // service via actor_connections.
-      // SBUG-01: skip actor creation if target matches a known service in this DB.
-      if (conn.crossing === "external" && this._stmtUpsertActor && this._stmtGetActorByName) {
-        const actorName = conn.target; // target service name = actor name
-        const knownService = this._stmtCheckKnownService
-          ? this._stmtCheckKnownService.get(actorName)
-          : null;
-        if (!knownService) {
-          this._stmtUpsertActor.run({
-            name: actorName,
-            kind: "system",
-            direction: "outbound",
-            source: "scan",
-          });
-          const actorRow = this._stmtGetActorByName.get(actorName);
-          if (actorRow) {
-            this._stmtUpsertActorConnection.run({
-              actor_id: actorRow.id,
-              service_id: sourceId,
-              direction: "outbound",
-              protocol: conn.protocol || null,
-              path: conn.path || null,
-            });
-          }
-        }
-      }
+      // Defensive: if the target IS a known service AND was tagged external,
+      // we've already inserted the regular connection above. Don't also create
+      // an actor — the existing service row is the authoritative endpoint.
+      // (Pre-#9 the actor block also fired here; the SBUG-01 check skipped it
+      // for known services. Behavior unchanged for this case.)
 
       // 3. Upsert schemas for this connection
       // Find schemas that belong to this connection path
@@ -1236,6 +1244,45 @@ export class QueryEngine {
    * @param {number|null} [repoId=null]
    * @returns {number|null}
    */
+  /**
+   * Insert (or update) an external actor + actor_connection. Used by
+   * persistFindings when a connection's target doesn't match a service row
+   * but the connection is tagged crossing='external'. (#9)
+   *
+   * No-op when the migration that creates the actors / actor_connections
+   * tables hasn't run yet, or when actorName is missing.
+   *
+   * @param {{actorName: string, sourceId: number, protocol?: string, path?: string}} opts
+   */
+  _upsertActorEdge({ actorName, sourceId, protocol = null, path = null }) {
+    if (!this._stmtUpsertActor || !this._stmtGetActorByName || !this._stmtUpsertActorConnection) {
+      return; // migration 008 not applied — skip silently
+    }
+    if (!actorName || !sourceId) return;
+
+    // Don't shadow a real service row with an actor of the same name.
+    const knownService = this._stmtCheckKnownService
+      ? this._stmtCheckKnownService.get(actorName)
+      : null;
+    if (knownService) return;
+
+    this._stmtUpsertActor.run({
+      name: actorName,
+      kind: "system",
+      direction: "outbound",
+      source: "scan",
+    });
+    const actorRow = this._stmtGetActorByName.get(actorName);
+    if (!actorRow) return;
+    this._stmtUpsertActorConnection.run({
+      actor_id: actorRow.id,
+      service_id: sourceId,
+      direction: "outbound",
+      protocol: protocol || null,
+      path: path || null,
+    });
+  }
+
   _resolveServiceId(name, repoId = null) {
     // Step 1: same-repo exact match
     if (repoId != null) {

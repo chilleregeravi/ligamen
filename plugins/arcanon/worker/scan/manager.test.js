@@ -284,7 +284,7 @@ describe("scanRepos", () => {
    */
   function makeQueryEngine({ repoState = null } = {}) {
     return {
-      upsertRepo: (repoData) => ({ id: 42 }),
+      upsertRepo: (repoData) => 42,
       getRepoState: (_id) => repoState,
       setRepoState: (_id, _commit) => {},
       getRepoByPath: (_path) => null,
@@ -502,7 +502,7 @@ describe("scanRepos — retry-once on agentRunner failure", () => {
 
   function makeQueryEngine({ repoState = null } = {}) {
     return {
-      upsertRepo: (repoData) => ({ id: 42 }),
+      upsertRepo: (repoData) => 42,
       getRepoState: (_id) => repoState,
       setRepoState: (_id, _commit) => {},
       getRepoByPath: (_path) => null,
@@ -647,7 +647,7 @@ describe("scanRepos — incremental prompt constraint", () => {
    */
   function makeIncrementalQE(lastCommit) {
     return {
-      upsertRepo: (_repoData) => ({ id: 99 }),
+      upsertRepo: (_repoData) => 99,
       getRepoState: (_id) => ({
         last_scanned_commit: lastCommit,
         last_scanned_at: null,
@@ -729,7 +729,7 @@ describe("scanRepos — incremental prompt constraint", () => {
 
     let beginScanCallCount = 0;
     const qe = {
-      upsertRepo: (_repoData) => ({ id: 100 }),
+      upsertRepo: (_repoData) => 100,
       getRepoState: (_id) => ({
         last_scanned_commit: firstEmptyCommit,
         last_scanned_at: null,
@@ -797,7 +797,7 @@ describe("scanRepos — SARC-02 prompt content", () => {
   });
 
   const mockQE = {
-    upsertRepo: (_repoData) => ({ id: 42 }),
+    upsertRepo: (_repoData) => 42,
     getRepoState: (_id) => null,
     setRepoState: (_id, _commit) => {},
     getRepoByPath: (_path) => null,
@@ -888,7 +888,7 @@ function buildEnrichmentDb() {
 function makeEnrichmentQueryEngine(db, { repoState = null } = {}) {
   return {
     _db: db,
-    upsertRepo: (_repoData) => ({ id: 42 }),
+    upsertRepo: (_repoData) => 42,
     getRepoState: (_id) => repoState,
     setRepoState: (_id, _commit) => {},
     getRepoByPath: (_path) => null,
@@ -1170,7 +1170,7 @@ describe("scanRepos — discovery wiring", () => {
 
   function makeDiscoveryQE({ repoState = null } = {}) {
     return {
-      upsertRepo: (_repoData) => ({ id: 42 }),
+      upsertRepo: (_repoData) => 42,
       getRepoState: (_id) => repoState,
       setRepoState: (_id, _commit) => {},
       getRepoByPath: (_path) => null,
@@ -1420,7 +1420,7 @@ describe("concurrent scan locking (SEC-03)", () => {
 
   function makeQueryEngine() {
     return {
-      upsertRepo: () => ({ id: 99 }),
+      upsertRepo: () => 99,
       getRepoState: () => null,
       setRepoState: () => {},
       getRepoByPath: () => null,
@@ -1588,7 +1588,7 @@ describe("scanRepos — scan lifecycle logging (SCAN-01, SCAN-02)", () => {
 
   function makeQE() {
     return {
-      upsertRepo: (_repoData) => ({ id: 42 }),
+      upsertRepo: (_repoData) => 42,
       getRepoState: (_id) => null,
       setRepoState: (_id, _commit) => {},
       getRepoByPath: (_path) => null,

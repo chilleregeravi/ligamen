@@ -560,7 +560,7 @@ export function releaseScanLock(lockPath) {
  * @param {string[]} repoPaths - Absolute paths to repos to scan
  * @param {{ full?: boolean }} [options]
  * @param {{
- *   upsertRepo: (repoData: object) => { id: number },
+ *   upsertRepo: (repoData: object) => number,
  *   getRepoState: (id: number) => object|null,
  *   beginScan: (repoId: number) => number,
  *   persistFindings: (repoId: number, findings: object, commit: string, scanVersionId: number) => void,
@@ -609,14 +609,14 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
    */
   async function scanOneRepo(repoPath) {
     // 1. Ensure repo row exists
-    const repo = queryEngine.upsertRepo({
+    const repoId = queryEngine.upsertRepo({
       path: repoPath,
       name: basename(repoPath),
       type: "single",
     });
 
     // 2. Determine scan mode
-    const ctx = buildScanContext(repoPath, repo.id, queryEngine, options);
+    const ctx = buildScanContext(repoPath, repoId, queryEngine, options);
 
     // 3. Skip — no scan needed (no bracket for no-op scans)
     if (ctx.mode === "skip") {
@@ -643,7 +643,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     });
 
     // 5. Open scan version bracket — records scan start in scan_versions table
-    const scanVersionId = queryEngine.beginScan(repo.id);
+    const scanVersionId = queryEngine.beginScan(repoId);
 
     // 6. Detect repo type and select type-specific prompt (SARC-03)
     const repoType = detectRepoType(repoPath);
@@ -720,7 +720,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
       repoPath,
       mode: ctx.mode,
       findings: result.findings,
-      repoId: repo.id,
+      repoId,
       scanVersionId,
       currentHead: getCurrentHead(repoPath),
       _writeDb: true,
