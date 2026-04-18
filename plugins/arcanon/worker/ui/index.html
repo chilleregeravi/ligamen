@@ -431,6 +431,91 @@
         min-width: 80px;
       }
 
+      /* Floating legend ---------------------------------------------------- */
+      .legend {
+        position: fixed;
+        right: var(--space-4);
+        bottom: var(--space-4);
+        z-index: var(--z-panel);
+        background: var(--color-overlay);
+        backdrop-filter: blur(6px);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        max-width: 320px;
+      }
+      .legend > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: var(--space-2) var(--space-3);
+        font-weight: 600;
+        color: var(--color-text-primary);
+        border-radius: var(--radius-md);
+      }
+      .legend > summary::-webkit-details-marker { display: none; }
+      .legend > summary::before {
+        content: "◐ ";
+        color: var(--color-accent);
+      }
+      .legend[open] > summary { border-bottom: 1px solid var(--color-border); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+      .legend__grid {
+        display: grid;
+        grid-template-columns: repeat(3, max-content);
+        gap: var(--space-3) var(--space-4);
+        padding: var(--space-3);
+      }
+      .legend__group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .legend__group-title {
+        font-weight: 600;
+        color: var(--color-text-primary);
+        margin-bottom: var(--space-1);
+      }
+      .legend__item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .legend__swatch {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .legend__swatch--diamond { border-radius: 2px; transform: rotate(45deg); }
+      .legend__swatch--hex { clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); border-radius: 0; }
+      .legend__line {
+        display: inline-block;
+        width: 18px;
+        height: 2px;
+        flex-shrink: 0;
+      }
+      .legend__line--dashed {
+        background: none !important;
+        border-top: 2px dashed currentColor;
+        color: var(--color-edge-grpc);
+      }
+      .legend__line--dotted {
+        background: none !important;
+        border-top: 2px dotted currentColor;
+        color: var(--color-edge-events);
+      }
+      .legend kbd {
+        display: inline-block;
+        padding: 1px 5px;
+        font-family: var(--font-mono);
+        background: var(--color-surface-elevated);
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        color: var(--color-text-primary);
+      }
+
       /* Graph overlays (loading / empty / error) --------------------------- */
       .graph-overlay[hidden] { display: none; }
       .graph-overlay {
@@ -702,6 +787,32 @@
         </dl>
       </div>
     </div>
+    <details id="graph-legend" class="legend">
+      <summary aria-label="Toggle graph legend">Legend</summary>
+      <div class="legend__grid">
+        <div class="legend__group">
+          <span class="legend__group-title">Nodes</span>
+          <span class="legend__item"><span class="legend__swatch" style="background: var(--color-node-service)"></span>Service</span>
+          <span class="legend__item"><span class="legend__swatch legend__swatch--diamond" style="background: var(--color-node-library)"></span>Library</span>
+          <span class="legend__item"><span class="legend__swatch legend__swatch--diamond" style="background: var(--color-node-infra)"></span>Infrastructure</span>
+          <span class="legend__item"><span class="legend__swatch legend__swatch--hex" style="background: var(--color-node-actor)"></span>External actor</span>
+        </div>
+        <div class="legend__group">
+          <span class="legend__group-title">Edges</span>
+          <span class="legend__item"><span class="legend__line" style="background: var(--color-edge-rest)"></span>REST</span>
+          <span class="legend__item"><span class="legend__line legend__line--dashed" style="background: var(--color-edge-grpc)"></span>gRPC</span>
+          <span class="legend__item"><span class="legend__line legend__line--dotted" style="background: var(--color-edge-events)"></span>Events</span>
+          <span class="legend__item"><span class="legend__line" style="background: var(--color-error)"></span>Schema mismatch</span>
+        </div>
+        <div class="legend__group">
+          <span class="legend__group-title">Shortcuts</span>
+          <span class="legend__item"><kbd>F</kbd> fit</span>
+          <span class="legend__item"><kbd>/</kbd> search</span>
+          <span class="legend__item"><kbd>I</kbd> isolate</span>
+          <span class="legend__item"><kbd>?</kbd> all shortcuts</span>
+        </div>
+      </div>
+    </details>
     <main id="canvas-container" tabindex="-1">
       <canvas
         id="graph-canvas"

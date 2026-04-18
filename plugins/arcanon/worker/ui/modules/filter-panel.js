@@ -29,6 +29,7 @@ export function setupFilterPanel() {
     state.filterPanelOpen = !state.filterPanelOpen;
     filterPanel.style.display = state.filterPanelOpen ? "flex" : "none";
     filtersBtn.classList.toggle("active", state.filterPanelOpen);
+    filtersBtn.setAttribute("aria-expanded", String(state.filterPanelOpen));
   });
 
   // 2. Protocol checkboxes (moved from setupControls in interactions.js)
