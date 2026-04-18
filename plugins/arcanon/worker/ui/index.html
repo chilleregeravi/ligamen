@@ -431,6 +431,122 @@
         min-width: 80px;
       }
 
+      /* Graph overlays (loading / empty / error) --------------------------- */
+      .graph-overlay[hidden] { display: none; }
+      .graph-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: var(--z-overlay);
+      }
+      .graph-overlay__card {
+        pointer-events: auto;
+        background: var(--color-overlay);
+        backdrop-filter: blur(4px);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-6) var(--space-8);
+        max-width: 420px;
+        text-align: center;
+        box-shadow: var(--shadow-md);
+      }
+      .graph-overlay__icon {
+        font-family: var(--font-mono);
+        font-size: 28px;
+        line-height: 1;
+        margin-bottom: var(--space-3);
+      }
+      .graph-overlay__icon--empty { color: var(--color-text-muted); }
+      .graph-overlay__icon--error { color: var(--color-error); }
+      .graph-overlay__title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        margin: 0 0 var(--space-2);
+        color: var(--color-text-primary);
+      }
+      .graph-overlay__body {
+        margin: 0 0 var(--space-3);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        line-height: var(--line-height);
+      }
+      .graph-overlay__muted {
+        margin: var(--space-3) 0 0;
+        color: var(--color-text-muted);
+        font-size: var(--font-size-sm);
+      }
+      .graph-overlay__detail {
+        display: block;
+        margin: var(--space-2) 0;
+        padding: var(--space-2);
+        background: var(--color-surface-elevated);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+        word-break: break-word;
+      }
+      .graph-overlay__cta {
+        display: inline-block;
+        margin-top: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-surface-elevated);
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        font-size: var(--font-size-sm);
+        color: var(--color-accent);
+      }
+      .graph-overlay__actions {
+        display: flex;
+        justify-content: center;
+        gap: var(--space-2);
+        margin-top: var(--space-3);
+      }
+      .graph-overlay__btn {
+        background: var(--color-accent);
+        color: var(--color-accent-fg);
+        border: none;
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        cursor: pointer;
+        transition: filter var(--duration-fast) var(--ease);
+      }
+      .graph-overlay__btn:hover { filter: brightness(1.1); }
+      .graph-overlay__skeleton {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: var(--space-3);
+      }
+      .shimmer {
+        display: inline-block;
+        background: linear-gradient(
+          90deg,
+          var(--color-surface-elevated) 0%,
+          var(--color-border) 50%,
+          var(--color-surface-elevated) 100%
+        );
+        background-size: 200% 100%;
+        border-radius: var(--radius-md);
+        animation: shimmer 1.4s linear infinite;
+      }
+      .shimmer--pill { width: 160px; height: 16px; }
+      .shimmer--wide { width: 240px; }
+      @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .shimmer { animation: none; }
+      }
+
       /* Help modal ---------------------------------------------------------- */
       .modal[hidden] { display: none; }
       .modal {

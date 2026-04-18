@@ -17,6 +17,7 @@ import { populateFilterDropdowns } from "./modules/filter-panel.js";
 import { initKeyboard } from "./modules/keyboard.js";
 import { initExport } from "./modules/export.js";
 import { toggleTheme } from "./styles/theme.js";
+import { renderSkeleton, renderEmpty, renderError, hideOverlay } from "./modules/graph-states.js";
 
 // Theme: read color tokens on first paint and whenever the theme changes.
 refreshColors();
@@ -61,22 +62,42 @@ export async function loadProject(hash, canvas) {
   const projectParam = `?hash=${encodeURIComponent(hash)}`;
   state.currentProject = hash;
 
+  // State machine entry: render the skeleton while we wait.
+  renderSkeleton();
+  const nodeInfo = document.getElementById("node-info");
+  if (nodeInfo) nodeInfo.textContent = "Loading…";
+
   // Load graph data
   let resp;
   try {
     resp = await fetch(`/graph${projectParam}`);
-  } catch {
-    document.getElementById("node-info").textContent = "Cannot reach server.";
+  } catch (err) {
+    renderError(err, () => loadProject(hash, canvas));
+    if (nodeInfo) nodeInfo.textContent = "Cannot reach server.";
     return;
   }
 
   if (!resp.ok) {
-    document.getElementById("node-info").textContent =
-      "No map data yet. Run /ligamen:map first.";
+    // Surface 4xx/5xx through the state machine with a retry button.
+    const err = new Error(`HTTP ${resp.status}`);
+    err.status = resp.status;
+    renderError(err, () => loadProject(hash, canvas));
+    if (nodeInfo) {
+      nodeInfo.textContent =
+        resp.status === 404
+          ? "No map data yet. Run /arcanon:map first."
+          : `Server returned ${resp.status}.`;
+    }
     return;
   }
 
   const raw = await resp.json();
+  if (!raw || !Array.isArray(raw.services) || raw.services.length === 0) {
+    renderEmpty("no-scan-yet");
+    if (nodeInfo) nodeInfo.textContent = "No services indexed yet.";
+    return;
+  }
+  hideOverlay();
   // Store latest scan version for "what changed" overlay (Phase 56)
   state.latestScanVersionId = raw.latest_scan_version_id ?? null;
 
