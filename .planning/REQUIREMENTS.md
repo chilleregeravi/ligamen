@@ -29,11 +29,11 @@ New ecosystem parsers in `scripts/drift-versions.sh`. Zero new runtime deps — 
 
 ### Type Extraction
 
-- [ ] **TYPE-01**: `scripts/drift-types.sh detect_repo_language()` returns tokens `java | cs | rb` for `.java | .cs | .rb` files
-- [ ] **TYPE-02**: Java extractor captures `public interface|class|record|enum <Name>`; handles generic bounds
-- [ ] **TYPE-03**: C# extractor captures `public interface|class|record|struct|enum <Name>`; handles `partial class` (document limitation: fragments compared as separate types)
-- [ ] **TYPE-04**: Ruby extractor captures `class|module <Name>`; no false positive on `self.class_eval` or re-opens
-- [ ] **TYPE-05**: New extractors use the `$WORK_DIR/<pkg_safe>` tmpdir pattern already established in drift-versions.sh (no new `declare -A` — Bash 3.2 compatible)
+- [x] **TYPE-01**: `scripts/drift-types.sh detect_repo_language()` returns tokens `java | cs | rb` for `.java | .cs | .rb` files
+- [x] **TYPE-02**: Java extractor captures `public interface|class|record|enum <Name>`; handles generic bounds
+- [x] **TYPE-03**: C# extractor captures `public interface|class|record|struct|enum <Name>`; handles `partial class` (document limitation: fragments compared as separate types)
+- [x] **TYPE-04**: Ruby extractor captures `class|module <Name>`; no false positive on `self.class_eval` or re-opens
+- [x] **TYPE-05**: New extractors use the `$WORK_DIR/<pkg_safe>` tmpdir pattern already established in drift-versions.sh (no new `declare -A` — Bash 3.2 compatible)
 
 ### Auth / DB Enrichment
 
@@ -137,11 +137,11 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | LANG-01 | 92 | Complete |
 | LANG-02 | 92 | Complete |
 | LANG-03 | 92 | Complete |
-| TYPE-01 | 92 | Pending |
-| TYPE-02 | 92 | Pending |
-| TYPE-03 | 92 | Pending |
-| TYPE-04 | 92 | Pending |
-| TYPE-05 | 92 | Pending |
+| TYPE-01 | 92 | Complete |
+| TYPE-02 | 92 | Complete |
+| TYPE-03 | 92 | Complete |
+| TYPE-04 | 92 | Complete |
+| TYPE-05 | 92 | Complete |
 | ENR-01 | 94 | Pending |
 | ENR-02 | 94 | Pending |
 | ENR-03 | 94 | Pending |
