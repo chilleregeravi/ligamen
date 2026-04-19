@@ -1,17 +1,24 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
-import { up as up001 } from './migrations/001_initial_schema.js';
-import { up as up005 } from './migrations/005_scan_versions.js';
-import { up as up010 } from './migrations/010_service_dependencies.js';
+import { runMigrations } from './database.js';
 import { QueryEngine } from './query-engine.js';
 
+/**
+ * Build a fully-migrated in-memory DB.
+ * withMig010=true  (default) — all migrations including 010 (production state)
+ * withMig010=false — drops service_dependencies after full migration to simulate
+ *                    a pre-migration-010 DB for graceful-absence tests.
+ */
 function seedDb(withMig010 = true) {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
-  up001(db);
-  up005(db);
-  if (withMig010) up010(db);
+  runMigrations(db);
+  if (!withMig010) {
+    db.exec('DROP TABLE IF EXISTS service_dependencies');
+    db.exec('DROP INDEX IF EXISTS idx_service_dependencies_package_name');
+    db.exec('DROP INDEX IF EXISTS idx_service_dependencies_scan_version');
+  }
   const repoId = db.prepare("INSERT INTO repos (path, name, type) VALUES ('/tmp/r','r','single')").run().lastInsertRowid;
   const svcId = db.prepare("INSERT INTO services (repo_id, name, root_path, language) VALUES (?, 'svc', '/tmp/r', 'js')").run(repoId).lastInsertRowid;
   const scanVer = db.prepare("INSERT INTO scan_versions (repo_id, started_at) VALUES (?, ?)").run(repoId, new Date().toISOString()).lastInsertRowid;
