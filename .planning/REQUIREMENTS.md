@@ -65,9 +65,9 @@ Extend `worker/scan/enrichment/auth-db-extractor.js` with language switch cases.
 
 ### Hub Payload v1.1
 
-- [ ] **HUB-01**: `buildFindingsBlock()` in `worker/hub-sync/payload.js` emits `dependencies: []` array per service from `queryEngine.getDependenciesForService(serviceId)`
-- [ ] **HUB-02**: `buildScanPayload()` sets `version: "1.1"` when any service has non-empty `dependencies`; falls back to `"1.0"` when all empty (backward compat with pre-THE-1018 hubs)
-- [ ] **HUB-03**: Feature flag `hub.beta_features.library_deps` in `.arcanon/config.json` (default `false`) gates emission — when off, payload is v1.0 regardless of deps
+- [x] **HUB-01**: `buildFindingsBlock()` in `worker/hub-sync/payload.js` emits `dependencies: []` array per service from `queryEngine.getDependenciesForService(serviceId)`
+- [x] **HUB-02**: `buildScanPayload()` sets `version: "1.1"` when any service has non-empty `dependencies`; falls back to `"1.0"` when all empty (backward compat with pre-THE-1018 hubs)
+- [x] **HUB-03**: Feature flag `hub.beta_features.library_deps` in `.arcanon/config.json` (default `false`) gates emission — when off, payload is v1.0 regardless of deps
 - [ ] **HUB-04**: node:test covers: empty deps → v1.0, populated deps + flag on → v1.1, populated deps + flag off → v1.0
 - [ ] **HUB-05**: Existing `/arcanon:drift versions` command keeps working exactly as today — no change to shell output shape
 
@@ -162,9 +162,9 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | DEP-09 | 93 | Pending |
 | DEP-10 | 93 | Pending |
 | DEP-11 | 93 | Pending |
-| HUB-01 | 96 | Pending |
-| HUB-02 | 96 | Pending |
-| HUB-03 | 96 | Pending |
+| HUB-01 | 96 | Complete |
+| HUB-02 | 96 | Complete |
+| HUB-03 | 96 | Complete |
 | HUB-04 | 96 | Pending |
 | HUB-05 | 96 | Pending |
 | DSP-01 | 95 | Complete |

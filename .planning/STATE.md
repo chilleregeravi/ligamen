@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v5.8.0
 milestone_name: Library Drift & Language Parity
-status: verifying
-stopped_at: Completed 94-auth-db-enrichment 94-03-PLAN.md
-last_updated: "2026-04-19T16:40:08.303Z"
+status: executing
+stopped_at: Completed 96-hub-payload-v1-1/96-01-PLAN.md
+last_updated: "2026-04-19T16:48:24.803Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 32
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 94 — Auth/DB Extractor Expansion
+**Current focus:** Phase 96 — Hub Payload v1.1 + Feature Flag
 
 ## Current Position
 
-Phase: 94 (Auth/DB Extractor Expansion) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 96 (Hub Payload v1.1 + Feature Flag) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-19
 
 Progress: [          ] 0%
@@ -72,6 +72,9 @@ Progress: [          ] 0%
 - [Phase 94-auth-db-enrichment]: C# partial class limitation documented in AUTH_SIGNALS.csharp comment, not implemented (Phase 92 TYPE-03 locked)
 - [Phase 94-auth-db-enrichment]: config/database.yml adapter: probe runs unconditionally in envFiles loop — safe because .env files never contain adapter: keys
 - [Phase 94-auth-db-enrichment]: http-basic mechanism label used for authenticate_or_request_with_http_basic (distinct from session, passes isCredential check at 10 chars)
+- [Phase 96-hub-payload-v1-1]: schemaVersion derived inside buildFindingsBlock return value — keeps payload.js pure; buildScanPayload reads it from the findings block
+- [Phase 96-hub-payload-v1-1]: anyServiceHasDeps gate: flag=true + all-empty deps falls back to v1.0 — existing hub deployments never receive unexpected keys
+- [Phase 96-hub-payload-v1-1]: Back-fill service ids onto r.findings.services after persistFindings via single SELECT name+id — avoids threading ids through agent pipeline
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-19T16:40:08.298Z
-Stopped at: Completed 94-auth-db-enrichment 94-03-PLAN.md
+Last session: 2026-04-19T16:48:24.799Z
+Stopped at: Completed 96-hub-payload-v1-1/96-01-PLAN.md
 Resume file: None
