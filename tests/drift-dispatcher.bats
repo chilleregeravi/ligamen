@@ -15,6 +15,9 @@ setup() {
   FAKE_REPO="$(mktemp -d)"
   # Minimal marker so extract_* functions don't choke — an empty dir is enough to exercise routing.
   export DRIFT_TEST_LINKED_REPOS="$FAKE_REPO"
+  # Ensure Homebrew bash (4+) is on PATH so `bash drift.sh` satisfies the Bash 4+ version guard.
+  # macOS ships Bash 3.2 at /bin/bash; the dispatcher requires 4+ for declare -A safety (DSP-04).
+  export PATH="/opt/homebrew/bin:$PATH"
 }
 
 teardown() {
