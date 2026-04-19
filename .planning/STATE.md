@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v5.8.0
 milestone_name: Library Drift & Language Parity
 status: executing
-stopped_at: Ready to plan first phase
-last_updated: "2026-04-19T15:11:11.774Z"
-last_activity: 2026-04-19 -- Phase 96 planning complete
+stopped_at: Completed 92-manifest-parsers-01-PLAN.md
+last_updated: "2026-04-19T15:19:46.188Z"
+last_activity: 2026-04-19
 progress:
   total_phases: 32
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** v5.8.0 — Library Drift & Language Parity
+**Current focus:** Phase 92 — Manifest Parser Foundation + Language Detection + Type Extraction
 
 ## Current Position
 
-Phase: 92 of 96 (not started)
-Plan: —
+Phase: 92 (Manifest Parser Foundation + Language Detection + Type Extraction) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-04-19 -- Phase 96 planning complete
+Last activity: 2026-04-19
 
 Progress: [          ] 0%
 
@@ -45,6 +45,9 @@ Progress: [          ] 0%
 
 (Cleared — see PROJECT.md Key Decisions table for full history)
 
+- [Phase 92-manifest-parsers]: MANAGED sentinel chosen over silent drop for unresolved Maven/NuGet versions — preserves row visibility in drift output
+- [Phase 92-manifest-parsers]: Separate tmpfiles per Gradle DSL branch to avoid cross-contamination when build.gradle and build.gradle.kts co-exist
+
 ### Pending Todos
 
 None.
@@ -55,6 +58,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-19
-Stopped at: Ready to plan first phase
+Last session: 2026-04-19T15:19:46.183Z
+Stopped at: Completed 92-manifest-parsers-01-PLAN.md
 Resume file: None

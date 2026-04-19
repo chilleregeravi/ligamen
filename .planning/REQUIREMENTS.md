@@ -13,13 +13,13 @@ Requirements for v5.8.0 release. Each maps to exactly one roadmap phase.
 
 New ecosystem parsers in `scripts/drift-versions.sh`. Zero new runtime deps — POSIX awk/grep/sed only.
 
-- [ ] **MF-01**: `/arcanon:drift versions` parses Maven `pom.xml` and resolves `<parent>` inheritance so managed deps surface with correct versions
-- [ ] **MF-02**: `/arcanon:drift versions` parses Gradle Groovy DSL (`build.gradle`) and Kotlin DSL (`build.gradle.kts`) with separate passes
-- [ ] **MF-03**: `/arcanon:drift versions` resolves Gradle version catalogs (`gradle/libs.versions.toml`) for BOM-managed deps
-- [ ] **MF-04**: `/arcanon:drift versions` parses NuGet `.csproj` `<PackageReference>` entries including Central Package Management (`Directory.Packages.props`)
-- [ ] **MF-05**: `/arcanon:drift versions` parses Bundler `Gemfile.lock` — uses lockfile pinned versions (not Gemfile ranges); covers GEM, GIT, PATH sections
+- [x] **MF-01**: `/arcanon:drift versions` parses Maven `pom.xml` and resolves `<parent>` inheritance so managed deps surface with correct versions
+- [x] **MF-02**: `/arcanon:drift versions` parses Gradle Groovy DSL (`build.gradle`) and Kotlin DSL (`build.gradle.kts`) with separate passes
+- [x] **MF-03**: `/arcanon:drift versions` resolves Gradle version catalogs (`gradle/libs.versions.toml`) for BOM-managed deps
+- [x] **MF-04**: `/arcanon:drift versions` parses NuGet `.csproj` `<PackageReference>` entries including Central Package Management (`Directory.Packages.props`)
+- [x] **MF-05**: `/arcanon:drift versions` parses Bundler `Gemfile.lock` — uses lockfile pinned versions (not Gemfile ranges); covers GEM, GIT, PATH sections
 - [ ] **MF-06**: Each new parser has a bats fixture covering its non-obvious edge case (parent POM, Kotlin DSL, CPM, GEM+GIT+PATH); `tests/fixtures/drift/` extended
-- [ ] **MF-07**: No regressions in existing npm / pypi / go / cargo drift output; bats suite remains green
+- [x] **MF-07**: No regressions in existing npm / pypi / go / cargo drift output; bats suite remains green
 
 ### Language Detection
 
@@ -127,13 +127,13 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MF-01 | 92 | Pending |
-| MF-02 | 92 | Pending |
-| MF-03 | 92 | Pending |
-| MF-04 | 92 | Pending |
-| MF-05 | 92 | Pending |
+| MF-01 | 92 | Complete |
+| MF-02 | 92 | Complete |
+| MF-03 | 92 | Complete |
+| MF-04 | 92 | Complete |
+| MF-05 | 92 | Complete |
 | MF-06 | 92 | Pending |
-| MF-07 | 92 | Pending |
+| MF-07 | 92 | Complete |
 | LANG-01 | 92 | Pending |
 | LANG-02 | 92 | Pending |
 | LANG-03 | 92 | Pending |
