@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v5.8.0
 milestone_name: Library Drift & Language Parity
-status: verifying
-stopped_at: Completed 95-03-PLAN.md
-last_updated: "2026-04-19T16:22:06.730Z"
+status: executing
+stopped_at: Completed 94-auth-db-enrichment-01-PLAN.md
+last_updated: "2026-04-19T16:30:37.947Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 32
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 95 — Shell Cleanup + Unified Dispatcher
+**Current focus:** Phase 94 — Auth/DB Extractor Expansion
 
 ## Current Position
 
-Phase: 95 (Shell Cleanup + Unified Dispatcher) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 94 (Auth/DB Extractor Expansion) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-19
 
 Progress: [          ] 0%
@@ -65,6 +65,8 @@ Progress: [          ] 0%
 - [Phase 95]: Pre-compute awk sleep interval once outside loop to avoid bc subprocess per iteration
 - [Phase 95]: Bash 4+ guard added to drift-types.sh; unset type_repos before first declare -A closes key-leak at loop entry
 - [Phase 95]: Remove global exec 2>/dev/null in lint.sh so linter panics surface; drop dead npm bin branch (npm 9+ removed it)
+- [Phase 94-auth-db-enrichment]: java-empty fixture needed for Test D isolation — SecurityConfig.java siblings in main fixture polluted no-signal test
+- [Phase 94-auth-db-enrichment]: DB signals for Java rely on .java source files only — pom.xml/yml not scanned; postgresql signal embedded in UserEntity.java comments
 
 ### Pending Todos
 
@@ -76,6 +78,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-19T16:22:06.726Z
-Stopped at: Completed 95-03-PLAN.md
+Last session: 2026-04-19T16:30:37.943Z
+Stopped at: Completed 94-auth-db-enrichment-01-PLAN.md
 Resume file: None

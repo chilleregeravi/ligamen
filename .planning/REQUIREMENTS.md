@@ -39,15 +39,15 @@ New ecosystem parsers in `scripts/drift-versions.sh`. Zero new runtime deps — 
 
 Extend `worker/scan/enrichment/auth-db-extractor.js` with language switch cases.
 
-- [ ] **ENR-01**: `LANG_EXTENSIONS` map includes `java: ['.java']`, `csharp: ['.cs']`, `ruby: ['.rb']`
-- [ ] **ENR-02**: `AUTH_SIGNALS.java` ships BOTH Spring Security 5 (`@EnableWebSecurity`, `@PreAuthorize`) AND Spring Security 6 (`SecurityFilterChain` bean, `OAuth2ResourceServer`) patterns
+- [x] **ENR-01**: `LANG_EXTENSIONS` map includes `java: ['.java']`, `csharp: ['.cs']`, `ruby: ['.rb']`
+- [x] **ENR-02**: `AUTH_SIGNALS.java` ships BOTH Spring Security 5 (`@EnableWebSecurity`, `@PreAuthorize`) AND Spring Security 6 (`SecurityFilterChain` bean, `OAuth2ResourceServer`) patterns
 - [ ] **ENR-03**: `AUTH_SIGNALS.csharp` covers ASP.NET Identity (`[Authorize]`, `AddAuthentication`, `AddJwtBearer`)
 - [ ] **ENR-04**: `AUTH_SIGNALS.ruby` covers Devise (`before_action :authenticate_user!`, `devise_for`) and HTTP basic
-- [ ] **ENR-05**: `DB_SOURCE_SIGNALS.java` covers Spring Data (`@Entity`, `JdbcTemplate`, `EntityManager`, `spring.datasource.url` in application.{yml,properties})
+- [x] **ENR-05**: `DB_SOURCE_SIGNALS.java` covers Spring Data (`@Entity`, `JdbcTemplate`, `EntityManager`, `spring.datasource.url` in application.{yml,properties})
 - [ ] **ENR-06**: `DB_SOURCE_SIGNALS.csharp` covers EF Core (`DbContext`, `Microsoft.EntityFrameworkCore`, minimal-API `builder.Services.AddDbContext<T>()`)
 - [ ] **ENR-07**: `DB_SOURCE_SIGNALS.ruby` covers ActiveRecord and probes `config/database.yml` `adapter:` key
-- [ ] **ENR-08**: `EXCLUDED_DIRS` adds `target` (Maven output), `obj`, `bin` (MSBuild output) so enrichment does not traverse generated files
-- [ ] **ENR-09**: `services.auth_mechanism` and `services.db_backend` populated for scanned Java/C#/Ruby services (end-to-end test against a fixture repo per language)
+- [x] **ENR-08**: `EXCLUDED_DIRS` adds `target` (Maven output), `obj`, `bin` (MSBuild output) so enrichment does not traverse generated files
+- [x] **ENR-09**: `services.auth_mechanism` and `services.db_backend` populated for scanned Java/C#/Ruby services (end-to-end test against a fixture repo per language)
 
 ### Dependency Persistence (THE-1019 core)
 
@@ -142,15 +142,15 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | TYPE-03 | 92 | Complete |
 | TYPE-04 | 92 | Complete |
 | TYPE-05 | 92 | Complete |
-| ENR-01 | 94 | Pending |
-| ENR-02 | 94 | Pending |
+| ENR-01 | 94 | Complete |
+| ENR-02 | 94 | Complete |
 | ENR-03 | 94 | Pending |
 | ENR-04 | 94 | Pending |
-| ENR-05 | 94 | Pending |
+| ENR-05 | 94 | Complete |
 | ENR-06 | 94 | Pending |
 | ENR-07 | 94 | Pending |
-| ENR-08 | 94 | Pending |
-| ENR-09 | 94 | Pending |
+| ENR-08 | 94 | Complete |
+| ENR-09 | 94 | Complete |
 | DEP-01 | 93 | Complete |
 | DEP-02 | 93 | Complete |
 | DEP-03 | 93 | Complete |
