@@ -154,3 +154,77 @@ test("serializePayload returns body + byte count under the limit", () => {
   assert.ok(bytes > 0);
   assert.equal(JSON.parse(body).version, "1.0");
 });
+
+// ── HUB-01/02/03: libraryDepsEnabled gate + schemaVersion derivation ──────────
+
+test("buildFindingsBlock(findings) with no opts returns schemaVersion 1.0 (backward compat)", () => {
+  const block = buildFindingsBlock({ services: [{ name: "svc" }] });
+  assert.equal(block.schemaVersion, "1.0");
+  assert.equal(block.services[0].dependencies, undefined);
+});
+
+test("buildFindingsBlock with libraryDepsEnabled=false returns schemaVersion 1.0 and no per-service deps", () => {
+  const findings = {
+    services: [{ name: "svc", dependencies: [{ package_name: "express" }] }],
+  };
+  const block = buildFindingsBlock(findings, { libraryDepsEnabled: false });
+  assert.equal(block.schemaVersion, "1.0");
+  assert.equal(block.services[0].dependencies, undefined);
+});
+
+test("buildFindingsBlock with libraryDepsEnabled=true but all services have empty deps returns schemaVersion 1.0 (flag-on fallback)", () => {
+  const findings = {
+    services: [{ name: "svc-a", dependencies: [] }, { name: "svc-b" }],
+  };
+  const block = buildFindingsBlock(findings, { libraryDepsEnabled: true });
+  assert.equal(block.schemaVersion, "1.0");
+  assert.equal(block.services[0].dependencies, undefined);
+  assert.equal(block.services[1].dependencies, undefined);
+});
+
+test("buildFindingsBlock with libraryDepsEnabled=true and non-empty deps returns schemaVersion 1.1 with per-service dependencies", () => {
+  const dep = { id: 1, service_id: 10, ecosystem: "npm", package_name: "express", version_spec: "^4", resolved_version: "4.18.0", manifest_file: "package.json", dep_kind: "direct" };
+  const findings = {
+    services: [
+      { name: "svc-a", dependencies: [dep] },
+      { name: "svc-b" },
+    ],
+  };
+  const block = buildFindingsBlock(findings, { libraryDepsEnabled: true });
+  assert.equal(block.schemaVersion, "1.1");
+  assert.deepEqual(block.services[0].dependencies, [dep]);
+  assert.deepEqual(block.services[1].dependencies, []);
+});
+
+test("buildScanPayload without libraryDepsEnabled emits version 1.0 (default)", () => {
+  const repoPath = makeTempGitRepo();
+  const { payload } = buildScanPayload({
+    findings: { services: [{ name: "svc" }] },
+    repoPath,
+  });
+  assert.equal(payload.version, "1.0");
+  assert.equal(payload.findings.services[0].dependencies, undefined);
+});
+
+test("buildScanPayload with libraryDepsEnabled=true and non-empty deps emits version 1.1", () => {
+  const repoPath = makeTempGitRepo();
+  const dep = { id: 1, service_id: 1, ecosystem: "npm", package_name: "lodash", version_spec: "^4", resolved_version: "4.17.21", manifest_file: "package.json", dep_kind: "direct" };
+  const { payload } = buildScanPayload({
+    findings: { services: [{ name: "svc", dependencies: [dep] }] },
+    repoPath,
+    libraryDepsEnabled: true,
+  });
+  assert.equal(payload.version, "1.1");
+  assert.deepEqual(payload.findings.services[0].dependencies, [dep]);
+});
+
+test("buildScanPayload with libraryDepsEnabled=true but empty deps emits version 1.0 (fallback)", () => {
+  const repoPath = makeTempGitRepo();
+  const { payload } = buildScanPayload({
+    findings: { services: [{ name: "svc", dependencies: [] }] },
+    repoPath,
+    libraryDepsEnabled: true,
+  });
+  assert.equal(payload.version, "1.0");
+  assert.equal(payload.findings.services[0].dependencies, undefined);
+});
