@@ -4,6 +4,12 @@
 # Reports CRITICAL when a shared type has differing field lists.
 set -euo pipefail
 
+# Require bash 4+ for associative arrays (declare -A)
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "drift-types: requires bash 4 or later (found bash ${BASH_VERSION})" >&2
+  exit 1
+fi
+
 # Source shared helpers (sets PLUGIN_ROOT, SHOW_INFO, LINKED_REPOS, emit_finding, parse_drift_args)
 source "$(dirname "${BASH_SOURCE[0]}")/drift-common.sh"
 
@@ -221,6 +227,8 @@ for lang in "${!lang_repos[@]}"; do
   [[ "$repo_count" -lt 2 ]] && continue
 
   # Collect type names from all repos in this language group
+  # unset first to prevent key leakage from a previous language iteration
+  unset type_repos
   declare -A type_repos  # type_repos["TypeName"] = "repo1 repo2 ..."
 
   for repo in $repos; do
