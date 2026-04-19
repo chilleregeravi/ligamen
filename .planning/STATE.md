@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v5.8.0
 milestone_name: Library Drift & Language Parity
 status: executing
-stopped_at: Completed 93-dep-collector 93-03-PLAN.md
-last_updated: "2026-04-19T15:53:31.619Z"
+stopped_at: Completed 95-01-PLAN.md
+last_updated: "2026-04-19T16:13:05.637Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 32
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 93 — DB Schema + Dependency Collector
+**Current focus:** Phase 95 — Shell Cleanup + Unified Dispatcher
 
 ## Current Position
 
-Phase: 93 (DB Schema + Dependency Collector) — EXECUTING
-Plan: 4 of 4
+Phase: 95 (Shell Cleanup + Unified Dispatcher) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
 Last activity: 2026-04-19
 
@@ -59,6 +59,8 @@ Progress: [          ] 0%
 - [Phase 93-dep-collector]: runMigrations() in test seedDb() instead of partial migration chain — QueryEngine constructor requires all migrations for unconditional prepared statements
 - [Phase 93-dep-collector]: Poetry regex: replaced \z (Perl/Ruby) with JS-compatible end-of-string match
 - [Phase 93-dep-collector]: ecosystems_scanned pushed even for empty-dep manifests — found+parsed without error is a valid scanned state
+- [Phase 95-shell-cleanup-dispatcher]: drift.sh uses bash subprocess (not source) to preserve DSP-03 direct-invocation regression contract
+- [Phase 95-shell-cleanup-dispatcher]: Reserved slots licenses|security exit 2 (distinct from unknown=1) to differentiate reserved vs typo
 
 ### Pending Todos
 
@@ -70,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-19T15:53:31.613Z
-Stopped at: Completed 93-dep-collector 93-03-PLAN.md
+Last session: 2026-04-19T16:13:01.631Z
+Stopped at: Completed 95-01-PLAN.md
 Resume file: None

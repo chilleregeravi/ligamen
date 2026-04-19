@@ -73,20 +73,20 @@ Extend `worker/scan/enrichment/auth-db-extractor.js` with language switch cases.
 
 ### Drift Dispatcher & Shell Cleanup (THE-1021)
 
-- [ ] **DSP-01**: New `scripts/drift.sh` dispatcher supports subcommands `versions | types | openapi | all`; reserves `licenses | security` for future (prints "not yet implemented" with exit 2)
-- [ ] **DSP-02**: Dispatcher invokes subcommands as subshells (`bash "$PLUGIN_ROOT/scripts/drift-${sub}.sh"`), never `source` — existing direct-invoke paths continue to work unchanged
-- [ ] **DSP-03**: `scripts/drift-*.sh` subcommand scripts keep sourcing `drift-common.sh` themselves (no coupling to dispatcher)
-- [ ] **DSP-04**: `scripts/drift.sh` bails cleanly with helpful message if `${BASH_VERSINFO[0]} < 4`
+- [x] **DSP-01**: New `scripts/drift.sh` dispatcher supports subcommands `versions | types | openapi | all`; reserves `licenses | security` for future (prints "not yet implemented" with exit 2)
+- [x] **DSP-02**: Dispatcher invokes subcommands as subshells (`bash "$PLUGIN_ROOT/scripts/drift-${sub}.sh"`), never `source` — existing direct-invoke paths continue to work unchanged
+- [x] **DSP-03**: `scripts/drift-*.sh` subcommand scripts keep sourcing `drift-common.sh` themselves (no coupling to dispatcher)
+- [x] **DSP-04**: `scripts/drift.sh` bails cleanly with helpful message if `${BASH_VERSINFO[0]} < 4`
 - [ ] **DSP-05**: New `lib/worker-restart.sh` exports `should_restart_worker()` (returns 0/1 + stdout reason) and `restart_worker_if_stale()` (idempotent stop-then-background-start)
 - [ ] **DSP-06**: `scripts/session-start.sh` lines 43-68 replaced with `source lib/worker-restart.sh; restart_worker_if_stale || true`
 - [ ] **DSP-07**: `scripts/worker-start.sh` lines 28-61 replaced with same call; PID-file mutex preserved
-- [ ] **DSP-08**: `drift-common.sh` "no linked repos" case emits `echo "drift: no linked repos configured" >&2` before return
+- [x] **DSP-08**: `drift-common.sh` "no linked repos" case emits `echo "drift: no linked repos configured" >&2` before return
 - [ ] **DSP-09**: Bug fix: `lib/worker-client.sh:38` — remove `bc` subprocess per sleep iteration; pre-compute once or use `awk`
 - [ ] **DSP-10**: Bug fix: `scripts/drift-types.sh:148,202` — `unset type_repos && declare -A type_repos` per language block to prevent associative-array leak
 - [ ] **DSP-11**: Bug fix: `scripts/lint.sh:10` — remove global `exec 2>/dev/null`; redirect per linter call so linter panics are surfaced
 - [ ] **DSP-12**: Bug fix: Declare Bash 4+ as plugin floor — add version guard at top of `drift-types.sh`; update `lib/config.sh:32` comment to drop bash 3.2 language
 - [ ] **DSP-13**: Dead code removed: `scripts/impact.sh:16-55` `classify_match()` function; `scripts/lint.sh:109` `NPM_BIN=$(npm bin ...)` line
-- [ ] **DSP-14**: Full bats suite passes (existing + new fixtures for MF-06, DSP-10); zero regressions
+- [x] **DSP-14**: Full bats suite passes (existing + new fixtures for MF-06, DSP-10); zero regressions
 
 ## v2 Requirements (Deferred)
 
@@ -167,20 +167,20 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | HUB-03 | 96 | Pending |
 | HUB-04 | 96 | Pending |
 | HUB-05 | 96 | Pending |
-| DSP-01 | 95 | Pending |
-| DSP-02 | 95 | Pending |
-| DSP-03 | 95 | Pending |
-| DSP-04 | 95 | Pending |
+| DSP-01 | 95 | Complete |
+| DSP-02 | 95 | Complete |
+| DSP-03 | 95 | Complete |
+| DSP-04 | 95 | Complete |
 | DSP-05 | 95 | Pending |
 | DSP-06 | 95 | Pending |
 | DSP-07 | 95 | Pending |
-| DSP-08 | 95 | Pending |
+| DSP-08 | 95 | Complete |
 | DSP-09 | 95 | Pending |
 | DSP-10 | 95 | Pending |
 | DSP-11 | 95 | Pending |
 | DSP-12 | 95 | Pending |
 | DSP-13 | 95 | Pending |
-| DSP-14 | 95 | Pending |
+| DSP-14 | 95 | Complete |
 
 **Coverage:**
 - v1 requirements: 53 total
