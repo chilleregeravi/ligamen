@@ -55,9 +55,10 @@ function _readHubConfig() {
       hubAutoUpload: Boolean(cfg?.hub?.["auto-upload"]),
       hubUrl: cfg?.hub?.url,
       projectSlug: cfg?.hub?.["project-slug"] || cfg?.["project-name"],
+      libraryDepsEnabled: Boolean(cfg?.hub?.beta_features?.library_deps),
     };
   } catch {
-    return { hubAutoUpload: false, hubUrl: undefined, projectSlug: undefined };
+    return { hubAutoUpload: false, hubUrl: undefined, projectSlug: undefined, libraryDepsEnabled: false };
   }
 }
 
@@ -766,6 +767,22 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     queryEngine.persistFindings(r.repoId, r.findings, r.currentHead, r.scanVersionId);
     queryEngine.endScan(r.repoId, r.scanVersionId);
 
+    // 10a. Back-fill DB ids onto r.findings.services so the hub auto-upload
+    // loop (step HUB-01) can call getDependenciesForService(svc.id).
+    // persistFindings builds a name→id map internally but does not write ids
+    // back onto the findings objects. We resolve them here via a single SELECT.
+    if (Array.isArray(r.findings?.services) && r.findings.services.length > 0) {
+      const dbServices = queryEngine._db
+        .prepare('SELECT id, name FROM services WHERE repo_id = ?')
+        .all(r.repoId);
+      const nameToId = new Map(dbServices.map((s) => [s.name, s.id]));
+      for (const svc of r.findings.services) {
+        if (svc.name && nameToId.has(svc.name)) {
+          svc.id = nameToId.get(svc.name);
+        }
+      }
+    }
+
     // 11. Run enrichment pass per service — post-scan, after bracket closes
     // ENRICH-01: enrichment runs after core scan. Bracket is already closed above.
     // Enrichment MUST NOT call beginScan/endScan — never opens a new bracket.
@@ -835,7 +852,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
   // HUB-01: Optional Arcanon Hub sync — opt-in via ARCANON_API_KEY or config.hub.autoUpload.
   // Runs per-repo, fire-and-log — a hub failure never fails the scan.
   try {
-    const { hubAutoUpload, hubUrl, projectSlug } = _readHubConfig();
+    const { hubAutoUpload, hubUrl, projectSlug, libraryDepsEnabled } = _readHubConfig();
     // Credential check spans env vars AND ~/.arcanon/config.json so that
     // users who ran /arcanon:login (without exporting an env var) still
     // get auto-uploads.
@@ -850,6 +867,16 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     if (hasCredentials() && hubAutoUpload) {
       for (const r of results) {
         if (!r.findings) continue;
+        // HUB-01 / HUB-03: when the feature flag is on, attach per-service deps
+        // fetched from the local DB. When the flag is off, skip the DB read entirely
+        // and let buildFindingsBlock emit v1.0 unchanged.
+        if (libraryDepsEnabled && Array.isArray(r.findings.services)) {
+          for (const svc of r.findings.services) {
+            if (typeof svc.id === 'number') {
+              svc.dependencies = queryEngine.getDependenciesForService(svc.id);
+            }
+          }
+        }
         try {
           const outcome = await syncFindings({
             findings: r.findings,
@@ -857,6 +884,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
             projectSlug,
             hubUrl,
             scanMode: r.mode,
+            libraryDepsEnabled,   // HUB-03 feature flag — gates v1.1 emission
             log: (level, msg, data) => slog(level, `hub-sync: ${msg}`, data),
           });
           if (outcome.ok) {
