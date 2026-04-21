@@ -20,6 +20,10 @@ Remove legacy surface, merge redundant commands, migrate config key.
 - [ ] **CLN-07**: Worker `hub.js` line 114 + `manager.js` line 55 use two-read pattern `cfg?.hub?.["auto-sync"] ?? cfg?.hub?.["auto-upload"]`
 - [ ] **CLN-08**: Deprecation warning emitted to stderr when legacy `auto-upload` key is read
 - [ ] **CLN-09**: bats regression test — existing commands still work (`/arcanon:map`, `/arcanon:drift`, `/arcanon:impact`, `/arcanon:sync`, `/arcanon:login`, `/arcanon:status`, `/arcanon:export`)
+- [ ] **CLN-10**: `/arcanon:impact` absorbs cross-impact's `--exclude <repo>` flag (can be repeated to exclude multiple repos from results) — matches flag parity flagged by review point #8
+- [ ] **CLN-11**: `/arcanon:impact --changed` flag (no positional target required) auto-detects changed symbols from uncommitted `git diff` and queries impact for each — absorbs cross-impact's primary use case
+- [ ] **CLN-12**: `/arcanon:impact` has 3-state degradation model inherited from cross-impact: (A) no worker → grep-based legacy fallback; (B) worker up, no map data → prompt to run /arcanon:map, then grep fallback as partial answer; (C) worker up, map has data → graph query flow
+- [ ] **CLN-13**: Phase 97 delete-cross-impact task (CLN-01) must run AFTER merge task (CLN-10..12) — ensures no regression in feature set during the deletion. bats test: `/arcanon:impact --exclude X` and `/arcanon:impact --changed` work BEFORE `commands/cross-impact.md` is deleted.
 
 ### Update Command (UPD)
 
@@ -127,6 +131,10 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | CLN-07 | 97 | Pending |
 | CLN-08 | 97 | Pending |
 | CLN-09 | 97 | Pending |
+| CLN-10 | 97 | Pending |
+| CLN-11 | 97 | Pending |
+| CLN-12 | 97 | Pending |
+| CLN-13 | 97 | Pending |
 | UPD-01 | 98 | Pending |
 | UPD-02 | 98 | Pending |
 | UPD-03 | 98 | Pending |
@@ -162,7 +170,7 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | HOK-13 | 100 | Pending |
 
 **Coverage:**
-- v1 requirements: 41 total
+- v1 requirements: 45 total
 - Mapped to phases: 41, Unmapped: 0 ✓
 
 ---
