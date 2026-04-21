@@ -156,7 +156,7 @@ ENRICHMENT="$(
     HUB_JSON="$(bash "$HUB_SH" status --json 2>/dev/null)" || HUB_JSON=""
     if [[ -n "$HUB_JSON" ]]; then
       CREDS="$(printf '%s' "$HUB_JSON" | jq -r '.credentials // "missing"' 2>/dev/null)" || CREDS="missing"
-      AUTO="$(printf '%s' "$HUB_JSON" | jq -r '.hub_auto_upload // false' 2>/dev/null)" || AUTO="false"
+      AUTO="$(printf '%s' "$HUB_JSON" | jq -r '.hub_auto_sync // .hub_auto_upload // false' 2>/dev/null)" || AUTO="false"
       case "${CREDS}:${AUTO}" in
         present:true)  HUB_STATUS="auto-sync on" ;;
         present:false) HUB_STATUS="manual" ;;
