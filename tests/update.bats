@@ -122,3 +122,113 @@ CHG
   run bash -c "bash '$PLUGIN_ROOT/scripts/update.sh' --check | jq -e 'has(\"status\") and has(\"installed\") and has(\"remote\") and has(\"update_available\") and has(\"changelog_preview\")'"
   assert_success
 }
+
+# ─── UPD-07 / UPD-08: --kill mode tests (Phase 98, plan 98-02) ───────────────
+
+# UPD-07: scan-lock abort (live lock)
+@test "UPD-07: --kill emits scan_in_progress when scan.lock has a live PID" {
+  export ARCANON_DATA_DIR="$(mktemp -d)"
+  export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
+
+  # Create a scan.lock containing a live PID (use $$ — the current shell)
+  echo "$$" > "${ARCANON_DATA_DIR}/scan.lock"
+  # Also create a worker.pid (so --kill would be tempted to act without the lock guard)
+  echo "$$" > "${ARCANON_DATA_DIR}/worker.pid"
+
+  run bash -c "bash '$PLUGIN_ROOT/scripts/update.sh' --kill | jq -er '.status'"
+  assert_success
+  assert_output "scan_in_progress"
+
+  # worker.pid must still exist — we did NOT kill
+  [[ -f "${ARCANON_DATA_DIR}/worker.pid" ]] || { echo "worker.pid was removed despite scan_in_progress"; return 1; }
+
+  rm -rf "$ARCANON_DATA_DIR"
+}
+
+# UPD-07: stale scan.lock is cleared and kill proceeds
+@test "UPD-07: --kill clears stale scan.lock (dead PID) and proceeds" {
+  export ARCANON_DATA_DIR="$(mktemp -d)"
+  export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
+
+  # PID 999999 is virtually guaranteed not to exist on a test machine
+  echo "999999" > "${ARCANON_DATA_DIR}/scan.lock"
+
+  run bash -c "bash '$PLUGIN_ROOT/scripts/update.sh' --kill | jq -er '.status'"
+  assert_success
+  assert_output "killed"
+
+  # scan.lock should be gone now
+  [[ ! -f "${ARCANON_DATA_DIR}/scan.lock" ]] || { echo "stale scan.lock was not cleared"; return 1; }
+
+  rm -rf "$ARCANON_DATA_DIR"
+}
+
+# UPD-08: sigterm path with live worker
+@test "UPD-08: --kill sends SIGTERM and removes worker.pid/worker.port on live worker" {
+  export ARCANON_DATA_DIR="$(mktemp -d)"
+  export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
+  export ARCANON_WORKER_PORT="37999"
+
+  bash "$PLUGIN_ROOT/scripts/worker-start.sh" >/dev/null
+  # shellcheck source=../plugins/arcanon/lib/worker-client.sh
+  source "$PLUGIN_ROOT/lib/worker-client.sh"
+  wait_for_worker 20 250
+
+  [[ -f "${ARCANON_DATA_DIR}/worker.pid" ]] || { echo "worker never started"; return 1; }
+  local pre_pid; pre_pid=$(cat "${ARCANON_DATA_DIR}/worker.pid")
+
+  run bash -c "bash '$PLUGIN_ROOT/scripts/update.sh' --kill | jq -er '.status'"
+  assert_success
+  assert_output "killed"
+
+  # worker.pid and worker.port must be gone
+  [[ ! -f "${ARCANON_DATA_DIR}/worker.pid" ]] || { echo "worker.pid survived --kill"; return 1; }
+  [[ ! -f "${ARCANON_DATA_DIR}/worker.port" ]] || { echo "worker.port survived --kill"; return 1; }
+
+  # Worker process must be gone (give kernel 0.5s to reap)
+  sleep 0.5
+  ! kill -0 "$pre_pid" 2>/dev/null || { echo "worker PID $pre_pid still alive after --kill"; kill -9 "$pre_pid"; return 1; }
+
+  rm -rf "$ARCANON_DATA_DIR"
+}
+
+# UPD-08: no-pid path
+@test "UPD-08: --kill emits reason=no_pid_file when worker not running" {
+  export ARCANON_DATA_DIR="$(mktemp -d)"
+  export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
+
+  run bash -c "bash '$PLUGIN_ROOT/scripts/update.sh' --kill | jq -er '.reason'"
+  assert_success
+  assert_output "no_pid_file"
+
+  rm -rf "$ARCANON_DATA_DIR"
+}
+
+# UPD-08: update.sh never references restart_worker_if_stale or worker_start_background (Anti-Pattern 2 regression guard)
+@test "UPD-08: scripts/update.sh does not reference restart_worker_if_stale or worker_start_background" {
+  run grep -E 'restart_worker_if_stale|worker_start_background' "$PLUGIN_ROOT/scripts/update.sh"
+  # grep exits 1 when no match — that's success for us
+  assert_failure
+}
+
+# UPD-08: after --kill, no new Arcanon worker has been started
+@test "UPD-08: --kill does not spawn a new worker (kill-only semantics)" {
+  export ARCANON_DATA_DIR="$(mktemp -d)"
+  export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
+  export ARCANON_WORKER_PORT="37999"
+
+  bash "$PLUGIN_ROOT/scripts/worker-start.sh" >/dev/null
+  source "$PLUGIN_ROOT/lib/worker-client.sh"
+  wait_for_worker 20 250
+
+  bash "$PLUGIN_ROOT/scripts/update.sh" --kill >/dev/null
+  sleep 0.5
+
+  # No worker.pid file means no new worker started (--kill is kill-only, 98-03 starts the new one)
+  [[ ! -f "${ARCANON_DATA_DIR}/worker.pid" ]] || { echo "worker.pid reappeared — --kill spawned a new worker"; return 1; }
+
+  # No Node process listening on 37999
+  ! lsof -i :37999 >/dev/null 2>&1 || { echo "something is listening on 37999 after --kill"; return 1; }
+
+  rm -rf "$ARCANON_DATA_DIR"
+}
