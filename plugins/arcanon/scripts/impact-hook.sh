@@ -18,11 +18,15 @@
 # Defensive: never `set -e`. Every exit must be explicit.
 
 # ---------------------------------------------------------------------------
-# t0 — begin latency clock (for debug trace)
+# t0 — begin latency clock (for debug trace, only when debug is active)
 # ---------------------------------------------------------------------------
 # macOS BSD date returns "17768000553N" for +%s%3N (%3N is not supported and
 # exits 0 with garbage). Validate the result is purely numeric before using it;
 # fall back to python3 (which is always available on macOS) otherwise.
+#
+# PERFORMANCE NOTE: python3 spawn costs ~30-40ms on macOS. _ms_now() is only
+# called when ARCANON_IMPACT_DEBUG=1 is set. _t0_ms is captured lazily here
+# (only when debug is active) to avoid the overhead on every normal invocation.
 _ms_now() {
   local _v
   _v=$(date +%s%3N 2>/dev/null)
@@ -32,7 +36,12 @@ _ms_now() {
     python3 -c 'import time;print(int(time.time()*1000))' 2>/dev/null || echo 0
   fi
 }
-_t0_ms=$(_ms_now)
+# Only capture t0 when debug tracing is requested (avoids python3 spawn on macOS hot path)
+if [[ "${ARCANON_IMPACT_DEBUG:-0}" == "1" ]]; then
+  _t0_ms=$(_ms_now)
+else
+  _t0_ms=0
+fi
 
 # ---------------------------------------------------------------------------
 # ARCANON_DISABLE_HOOK (HOK-11) — escape hatch, short-circuit
@@ -52,7 +61,13 @@ fi
 # ---------------------------------------------------------------------------
 # Source library helpers — silently swallow errors (HOK-09)
 # ---------------------------------------------------------------------------
-_HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Pure-bash hook dir resolution: avoids two subshells (cd + dirname) on every run.
+# ${BASH_SOURCE[0]%/*} strips the filename component; works for both absolute and
+# relative paths because bash sets BASH_SOURCE[0] to the script path as invoked.
+_HOOK_DIR="${BASH_SOURCE[0]%/*}"
+# If the script is invoked without a path component (e.g. `bash impact-hook.sh`),
+# BASH_SOURCE[0] equals the filename with no slash — fall back to pwd.
+[[ "$_HOOK_DIR" == "${BASH_SOURCE[0]}" ]] && _HOOK_DIR="$(pwd)"
 _LIB_DIR="${_HOOK_DIR}/../lib"
 
 # shellcheck source=../lib/data-dir.sh
@@ -60,7 +75,7 @@ source "${_LIB_DIR}/data-dir.sh" 2>/dev/null || exit 0
 # shellcheck source=../lib/db-path.sh
 source "${_LIB_DIR}/db-path.sh" 2>/dev/null || exit 0
 
-DATA_DIR=$(resolve_arcanon_data_dir 2>/dev/null) || exit 0
+DATA_DIR=$(resolve_arcanon_data_dir) || exit 0
 
 # ---------------------------------------------------------------------------
 # Debug trace helper (HOK-10)
@@ -108,15 +123,22 @@ fi
 # ---------------------------------------------------------------------------
 # Path normalization (mirror file-guard.sh lines 34-42)
 # ---------------------------------------------------------------------------
-if command -v realpath &>/dev/null && realpath -m / &>/dev/null 2>&1; then
-  FILE=$(realpath -m "$RAW_FILE" 2>/dev/null || printf '%s' "$RAW_FILE")
-else
-  _dir=$(dirname "$RAW_FILE")
-  _base=$(basename "$RAW_FILE")
+# Avoid calling command -v + realpath -m / probe on every invocation — those are
+# two extra subshells. Instead call realpath -m directly and fall back only on
+# failure (non-zero exit). On macOS, realpath is available via coreutils or
+# as /usr/bin/realpath (macOS 12.3+). The -m flag is GNU-only; BSD realpath
+# does not support it, so we test the exit code of the actual call.
+FILE=$(realpath -m "$RAW_FILE" 2>/dev/null)
+if [[ -z "$FILE" ]]; then
+  # realpath unavailable or failed (BSD / older macOS): manual fallback
+  _dir="${RAW_FILE%/*}"
+  _base="${RAW_FILE##*/}"
+  # If no slash in RAW_FILE, _dir would equal RAW_FILE — use pwd
+  [[ "$_dir" == "$RAW_FILE" ]] && _dir="$(pwd)"
   _resolved_dir=$(cd "$_dir" 2>/dev/null && pwd || printf '%s' "$_dir")
   FILE="${_resolved_dir}/${_base}"
 fi
-BASENAME=$(basename "$FILE")
+BASENAME="${FILE##*/}"
 
 # ---------------------------------------------------------------------------
 # HOK-07 — Self-exclusion: skip if file is inside $CLAUDE_PLUGIN_ROOT
@@ -155,15 +177,16 @@ fi
 
 # Resolve project root by walking up from the edited file.
 # Looks for arcanon.config.json -> .arcanon/ -> .git/ (in that order)
+# Uses bash parameter expansion (${dir%/*}) instead of $(dirname) to avoid
+# forking a subprocess per directory level — saves ~2ms per level traversed.
 _find_project_root() {
-  local dir
-  dir=$(dirname "$1")
-  while [[ "$dir" != "/" && "$dir" != "" ]]; do
+  local dir="${1%/*}"  # strip filename component in pure bash
+  while [[ "$dir" != "/" && -n "$dir" ]]; do
     if [[ -f "$dir/arcanon.config.json" ]] || [[ -d "$dir/.arcanon" ]] || [[ -d "$dir/.git" ]]; then
       printf '%s\n' "$dir"
       return 0
     fi
-    dir=$(dirname "$dir")
+    dir="${dir%/*}"
   done
   return 1
 }
