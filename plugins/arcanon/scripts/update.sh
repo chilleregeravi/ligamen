@@ -19,8 +19,9 @@ PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && p
 MODE="${1:-}"
 case "$MODE" in
   --check|--kill) ;;  # fall through to mode-specific logic below
-  --prune-cache|--verify)
-    echo "{\"error\": \"mode ${MODE} not yet implemented (pending plan 98-03)\"}" >&2
+  --prune-cache) ;;  # fall through to prune logic below
+  --verify)
+    echo "{\"error\":\"mode --verify not yet implemented (pending Task 2 of 98-03)\"}" >&2
     exit 1
     ;;
   *)
@@ -85,6 +86,61 @@ if [[ "$MODE" == "--kill" ]]; then
   sleep 0.1  # let kernel reap
   rm -f "$PID_FILE" "$PORT_FILE"
   printf '{"status":"killed","reason":"sigkill","pid":"%s"}\n' "$PID"
+  exit 0
+fi
+
+# ─── --prune-cache mode (REQ UPD-09 — Pitfall 17) ───────────────────────────
+if [[ "$MODE" == "--prune-cache" ]]; then
+  CURRENT_VER=$(jq -r '.version // empty' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || true)
+  if [[ -z "$CURRENT_VER" ]]; then
+    CURRENT_VER=$(jq -r '.version // empty' "${PLUGIN_ROOT}/package.json" 2>/dev/null || true)
+  fi
+
+  if [[ -z "$CURRENT_VER" ]]; then
+    printf '{"status":"skipped","reason":"no_current_version","pruned":[],"kept":[]}\n'
+    exit 0
+  fi
+
+  # Track what we pruned and what we kept for transparent reporting.
+  declare -a PRUNED=()
+  declare -a KEPT=()
+  declare -a LOCKED=()
+
+  # Glob-discover cache dirs. Anti-Pattern 4: do NOT hardcode the marketplace segment.
+  shopt -s nullglob
+  for dir in "${HOME}"/.claude/plugins/cache/*/arcanon/*/; do
+    # Extract version (last path segment before trailing slash)
+    ver="${dir%/}"
+    ver="${ver##*/}"
+
+    # Keep the current version — that's the one we just installed
+    if [[ "$ver" == "$CURRENT_VER" ]]; then
+      KEPT+=("$dir")
+      continue
+    fi
+
+    # Pitfall 17: refuse to delete a dir that has active file handles.
+    # Worker was killed in 98-02 Step 4, so old dir should be idle, but belt-and-suspenders.
+    if command -v lsof >/dev/null 2>&1 && lsof +D "$dir" >/dev/null 2>&1; then
+      LOCKED+=("$dir")
+      continue
+    fi
+
+    # Safe to remove
+    if rm -rf "$dir" 2>/dev/null; then
+      PRUNED+=("$dir")
+    else
+      LOCKED+=("$dir")  # rm failed for some other reason — treat like locked
+    fi
+  done
+  shopt -u nullglob
+
+  # Emit JSON report. Handle empty arrays correctly with jq.
+  PRUNED_JSON=$(printf '%s\n' "${PRUNED[@]+"${PRUNED[@]}"}" | jq -R . | jq -s .)
+  KEPT_JSON=$(printf '%s\n' "${KEPT[@]+"${KEPT[@]}"}" | jq -R . | jq -s .)
+  LOCKED_JSON=$(printf '%s\n' "${LOCKED[@]+"${LOCKED[@]}"}" | jq -R . | jq -s .)
+  printf '{"status":"pruned","current_version":"%s","pruned":%s,"kept":%s,"locked":%s}\n' \
+    "$CURRENT_VER" "$PRUNED_JSON" "$KEPT_JSON" "$LOCKED_JSON"
   exit 0
 fi
 
