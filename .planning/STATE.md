@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.1.1
 milestone_name: Command Cleanup + Update + Ambient Hooks
 status: verifying
-stopped_at: Completed 98-03-PLAN.md (cache prune + health verify + final restart message)
-last_updated: "2026-04-21T19:17:07.146Z"
+stopped_at: Completed 99-01-PLAN.md (SessionStart enrichment block + bats tests)
+last_updated: "2026-04-21T19:25:38.913Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 36
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 7
-  percent: 58
+  completed_plans: 8
+  percent: 67
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-21)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 98 — /arcanon:update Command
+**Current focus:** Phase 99 — SessionStart Enrichment
 
 ## Current Position
 
-Phase: 98 (/arcanon:update Command) — EXECUTING
-Plan: 3 of 3
+Phase: 99 (SessionStart Enrichment) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-04-21
 
-Progress: [██████░░░░] 58%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -63,6 +63,8 @@ Progress: [██████░░░░] 58%
 - --yes absent: reinstall uses claude plugin update arcanon --scope user without --yes per 98-01 pre-flight confirmation
 - lsof +D detects open directory handles (cwd of a process), not open file handles — tail -f does NOT trigger it; tests must use (cd dir && sleep) to hold a genuine directory FD
 - --verify always exits 0 regardless of poll outcome (Pitfall 11 graceful failure); caller reads .status to format user message
+- Subshell capture pattern for ARCANON_ENRICHMENT block: entire block runs in $(...) subshell preserving set -euo pipefail discipline; failures exit silently via exit 0
+- Stale prefix appended to ENRICHMENT suffix (not full context string): banner reads 'Arcanon active. Commands: ... [stale map — last scanned 3d ago] 5 services mapped.'
 
 ### Pending Todos
 
@@ -76,6 +78,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-21T19:17:07.137Z
-Stopped at: Completed 98-03-PLAN.md (cache prune + health verify + final restart message)
+Last session: 2026-04-21T19:25:38.905Z
+Stopped at: Completed 99-01-PLAN.md (SessionStart enrichment block + bats tests)
 Resume file: None

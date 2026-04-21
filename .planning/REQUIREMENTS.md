@@ -73,13 +73,20 @@ New `/arcanon:update` command for clean self-update flow.
 
 Extend existing `session-start.sh` with impact-map context when available.
 
-- [ ] **SSE-01**: When `impact-map.db` exists for the current project AND is < 7 days old AND worker is up, inject enrichment suffix to the session banner
-- [ ] **SSE-02**: Enrichment string capped at ~120-200 chars: "N services mapped. K load-bearing files. Last scan: date. Hub: status."
-- [ ] **SSE-03**: Staleness guard: prepend `[stale map — last scanned Xd ago]` when scan age > 48h (but still within the 7-day window)
-- [ ] **SSE-04**: On any error (db missing, worker down, query timeout > 200ms) fall back silently to existing minimal banner — never break the session
-- [ ] **SSE-05**: Inject ONLY when an impact-map exists — NOT in directories where Arcanon has never scanned
-- [ ] **SSE-06**: Total SessionStart overhead stays under 200ms (three sqlite3 CLI queries + one `hub.sh status` call)
-- [ ] **SSE-07**: bats test with fixture impact-map.db: verifies fresh map → full enrichment, stale map → prefixed warning, missing map → silent fallback
+- [x] **SSE-01
+**: When `impact-map.db` exists for the current project AND is < 7 days old AND worker is up, inject enrichment suffix to the session banner
+- [x] **SSE-02
+**: Enrichment string capped at ~120-200 chars: "N services mapped. K load-bearing files. Last scan: date. Hub: status."
+- [x] **SSE-03
+**: Staleness guard: prepend `[stale map — last scanned Xd ago]` when scan age > 48h (but still within the 7-day window)
+- [x] **SSE-04
+**: On any error (db missing, worker down, query timeout > 200ms) fall back silently to existing minimal banner — never break the session
+- [x] **SSE-05
+**: Inject ONLY when an impact-map exists — NOT in directories where Arcanon has never scanned
+- [x] **SSE-06
+**: Total SessionStart overhead stays under 200ms (three sqlite3 CLI queries + one `hub.sh status` call)
+- [x] **SSE-07
+**: bats test with fixture impact-map.db: verifies fresh map → full enrichment, stale map → prefixed warning, missing map → silent fallback
 
 ### PreToolUse Impact Hook (HOK)
 
