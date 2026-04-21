@@ -20,10 +20,14 @@ Remove legacy surface, merge redundant commands, migrate config key.
 - [ ] **CLN-07**: Worker `hub.js` line 114 + `manager.js` line 55 use two-read pattern `cfg?.hub?.["auto-sync"] ?? cfg?.hub?.["auto-upload"]`
 - [ ] **CLN-08**: Deprecation warning emitted to stderr when legacy `auto-upload` key is read
 - [ ] **CLN-09**: bats regression test — existing commands still work (`/arcanon:map`, `/arcanon:drift`, `/arcanon:impact`, `/arcanon:sync`, `/arcanon:login`, `/arcanon:status`, `/arcanon:export`)
-- [ ] **CLN-10**: `/arcanon:impact` absorbs cross-impact's `--exclude <repo>` flag (can be repeated to exclude multiple repos from results) — matches flag parity flagged by review point #8
-- [ ] **CLN-11**: `/arcanon:impact --changed` flag (no positional target required) auto-detects changed symbols from uncommitted `git diff` and queries impact for each — absorbs cross-impact's primary use case
-- [ ] **CLN-12**: `/arcanon:impact` has 3-state degradation model inherited from cross-impact: (A) no worker → grep-based legacy fallback; (B) worker up, no map data → prompt to run /arcanon:map, then grep fallback as partial answer; (C) worker up, map has data → graph query flow
-- [ ] **CLN-13**: Phase 97 delete-cross-impact task (CLN-01) must run AFTER merge task (CLN-10..12) — ensures no regression in feature set during the deletion. bats test: `/arcanon:impact --exclude X` and `/arcanon:impact --changed` work BEFORE `commands/cross-impact.md` is deleted.
+- [x] **CLN-10
+**: `/arcanon:impact` absorbs cross-impact's `--exclude <repo>` flag (can be repeated to exclude multiple repos from results) — matches flag parity flagged by review point #8
+- [x] **CLN-11
+**: `/arcanon:impact --changed` flag (no positional target required) auto-detects changed symbols from uncommitted `git diff` and queries impact for each — absorbs cross-impact's primary use case
+- [x] **CLN-12
+**: `/arcanon:impact` has 3-state degradation model inherited from cross-impact: (A) no worker → grep-based legacy fallback; (B) worker up, no map data → prompt to run /arcanon:map, then grep fallback as partial answer; (C) worker up, map has data → graph query flow
+- [x] **CLN-13**: Phase 97 delete-cross-impact task (CLN-01) must run AFTER merge task (CLN-10
+..12) — ensures no regression in feature set during the deletion. bats test: `/arcanon:impact --exclude X` and `/arcanon:impact --changed` work BEFORE `commands/cross-impact.md` is deleted.
 
 ### Update Command (UPD)
 

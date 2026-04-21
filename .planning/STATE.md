@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.1.1
 milestone_name: Command Cleanup + Update + Ambient Hooks
 status: executing
-stopped_at: Ready to plan first phase
-last_updated: "2026-04-21T17:58:55.753Z"
-last_activity: 2026-04-21 -- Phase 100 planning complete
+stopped_at: Completed 97-04-PLAN.md (cross-impact merge into impact.md)
+last_updated: "2026-04-21T18:24:29.484Z"
+last_activity: 2026-04-21
 progress:
   total_phases: 36
   completed_phases: 0
-  total_plans: 11
-  completed_plans: 0
-  percent: 0
+  total_plans: 12
+  completed_plans: 1
+  percent: 8
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-21)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** v0.1.1 — Command Cleanup + Update + Ambient Hooks
+**Current focus:** Phase 97 — Command Cleanup
 
 ## Current Position
 
-Phase: 97 of 100 (not started)
-Plan: —
+Phase: 97 (Command Cleanup) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-04-21 -- Phase 100 planning complete
+Last activity: 2026-04-21
 
-Progress: [          ] 0%
+Progress: [█░░░░░░░░░] 8%
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [          ] 0%
 - [v0.1.1]: Defer skills and agents to v0.2.0 — ship hooks first to observe real firing behavior before designing skills that layer on top.
 - [v0.1.1]: PreToolUse hook fires on service-load-bearing files (`*.proto`, `openapi.*`, known service entry-points from impact-map) — deterministic, testable, doesn't depend on Claude's probabilistic skill matching.
 - [v0.1.1]: `/arcanon:update` is opt-in: checks remote, asks user, then applies cleanly (reinstall + kill stale worker + prune cache + verify). Addresses the v6.0.0 → v0.1.0 stale-worker incident directly.
+- Merge-then-delete sequencing for cross-impact: absorb all capabilities into impact.md first (Wave 1), then delete cross-impact.md (Wave 2) gated on bats serialization guard
 
 ### Pending Todos
 
@@ -63,6 +64,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-21
-Stopped at: Ready to plan first phase
+Last session: 2026-04-21T18:24:29.475Z
+Stopped at: Completed 97-04-PLAN.md (cross-impact merge into impact.md)
 Resume file: None
