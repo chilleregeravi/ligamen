@@ -18,9 +18,9 @@ PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && p
 
 MODE="${1:-}"
 case "$MODE" in
-  --check) ;;  # fall through to check logic below
-  --kill|--prune-cache|--verify)
-    echo "{\"error\": \"mode ${MODE} not yet implemented (pending plan 98-02/98-03)\"}" >&2
+  --check|--kill) ;;  # fall through to mode-specific logic below
+  --prune-cache|--verify)
+    echo "{\"error\": \"mode ${MODE} not yet implemented (pending plan 98-03)\"}" >&2
     exit 1
     ;;
   *)
@@ -28,6 +28,65 @@ case "$MODE" in
     exit 1
     ;;
 esac
+
+# ─── --kill mode (REQ UPD-07, UPD-08) ────────────────────────────────────────
+if [[ "$MODE" == "--kill" ]]; then
+  # Resolve DATA_DIR via shared resolver — same pattern as worker-stop.sh:11-15.
+  # shellcheck source=../lib/data-dir.sh
+  source "${PLUGIN_ROOT}/lib/data-dir.sh"
+  DATA_DIR="$(resolve_arcanon_data_dir)"
+  PID_FILE="${DATA_DIR}/worker.pid"
+  PORT_FILE="${DATA_DIR}/worker.port"
+  SCAN_LOCK="${DATA_DIR}/scan.lock"
+
+  # REQ UPD-07: scan-in-progress guard. scan.lock is written/removed by
+  # worker/scan/manager.js per Phase 80 SEC-03 and contains the scanning PID.
+  if [[ -f "$SCAN_LOCK" ]]; then
+    _lock_pid=$(cat "$SCAN_LOCK" 2>/dev/null || true)
+    if [[ -n "$_lock_pid" ]] && kill -0 "$_lock_pid" 2>/dev/null; then
+      printf '{"status":"scan_in_progress","lock_pid":"%s","message":"A scan is currently running (PID %s). Wait for it to finish or cancel it before updating."}\n' \
+        "$_lock_pid" "$_lock_pid"
+      exit 0  # REQ UPD-07: abort gracefully, not an error. commands/update.md reads status.
+    fi
+    # Stale lock — ignore it and proceed.
+    rm -f "$SCAN_LOCK"
+  fi
+
+  # REQ UPD-08: kill-only semantics (no restart).
+  if [[ ! -f "$PID_FILE" ]]; then
+    printf '{"status":"killed","reason":"no_pid_file","message":"worker was not running"}\n'
+    exit 0
+  fi
+
+  PID=$(cat "$PID_FILE" 2>/dev/null || true)
+  # T-98-05: validate PID is numeric before using it with kill
+  if [[ -z "$PID" ]] || ! [[ "$PID" =~ ^[0-9]+$ ]] || ! kill -0 "$PID" 2>/dev/null; then
+    rm -f "$PID_FILE" "$PORT_FILE"
+    printf '{"status":"killed","reason":"stale_pid","message":"worker was not running (stale PID)"}\n'
+    exit 0
+  fi
+
+  # SIGTERM, poll 10x500ms = 5s, SIGKILL. Mirrors worker-stop.sh:36-54.
+  kill -TERM "$PID" 2>/dev/null || true
+
+  _iter=0
+  while [[ $_iter -lt 10 ]]; do
+    sleep 0.5
+    if ! kill -0 "$PID" 2>/dev/null; then
+      rm -f "$PID_FILE" "$PORT_FILE"
+      printf '{"status":"killed","reason":"sigterm","pid":"%s"}\n' "$PID"
+      exit 0
+    fi
+    _iter=$((_iter + 1))
+  done
+
+  # 5s elapsed — force-kill.
+  kill -KILL "$PID" 2>/dev/null || true
+  sleep 0.1  # let kernel reap
+  rm -f "$PID_FILE" "$PORT_FILE"
+  printf '{"status":"killed","reason":"sigkill","pid":"%s"}\n' "$PID"
+  exit 0
+fi
 
 # ─── --check mode ───────────────────────────────────────────────────────────
 # 1. Read installed version (prefer plugin.json, fallback package.json)
