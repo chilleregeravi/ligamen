@@ -110,6 +110,57 @@ Tell the user:
 
 If the reinstall command exits non-zero, relay its stderr verbatim and stop — do NOT continue to Step 6/7.
 
-## Step 6 — (Continued in plan 98-03: cache prune)
+## Step 6 — Prune stale cache directories [REQ UPD-09]
 
-## Step 7 — (Continued in plan 98-03: health verify + final message)
+Run:
+
+```bash
+PRUNE_OUT=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/update.sh" --prune-cache)
+```
+
+Parse the result and tell the user briefly:
+
+```bash
+PRUNED=$(printf '%s' "$PRUNE_OUT" | jq -r '.pruned | length')
+LOCKED=$(printf '%s' "$PRUNE_OUT" | jq -r '.locked | length')
+```
+
+- If `PRUNED > 0`: `Pruned {PRUNED} old cache version(s).`
+- If `LOCKED > 0`: `Skipped {LOCKED} cache dir(s) with active file handles — you can re-run /arcanon:update later to clean them up.`
+- If both are 0: say nothing, proceed silently.
+
+Never fail the update because of prune issues — this step is housekeeping, not correctness-critical.
+
+## Step 7 — Verify new worker + final message [REQ UPD-10, UPD-12]
+
+Run:
+
+```bash
+VERIFY_OUT=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/update.sh" --verify)
+VERIFY_STATUS=$(printf '%s' "$VERIFY_OUT" | jq -r '.status')
+TARGET_VER=$(printf '%s' "$VERIFY_OUT" | jq -r '.target')
+```
+
+Branch on `VERIFY_STATUS`:
+
+| status | Message |
+|--------|---------|
+| `verified` | Success path (see below). |
+| `verify_failed` with reason=no_response | `New worker did not respond within 10s. Plugin is installed (v{TARGET_VER}) — Restart Claude Code to activate it.` |
+| `verify_failed` with reason=version_mismatch | `Verification reports v{RUNNING_VER} but expected v{TARGET_VER}. Plugin files updated — Restart Claude Code to pick up v{TARGET_VER}.` |
+
+Extract `RUNNING_VER` when needed:
+
+```bash
+RUNNING_VER=$(printf '%s' "$VERIFY_OUT" | jq -r '.running // "unknown"')
+```
+
+**Success path — the final message (REQ UPD-12):**
+
+```
+Arcanon v{TARGET_VER} installed and verified.
+
+Restart Claude Code to activate v{TARGET_VER}
+```
+
+The restart sentence must appear verbatim (with the `{TARGET_VER}` placeholder replaced). Session restart is required because new commands/hooks in the updated plugin only load at Claude Code startup — this is a hard constraint from the plugin runtime.
