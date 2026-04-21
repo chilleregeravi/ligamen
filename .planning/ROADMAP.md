@@ -693,7 +693,9 @@ Plans:
   3. When the impact-map is missing, > 7 days old, or the worker is down, the existing minimal banner is shown with no error — the session is never broken
   4. Starting a session in a directory where Arcanon has never scanned produces no enrichment suffix (inject-only-when-scanned behavior)
   5. Total SessionStart overhead stays under 200ms; the bats fixture test passes for fresh/stale/missing cases
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 99-01-PLAN.md — SessionStart enrichment: impact-map stats suffix (sha256 project hash + sqlite3 COUNT queries + hub.sh status) inserted between lines 83 and 85 of session-start.sh, with silent-fallback on every error path and 7-case bats coverage (SSE-01..07)
 
 ### Phase 100: PreToolUse Impact Hook
 **Goal**: When Claude edits a service-load-bearing file (proto/openapi definitions or a tracked service entry-point), it automatically receives a cross-repo consumer warning before making the change — ambient protection without any user command
