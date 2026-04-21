@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.1.1
 milestone_name: Command Cleanup + Update + Ambient Hooks
 status: verifying
-stopped_at: Completed 97-03-PLAN.md
-last_updated: "2026-04-21T18:36:21.815Z"
+stopped_at: Completed 97-01-PLAN.md
+last_updated: "2026-04-21T18:40:25.102Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 36
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 12
-  completed_plans: 3
-  percent: 25
+  completed_plans: 4
+  percent: 33
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 3 of 3
 Status: Phase complete — ready for verification
 Last activity: 2026-04-21
 
-Progress: [███░░░░░░░] 25%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [███░░░░░░░] 25%
 - Deprecated stub pattern established: [DEPRECATED] frontmatter + printf >&2 + $ARGUMENTS passthrough + v0.2.0 removal anchor
 - Use typeof newKey !== 'undefined' (not ??) to preserve false values in two-read config fallback
 - Guard hub.js main() behind import.meta.url === process.argv[1] to enable ESM import in tests
+- 97-01: Outright kill of /arcanon:cross-impact with no migration stub — /arcanon:impact is canonical, docs already mark cross-impact legacy
 
 ### Pending Todos
 
@@ -68,6 +69,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-21T18:36:21.807Z
-Stopped at: Completed 97-03-PLAN.md
+Last session: 2026-04-21T18:40:25.094Z
+Stopped at: Completed 97-01-PLAN.md
 Resume file: None

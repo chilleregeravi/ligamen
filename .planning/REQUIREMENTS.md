@@ -11,8 +11,10 @@
 
 Remove legacy surface, merge redundant commands, migrate config key.
 
-- [ ] **CLN-01**: `/arcanon:cross-impact` command removed (file `commands/cross-impact.md` deleted)
-- [ ] **CLN-02**: Banner / doc references to `/arcanon:cross-impact` removed from `scripts/session-start.sh`, `README.md`, `docs/commands.md`
+- [x] **CLN-01
+**: `/arcanon:cross-impact` command removed (file `commands/cross-impact.md` deleted)
+- [x] **CLN-02
+**: Banner / doc references to `/arcanon:cross-impact` removed from `scripts/session-start.sh`, `README.md`, `docs/commands.md`
 - [x] **CLN-03
 **: `/arcanon:sync` absorbs `/arcanon:upload` semantics; supports `--drain` (queue only), `--repo <path>`, `--dry-run`, `--force` flags
 - [x] **CLN-04
