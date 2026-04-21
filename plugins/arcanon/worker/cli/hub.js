@@ -334,7 +334,10 @@ async function main() {
   }
 }
 
-main();
+// Only run as CLI entry point when executed directly; skip when imported by tests.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main();
+}
 
 // Exported for test access only (_-prefixed = internal helper, not public surface).
 export { _readHubAutoSync };
