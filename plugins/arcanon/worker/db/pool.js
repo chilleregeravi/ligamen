@@ -71,7 +71,7 @@ export function getQueryEngine(projectRoot) {
 
 /**
  * List all projects that have a DB.
- * Scans ~/.ligamen/projects/ for impact-map.db files.
+ * Scans ~/.arcanon/projects/ for impact-map.db files.
  * @returns {Array<{hash: string, dbPath: string, size: number}>}
  */
 export function listProjects() {

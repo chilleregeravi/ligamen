@@ -1,5 +1,5 @@
 /**
- * worker/query-engine.js — Read/write query layer over the Ligamen SQLite schema.
+ * worker/query-engine.js — Read/write query layer over the Arcanon SQLite schema.
  *
  * QueryEngine wraps a better-sqlite3 Database instance and provides:
  *   - Transitive impact traversal (downstream and upstream) with cycle detection
@@ -1399,7 +1399,7 @@ export class QueryEngine {
 
     // Step 5: ambiguous — warn and return first match
     (this._logger?.warn ?? console.warn)(
-      '[ligamen] Ambiguous service name "' + name + '" matches ' + rows.length +
+      '[arcanon] Ambiguous service name "' + name + '" matches ' + rows.length +
       ' repos — using id ' + rows[0].id + '. Scope your connection to avoid collisions.'
     );
     return rows[0].id;
