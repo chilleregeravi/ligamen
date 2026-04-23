@@ -1,5 +1,5 @@
 {
-  "name": "@ligamen/runtime-deps",
+  "name": "@arcanon/runtime-deps",
   "version": "0.1.1",
   "private": true,
   "description": "Runtime dependencies installed into CLAUDE_PLUGIN_DATA for the MCP server",
