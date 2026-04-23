@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### BREAKING
+
+The Ligamen → Arcanon rename is now enforced at the runtime layer. Legacy
+names, paths, and package identities have been removed without fallback.
+
+1. **All `LIGAMEN_*` env var reads removed.** The worker, `lib/`, and `scripts/`
+   no longer read any `LIGAMEN_*` environment variable. Only `ARCANON_*` names
+   are recognized (`ARCANON_PROJECT_ROOT`, `ARCANON_CHROMA_MODE`,
+   `ARCANON_CHROMA_HOST`, `ARCANON_CHROMA_PORT`, `ARCANON_API_KEY`, etc.).
+2. **`$HOME/.ligamen` data-dir fallback removed.** All SQLite, logs, queue,
+   and scan state resolve exclusively under `$HOME/.arcanon/`. Existing
+   `~/.ligamen/` directories are ignored.
+3. **`ligamen.config.json` config reader removed.** Config discovery reads
+   `arcanon.config.json` only. Any `ligamen.config.json` file in a repo is
+   now invisible to the plugin.
+4. **ChromaDB `COLLECTION_NAME` renamed** from `"ligamen-impact"` to
+   `"arcanon-impact"`. Existing ChromaDB collections created under the
+   Ligamen name are **orphaned** on upgrade — users must rebuild semantic
+   search via `/arcanon:map` (or ignore if they were not using ChromaDB).
+5. **`runtime-deps.json` package identity renamed** from
+   `@ligamen/runtime-deps` to `@arcanon/runtime-deps`.
+
+**Migration instructions:**
+
+- Rename `ligamen.config.json` → `arcanon.config.json` at each repo root.
+- Rename `$HOME/.ligamen/` → `$HOME/.arcanon/` (or re-run `/arcanon:map` to
+  rebuild state at the new location).
+- Rename any shell-profile `LIGAMEN_*` env vars to their `ARCANON_*`
+  equivalents (e.g., `LIGAMEN_CHROMA_MODE` → `ARCANON_CHROMA_MODE`).
+- If ChromaDB semantic search was in use, re-run `/arcanon:map` to populate
+  the new `arcanon-impact` collection.
+
 ## [0.1.1] - 2026-04-23
 
 ### Added
@@ -39,7 +71,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Notes on prior versions
 
-Historical releases (v1.0 through v5.7.0) were shipped under the **Ligamen** name. The plugin was rebranded to **Arcanon**, adding the Arcanon Hub sync pipeline and consolidating the library-drift workstream. The version was reset to `0.1.0` for the first public Arcanon release; legacy `~/.ligamen/` data dirs and `LIGAMEN_*` env vars are still read for back-compat.
+Earlier pre-public releases (v1.0 through v5.7.0) shipped under the
+project's former name. The version was reset to `0.1.0` for the first
+public Arcanon release, which added the Arcanon Hub sync pipeline and
+consolidated the library-drift workstream.
 
 The v5.8.0 internal milestone (Library Drift & Language Parity) shipped during the Arcanon rebrand and is captured as part of the first Arcanon public release rather than tagged separately. It delivered:
 
