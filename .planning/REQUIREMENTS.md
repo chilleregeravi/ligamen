@@ -106,52 +106,59 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENV-01 | TBD | Pending |
-| ENV-02 | TBD | Pending |
-| ENV-03 | TBD | Pending |
-| ENV-04 | TBD | Pending |
-| ENV-05 | TBD | Pending |
-| ENV-06 | TBD | Pending |
-| ENV-07 | TBD | Pending |
-| ENV-08 | TBD | Pending |
-| ENV-09 | TBD | Pending |
-| PATH-01 | TBD | Pending |
-| PATH-02 | TBD | Pending |
-| PATH-03 | TBD | Pending |
-| PATH-04 | TBD | Pending |
-| PATH-05 | TBD | Pending |
-| PATH-06 | TBD | Pending |
-| PKG-01 | TBD | Pending |
-| PKG-02 | TBD | Pending |
-| PKG-03 | TBD | Pending |
-| SRC-01 | TBD | Pending |
-| SRC-02 | TBD | Pending |
-| SRC-03 | TBD | Pending |
-| SRC-04 | TBD | Pending |
-| SRC-05 | TBD | Pending |
-| SRC-06 | TBD | Pending |
-| SRC-07 | TBD | Pending |
-| SRC-08 | TBD | Pending |
-| TST-01 | TBD | Pending |
-| TST-02 | TBD | Pending |
-| TST-03 | TBD | Pending |
-| TST-04 | TBD | Pending |
-| TST-05 | TBD | Pending |
-| TST-06 | TBD | Pending |
-| TST-07 | TBD | Pending |
-| DOC-01 | TBD | Pending |
-| DOC-02 | TBD | Pending |
-| DOC-03 | TBD | Pending |
-| README-01 | TBD | Pending |
-| README-02 | TBD | Pending |
-| README-03 | TBD | Pending |
-| VER-01 | TBD | Pending |
-| VER-02 | TBD | Pending |
-| VER-03 | TBD | Pending |
+| ENV-01 | Phase 101 | Pending |
+| ENV-02 | Phase 101 | Pending |
+| ENV-03 | Phase 101 | Pending |
+| ENV-04 | Phase 101 | Pending |
+| ENV-05 | Phase 101 | Pending |
+| ENV-06 | Phase 101 | Pending |
+| ENV-07 | Phase 101 | Pending |
+| ENV-08 | Phase 101 | Pending |
+| ENV-09 | Phase 101 | Pending |
+| PATH-01 | Phase 101 | Pending |
+| PATH-02 | Phase 101 | Pending |
+| PATH-03 | Phase 101 | Pending |
+| PATH-04 | Phase 101 | Pending |
+| PATH-05 | Phase 101 | Pending |
+| PATH-06 | Phase 101 | Pending |
+| PKG-01 | Phase 101 | Pending |
+| PKG-02 | Phase 101 | Pending |
+| PKG-03 | Phase 101 | Pending |
+| SRC-01 | Phase 102 | Pending |
+| SRC-02 | Phase 102 | Pending |
+| SRC-03 | Phase 102 | Pending |
+| SRC-04 | Phase 102 | Pending |
+| SRC-05 | Phase 102 | Pending |
+| SRC-06 | Phase 102 | Pending |
+| SRC-07 | Phase 102 | Pending |
+| SRC-08 | Phase 102 | Pending |
+| TST-01 | Phase 103 | Pending |
+| TST-02 | Phase 103 | Pending |
+| TST-03 | Phase 103 | Pending |
+| TST-04 | Phase 103 | Pending |
+| TST-05 | Phase 103 | Pending |
+| TST-06 | Phase 103 | Pending |
+| TST-07 | Phase 103 | Pending |
+| DOC-01 | Phase 104 | Pending |
+| DOC-02 | Phase 104 | Pending |
+| DOC-03 | Phase 104 | Pending |
+| README-01 | Phase 104 | Pending |
+| README-02 | Phase 104 | Pending |
+| README-03 | Phase 104 | Pending |
+| VER-01 | Phase 105 | Pending |
+| VER-02 | Phase 105 | Pending |
+| VER-03 | Phase 105 | Pending |
 
 **Coverage:**
 - v1 requirements: 42 total
-- Mapped to phases: 0, Unmapped: 42 (roadmapper fills this)
+- Mapped to phases: 42, Unmapped: 0
+
+**Phase distribution:**
+- Phase 101 (Runtime Purge): 18 REQs (ENV-01..09 + PATH-01..06 + PKG-01..03)
+- Phase 102 (Source Cosmetic Rename): 8 REQs (SRC-01..08)
+- Phase 103 (Test Suite Rewrite): 7 REQs (TST-01..07)
+- Phase 104 (Docs & README Purge): 6 REQs (DOC-01..03 + README-01..03)
+- Phase 105 (Verification Gate): 3 REQs (VER-01..03)
 
 ---
-*Requirements defined: 2026-04-23*
+*Requirements defined: 2026-04-23 — Traceability populated by gsd-roadmapper 2026-04-23*
