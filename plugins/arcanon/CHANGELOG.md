@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-## [0.1.2] - 2026-04-23
+## [0.1.2] - 2026-04-24
+
+### Fixed
+
+- **`/arcanon:sync`, `/arcanon:upload`, `/arcanon:impact`, `/arcanon:export`, `/arcanon:drift`, `/arcanon:status` crashing on fresh Node 25 installs** (issue #18 Bug 1). `better-sqlite3` floor bumped from `^12.8.0` to `^12.9.0` so `npm install` pulls prebuilt `node-v141` binaries instead of failing a source compile. Applies to both `package.json` and `runtime-deps.json`.
+- **`no such column: boundary_entry` error on `/arcanon:upload` and `/arcanon:export`** (issue #18 Bug 2). Added migration `011_services_boundary_entry.js` which adds the missing `boundary_entry TEXT` column to `services`. `upsertService` now writes `svc.boundary_entry` through; a try/catch fallback preserves backward compatibility for databases that haven't applied migration 011 yet.
+- Removed the runtime `ALTER TABLE services ADD COLUMN boundary_entry` workaround from `manager.dep-collector.test.js` now that the migration handles it legitimately.
 
 ### BREAKING
 
