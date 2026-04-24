@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-21
+**Analysis Date:** 2026-04-24
 
 Arcanon has two test suites that BOTH must be green for phase verification: **bats** for shell (hooks, libs, scripts, plus integration against the worker) and **`node:test`** for JavaScript (worker, MCP, DB, hub-sync). The v0.1.2 ship criterion is **310/310 bats + all affected node tests green**.
 
@@ -313,4 +313,4 @@ node --test worker/db/query-engine-enrich.test.js
 
 ---
 
-*Testing analysis: 2026-04-21*
+*Testing analysis: 2026-04-24*

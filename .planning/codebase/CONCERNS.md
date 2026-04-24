@@ -1,6 +1,6 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-04-21
+**Analysis Date:** 2026-04-24
 **Plugin Version:** v0.1.2 (shipped 2026-04-24)
 **Prior map:** 2026-03-31 (stale — this document supersedes)
 
@@ -242,4 +242,4 @@ Documented in `plugins/arcanon/CHANGELOG.md` BREAKING section (the only remainin
 
 ---
 
-*Concerns audit: 2026-04-21*
+*Concerns audit: 2026-04-24*

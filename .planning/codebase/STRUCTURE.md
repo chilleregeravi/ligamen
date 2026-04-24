@@ -1,6 +1,6 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-04-21
+**Analysis Date:** 2026-04-24
 
 ## Directory Layout
 
@@ -494,4 +494,4 @@ ligamen/                                       # Repo root (ships as the plugin 
 
 ---
 
-*Structure analysis: 2026-04-21*
+*Structure analysis: 2026-04-24*

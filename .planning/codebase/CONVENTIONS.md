@@ -1,6 +1,6 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-04-21
+**Analysis Date:** 2026-04-24
 
 Arcanon is a Claude Code plugin shipped as `plugins/arcanon/` inside the `ligamen` monorepo. The plugin is a polyglot mix of Bash (hooks, libs, scripts) and Node.js ESM (worker, MCP server, UI). Both stacks have hard-enforced naming and idiom rules as of v0.1.2.
 
@@ -301,4 +301,4 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ---
 
-*Convention analysis: 2026-04-21*
+*Convention analysis: 2026-04-24*
