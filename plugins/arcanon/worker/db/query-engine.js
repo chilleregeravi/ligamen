@@ -255,6 +255,39 @@ function sanitizeBindings(obj) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// base_path strip helper (TRUST-04 / Phase 110)
+// ---------------------------------------------------------------------------
+
+/**
+ * Strips a target service's `base_path` from an outbound connection path,
+ * if and only if the prefix is at a path-segment boundary.
+ *
+ * Algorithm (D-02 + D-03):
+ *   1. If basePath is null/empty/undefined → return null (no strip applies).
+ *   2. Normalize trailing slash on basePath.
+ *   3. If connPath === basePath → return "/" (full match collapses to root).
+ *   4. If connPath starts with basePath + "/" → return connPath.slice(bp.length).
+ *   5. Otherwise (substring without segment boundary, or no prefix at all) → return null.
+ *
+ * Returns null in every "no strip" case — callers should fall back to literal
+ * compare (which preserves correctness when basePath is absent).
+ *
+ * @param {string} connPath - Outbound connection path (the "candidate to strip from")
+ * @param {string|null|undefined} basePath - Target service's base_path
+ * @returns {string|null} Stripped path, or null when no strip applies.
+ */
+export function stripBasePath(connPath, basePath) {
+  if (basePath == null || basePath === "") return null;
+  // Normalize trailing slash
+  const bp = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+  if (bp === "") return null;
+  if (connPath === bp) return "/";
+  if (connPath.startsWith(bp + "/")) return connPath.slice(bp.length);
+  // bp is a substring but not a path-segment boundary, OR no prefix at all.
+  return null;
+}
+
 export class QueryEngine {
   /**
    * @param {import('better-sqlite3').Database} db - An open better-sqlite3 instance.
@@ -376,30 +409,48 @@ export class QueryEngine {
         scanned_at = COALESCE(excluded.scanned_at, scanned_at)
     `);
 
-    // Try with boundary_entry column (migration 011). Fall back to pre-011 schema
-    // for databases that haven't yet applied the migration.
+    // Try with base_path column (migration 014, TRUST-04). Fall back through
+    // migration-011 (boundary_entry only), then pre-011 plain shape for older
+    // databases. Mirrors the connections.path_template multi-tier fallback.
+    this._hasBasePath = false;
     try {
       this._stmtUpsertService = db.prepare(`
-        INSERT INTO services (repo_id, name, root_path, language, type, scan_version_id, boundary_entry)
-        VALUES (@repo_id, @name, @root_path, @language, @type, @scan_version_id, @boundary_entry)
+        INSERT INTO services (repo_id, name, root_path, language, type, scan_version_id, boundary_entry, base_path)
+        VALUES (@repo_id, @name, @root_path, @language, @type, @scan_version_id, @boundary_entry, @base_path)
         ON CONFLICT(repo_id, name) DO UPDATE SET
           root_path = excluded.root_path,
           language = excluded.language,
           type = excluded.type,
           scan_version_id = excluded.scan_version_id,
-          boundary_entry = excluded.boundary_entry
+          boundary_entry = excluded.boundary_entry,
+          base_path = excluded.base_path
       `);
+      this._hasBasePath = true;
     } catch {
-      // boundary_entry column not present — pre-migration-011 database
-      this._stmtUpsertService = db.prepare(`
-        INSERT INTO services (repo_id, name, root_path, language, type, scan_version_id)
-        VALUES (@repo_id, @name, @root_path, @language, @type, @scan_version_id)
-        ON CONFLICT(repo_id, name) DO UPDATE SET
-          root_path = excluded.root_path,
-          language = excluded.language,
-          type = excluded.type,
-          scan_version_id = excluded.scan_version_id
-      `);
+      // base_path column not present — try migration-011 shape
+      try {
+        this._stmtUpsertService = db.prepare(`
+          INSERT INTO services (repo_id, name, root_path, language, type, scan_version_id, boundary_entry)
+          VALUES (@repo_id, @name, @root_path, @language, @type, @scan_version_id, @boundary_entry)
+          ON CONFLICT(repo_id, name) DO UPDATE SET
+            root_path = excluded.root_path,
+            language = excluded.language,
+            type = excluded.type,
+            scan_version_id = excluded.scan_version_id,
+            boundary_entry = excluded.boundary_entry
+        `);
+      } catch {
+        // boundary_entry column not present — pre-migration-011 database
+        this._stmtUpsertService = db.prepare(`
+          INSERT INTO services (repo_id, name, root_path, language, type, scan_version_id)
+          VALUES (@repo_id, @name, @root_path, @language, @type, @scan_version_id)
+          ON CONFLICT(repo_id, name) DO UPDATE SET
+            root_path = excluded.root_path,
+            language = excluded.language,
+            type = excluded.type,
+            scan_version_id = excluded.scan_version_id
+        `);
+      }
     }
 
     // Try with path_template column (migration 013, TRUST-03). Falls back
@@ -722,8 +773,12 @@ export class QueryEngine {
       type: "service",
       scan_version_id: null,
       boundary_entry: null,
+      base_path: null,
       ...serviceData,
     });
+    // If the prepared statement does NOT include base_path (pre-migration-014),
+    // strip the key so better-sqlite3 doesn't reject the extra named param.
+    if (!this._hasBasePath) delete sanitized.base_path;
     this._stmtUpsertService.run(sanitized);
     // lastInsertRowid is unreliable on the ON CONFLICT DO UPDATE path
     // (returns 0 or a stale rowid from a prior INSERT on another table).
@@ -1367,38 +1422,80 @@ export class QueryEngine {
       .get();
     if (!tableExists) return [];
 
-    const mismatches = this._db
-      .prepare(
-        `
-      SELECT c.id, c.method, c.path, c.protocol,
-             s_src.name as source, s_tgt.name as target
-      FROM connections c
-      JOIN services s_src ON c.source_service_id = s_src.id
-      JOIN services s_tgt ON c.target_service_id = s_tgt.id
-      WHERE c.protocol NOT IN ('internal', 'sdk', 'import')
-        AND c.path IS NOT NULL
-        -- Target has exposed endpoints (was scanned properly)
-        AND EXISTS (
-          SELECT 1 FROM exposed_endpoints ep
-          WHERE ep.service_id = c.target_service_id
+    // Phase 110 (TRUST-04): pull candidate connections + their target's
+    // base_path, and apply base_path stripping in JS before comparing against
+    // the target's exposed endpoints. Falls back to a SQL shape that omits
+    // s_tgt.base_path for pre-migration-014 databases.
+    let rows;
+    try {
+      rows = this._db
+        .prepare(
+          `
+        SELECT c.id, c.method, c.path, c.protocol,
+               s_src.name as source, s_tgt.name as target,
+               s_tgt.id as target_id, s_tgt.base_path as target_base_path
+        FROM connections c
+        JOIN services s_src ON c.source_service_id = s_src.id
+        JOIN services s_tgt ON c.target_service_id = s_tgt.id
+        WHERE c.protocol NOT IN ('internal', 'sdk', 'import')
+          AND c.path IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM exposed_endpoints ep
+            WHERE ep.service_id = c.target_service_id
+          )
+      `,
         )
-        -- But this specific path is NOT in the exposed list
-        AND NOT EXISTS (
-          SELECT 1 FROM exposed_endpoints ep
-          WHERE ep.service_id = c.target_service_id
-            AND ep.path = c.path
+        .all();
+    } catch {
+      // Pre-migration-014 db: services.base_path doesn't exist. Fall back to
+      // the legacy shape (no base_path column) and treat target_base_path as null.
+      rows = this._db
+        .prepare(
+          `
+        SELECT c.id, c.method, c.path, c.protocol,
+               s_src.name as source, s_tgt.name as target,
+               s_tgt.id as target_id
+        FROM connections c
+        JOIN services s_src ON c.source_service_id = s_src.id
+        JOIN services s_tgt ON c.target_service_id = s_tgt.id
+        WHERE c.protocol NOT IN ('internal', 'sdk', 'import')
+          AND c.path IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM exposed_endpoints ep
+            WHERE ep.service_id = c.target_service_id
+          )
+      `,
         )
-    `,
-      )
-      .all();
+        .all()
+        .map((r) => ({ ...r, target_base_path: null }));
+    }
 
-    return mismatches.map((c) => ({
-      connection_id: c.id,
-      source: c.source,
-      target: c.target,
-      type: "endpoint_not_exposed",
-      detail: `${c.method || c.protocol} ${c.path} — ${c.target} does not expose this endpoint`,
-    }));
+    const exposedStmt = this._db.prepare(
+      `SELECT path FROM exposed_endpoints WHERE service_id = ?`,
+    );
+
+    const mismatches = [];
+    for (const c of rows) {
+      const exposedPaths = new Set(
+        exposedStmt.all(c.target_id).map((r) => r.path),
+      );
+      // Try literal match first — preserves correctness when base_path is
+      // absent (D-02) and when the agent emitted the literal prefixed path
+      // in `exposes` (Test 8).
+      if (exposedPaths.has(c.path)) continue;
+      // Try stripped match if target has base_path (D-02: gated on target).
+      const stripped = stripBasePath(c.path, c.target_base_path);
+      if (stripped !== null && exposedPaths.has(stripped)) continue;
+      // Neither match — real mismatch.
+      mismatches.push({
+        connection_id: c.id,
+        source: c.source,
+        target: c.target,
+        type: "endpoint_not_exposed",
+        detail: `${c.method || c.protocol} ${c.path} — ${c.target} does not expose this endpoint`,
+      });
+    }
+    return mismatches;
   }
 
   /**
@@ -1436,6 +1533,7 @@ export class QueryEngine {
         type: svc.type || "service",
         scan_version_id: scanVersionId ?? null,
         boundary_entry: svc.boundary_entry || null,
+        base_path: svc.base_path || null,
       });
       serviceIdMap.set(svc.name, id);
     }
