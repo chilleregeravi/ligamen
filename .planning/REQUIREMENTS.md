@@ -13,12 +13,14 @@
 
 Hard-remove `runtime-deps.json`. Single source of truth = `package.json`. Replace file-existence checks with binding-load validation. Drop duplicate self-heal in `mcp-wrapper.sh`.
 
-- [ ] **INST-01**: `plugins/arcanon/runtime-deps.json` deleted from the repo
+- [x] **INST-01
+**: `plugins/arcanon/runtime-deps.json` deleted from the repo
 - [ ] **INST-02**: `scripts/install-deps.sh` rewritten — sentinel = sha256 of `jq '.dependencies + .optionalDependencies' package.json` (computed from current package.json each run, no separate manifest)
 - [ ] **INST-03**: `install-deps.sh` validates binding load via `node -e "require('better-sqlite3'); new (require('better-sqlite3'))(':memory:').close()"` after install. If validation fails, runs `npm rebuild better-sqlite3` once before giving up.
 - [ ] **INST-04**: `install-deps.sh` early-exits in <100ms when sentinel matches AND binding loads. No `npm install` invocation in the happy-path.
 - [ ] **INST-05**: `install-deps.sh` exits 0 on all paths (non-blocking). Genuine install failure is logged to stderr and surfaced via worker startup, not by failing the SessionStart hook.
-- [ ] **INST-06**: `scripts/mcp-wrapper.sh` reduced to `exec node "${PLUGIN_ROOT}/worker/mcp/server.js"` plus the existing CLAUDE_PLUGIN_ROOT resolution. No self-heal block. No npm install fallback.
+- [x] **INST-06
+**: `scripts/mcp-wrapper.sh` reduced to `exec node "${PLUGIN_ROOT}/worker/mcp/server.js"` plus the existing CLAUDE_PLUGIN_ROOT resolution. No self-heal block. No npm install fallback.
 - [ ] **INST-07**: bats test — sentinel matches AND binding loads → install-deps.sh exits in <100ms with no npm process spawned (lsof / process count assertion)
 - [ ] **INST-08**: bats test — broken binding (delete `node_modules/better-sqlite3/build/Release/`) → install-deps.sh detects and triggers `npm rebuild better-sqlite3` (or full reinstall) → binding loads after
 - [ ] **INST-09**: bats test — `npm install` succeeds with prebuild-install silent failure simulation (mock npm install that wipes `build/Release/`) → install-deps.sh detects via `require()` and triggers rebuild
@@ -74,7 +76,8 @@ Remove the `/arcanon:upload` deprecated stub. Originally promised for v0.2.0; br
 - [ ] **VER-03**: Final repo-wide grep — `runtime-deps.json` does not exist anywhere in the repo
 - [ ] **VER-04**: Final repo-wide grep — `commands/upload.md` does not exist; no `--help` references in command files (verify v0.1.4 scope wasn't accidentally absorbed)
 - [ ] **VER-05**: Fresh-install integration smoke test on Node 25 — clone v0.1.3 tag, run `claude plugin install`, start session, run `/arcanon:map` (or `/arcanon:status`) without hitting binding errors
-- [ ] **VER-06**: Manifest version strings all bumped to 0.1.3 (5 manifest files: `plugins/arcanon/.claude-plugin/plugin.json`, `plugins/arcanon/.claude-plugin/marketplace.json`, `.claude-plugin/marketplace.json`, `plugins/arcanon/package.json`, `plugins/arcanon/runtime-deps.json` if not yet deleted at this point — actually it WILL be deleted per INST-01, so 4 manifest files at 0.1.3)
+- [x] **VER-06**: Manifest version strings all bumped to 0.1.3 (5 manifest files: `plugins/arcanon/.claude-plugin/plugin.json`, `plugins/arcanon/.claude-plugin/marketplace.json`, `.claude-plugin/marketplace.json`, `plugins/arcanon/package.json`, `plugins/arcanon/runtime-deps.json` if not yet deleted at this point — actually it WILL be deleted per INST-01
+, so 4 manifest files at 0.1.3)
 - [ ] **VER-07**: CHANGELOG `[0.1.3] - 2026-04-XX` section pinned with all `### BREAKING`, `### Added`, `### Changed`, `### Fixed`, `### Removed` subsections complete
 
 ## Future Requirements (Deferred)
@@ -106,12 +109,12 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| INST-01 | Phase 107 | Pending |
+| INST-01 | Phase 107 | Complete (107-01, commit f58488d) |
 | INST-02 | Phase 107 | Pending |
 | INST-03 | Phase 107 | Pending |
 | INST-04 | Phase 107 | Pending |
 | INST-05 | Phase 107 | Pending |
-| INST-06 | Phase 107 | Pending |
+| INST-06 | Phase 107 | Complete (107-01, commit 0f1862c) |
 | INST-07 | Phase 107 | Pending |
 | INST-08 | Phase 107 | Pending |
 | INST-09 | Phase 107 | Pending |

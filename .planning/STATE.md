@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1.3
 milestone_name: Trust & Foundations
-status: roadmap_complete
-stopped_at: Roadmap created (Phases 107-113)
-last_updated: "2026-04-25T12:00:00.000Z"
-last_activity: 2026-04-25
+status: in_progress
+stopped_at: Completed 107-01-PLAN.md
+last_updated: "2026-04-25T12:06:47.605Z"
+last_activity: 2026-04-25 — Phase 107 Plan 01 complete (runtime-deps.json deleted, mcp-wrapper.sh trimmed)
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 14
+  completed_plans: 1
+  percent: 7
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 ## Current Position
 
-Phase: Roadmap complete; ready for `/gsd-plan-phase 107`
-Plan: —
-Status: Roadmap complete (7 phases, 45/45 requirements mapped)
-Last activity: 2026-04-25 — Roadmap created with Phases 107-113
+Phase: 107 Install Architecture Cleanup (in progress, Wave 1)
+Plan: 107-01 complete (2 commits); next up 107-02 install-deps.sh rewrite
+Status: 1/14 plans complete; INST-01 + INST-06 marked done in REQUIREMENTS.md
+Last activity: 2026-04-25 — Plan 107-01 landed: runtime-deps.json deleted, mcp-wrapper.sh trimmed to 12 lines
 
 ## v0.1.3 Phase Map
 
@@ -43,6 +43,7 @@ Last activity: 2026-04-25 — Roadmap created with Phases 107-113
 | 113 | Verification Gate (release pin) | VER-01..07 (7) |
 
 **Wave-able phases (can run in parallel within constraints):**
+
 - Phase 108 is independent of Phase 107 once Phase 107 lands the install path
 - Phases 110/111/112 each depend on Phase 109 landing first (migration 013 path_template)
 - Phase 113 always last
@@ -51,9 +52,13 @@ Last activity: 2026-04-25 — Roadmap created with Phases 107-113
 
 **Velocity:**
 
-- Total plans completed: 193 (v1.0–v5.8.0 + v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans)
+- Total plans completed: 194 (v1.0–v5.8.0 + v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans + v0.1.3 1 plan)
 - Total milestones shipped: 21 (Ligamen v1.0–v5.8.0 + Arcanon v0.1.0 + v0.1.1 + v0.1.2)
-- v0.1.3 in progress: 7 phases planned, 0 plans drafted, 0 plans complete
+- v0.1.3 in progress: 7 phases planned, 14 plans drafted, 1 plan complete (107-01)
+
+| Phase | Plan | Tasks | Files | Duration |
+| ----- | ---- | ----- | ----- | -------- |
+| 107   | 01   | 2     | 2     | ~5 min   |
 
 ## Accumulated Context
 
@@ -65,6 +70,7 @@ Last activity: 2026-04-25 — Roadmap created with Phases 107-113
 - **Validate, don't guess.** install-deps.sh and mcp-wrapper.sh's file-existence checks are replaced with `require("better-sqlite3")` validation. Fixes Node 25 binding bug class permanently.
 - **Phase ordering trades migration grouping for REQ atomicity.** Migrations 012-015 each ship in the same phase as the runtime code that exercises them, so each REQ maps to exactly one phase. Phase 109 lands migration 013 + path canonicalization writes; Phase 110 lands migration 012 + base_path scan/resolution; Phase 111 lands migrations 014 + 015 + their wiring. Cleaner than splitting "all migrations first."
 - **`/arcanon:verify` lives in Phase 112 (after data-shape phases).** The verify command reads scan data + connections.path_template + persisted evidence; depends on data shape stabilizing. Independent of Phase 110 (base_path) and Phase 111 (quality_score) but ordered after for stable test fixtures.
+- Phase 107-01 complete: runtime-deps.json deleted, mcp-wrapper.sh trimmed to 12 lines (INST-01, INST-06)
 
 ### Pending Todos
 
@@ -78,6 +84,6 @@ Last activity: 2026-04-25 — Roadmap created with Phases 107-113
 
 ## Session Continuity
 
-Last session: 2026-04-25T12:00:00.000Z
-Stopped at: Roadmap created — 7 phases (107-113) defined, 45/45 requirements mapped, traceability table populated
-Resume file: None — ready for `/gsd-plan-phase 107`
+Last session: 2026-04-25T12:06:43.188Z
+Stopped at: Completed 107-01-PLAN.md
+Resume file: None

@@ -700,7 +700,7 @@ Plans:
   5. A fresh-install integration run (`claude plugin marketplace add` → `claude plugin install` → first session) results in a healthy worker daemon, MCP server up, and `/arcanon:map` callable without binding errors
 **Plans**: 3 plans
 Plans:
-- [ ] 107-01-PLAN.md — Delete runtime-deps.json + reduce mcp-wrapper.sh to minimal exec form (INST-01, INST-06)
+- [x] 107-01-PLAN.md — Delete runtime-deps.json + reduce mcp-wrapper.sh to minimal exec form (INST-01, INST-06) — complete 2026-04-25 (commits f58488d, 0f1862c)
 - [ ] 107-02-PLAN.md — Rewrite install-deps.sh with sha256 sentinel + binding-load validation + single rebuild fallback (INST-02, INST-03, INST-04, INST-05)
 - [ ] 107-03-PLAN.md — bats coverage for new install architecture + integration smoke (INST-07..12)
 
@@ -812,7 +812,7 @@ Plans:
 | 92-96 | v5.8.0 | 16/16 | Complete | 2026-04-19 |
 | 97-100 | v0.1.1 | 12/12 | Complete | 2026-04-21 |
 | 101-105 | v0.1.2 | 9/9 | Complete | 2026-04-23 |
-| 107 | v0.1.3 | 0/3 | Not started | - |
+| 107 | v0.1.3 | 1/3 | In progress | 2026-04-25 |
 | 108 | v0.1.3 | 0/2 | Not started | - |
 | 109 | v0.1.3 | 0/TBD | Not started | - |
 | 110 | v0.1.3 | 0/1 | Not started | - |
