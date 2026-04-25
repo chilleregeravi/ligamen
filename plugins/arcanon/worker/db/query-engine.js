@@ -214,6 +214,30 @@ export async function search(query, options = {}) {
 const SEVERITY_ORDER = { CRITICAL: 0, WARN: 1, INFO: 2 };
 
 // ---------------------------------------------------------------------------
+// Path canonicalization (TRUST-03)
+// ---------------------------------------------------------------------------
+
+/**
+ * Canonicalize a connection path by replacing every `{xxx}` template variable
+ * with `{_}`. Used by persistFindings to collapse template-variant connections
+ * (e.g. /runtime/streams/{stream_id} and /runtime/streams/{name} both become
+ * /runtime/streams/{_}). Returns null/empty unchanged so we don't mint a `{_}`
+ * for paths the agent didn't claim.
+ *
+ * Out of scope this phase: Express `:id` style, OpenAPI named groups, JAX-RS
+ * constraint suffixes. See 109-CONTEXT.md D-06 in
+ * .planning/phases/109-path-canonicalization-and-evidence/.
+ *
+ * @param {string|null|undefined} pathStr
+ * @returns {string|null}
+ */
+export function canonicalizePath(pathStr) {
+  if (pathStr == null) return null;
+  if (pathStr === "") return "";
+  return pathStr.replace(/\{[^/}]+\}/g, "{_}");
+}
+
+// ---------------------------------------------------------------------------
 // Binding sanitizer
 // ---------------------------------------------------------------------------
 
@@ -378,26 +402,37 @@ export class QueryEngine {
       `);
     }
 
-    // Try with confidence+evidence columns (migration 009). Fall back to
-    // crossing-only (migration 008), then pre-migration-008 for compatibility.
+    // Try with path_template column (migration 013, TRUST-03). Falls back
+    // through migration-009 (confidence+evidence), migration-008 (crossing),
+    // then pre-008 plain columns for legacy DBs.
+    this._hasPathTemplate = false;
     try {
       this._stmtUpsertConnection = db.prepare(`
-        INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id, crossing, confidence, evidence)
-        VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id, @crossing, @confidence, @evidence)
+        INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, path_template, source_file, target_file, scan_version_id, crossing, confidence, evidence)
+        VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @path_template, @source_file, @target_file, @scan_version_id, @crossing, @confidence, @evidence)
       `);
+      this._hasPathTemplate = true;
     } catch {
-      // confidence/evidence columns not present — try with crossing only (migration 008)
+      // path_template column not present — pre-migration-013 db
       try {
         this._stmtUpsertConnection = db.prepare(`
-          INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id, crossing)
-          VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id, @crossing)
+          INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id, crossing, confidence, evidence)
+          VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id, @crossing, @confidence, @evidence)
         `);
       } catch {
-        // crossing column not present — pre-migration-008 database
-        this._stmtUpsertConnection = db.prepare(`
-          INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id)
-          VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id)
-        `);
+        // confidence/evidence columns not present — try with crossing only (migration 008)
+        try {
+          this._stmtUpsertConnection = db.prepare(`
+            INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id, crossing)
+            VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id, @crossing)
+          `);
+        } catch {
+          // crossing column not present — pre-migration-008 database
+          this._stmtUpsertConnection = db.prepare(`
+            INSERT OR REPLACE INTO connections (source_service_id, target_service_id, protocol, method, path, source_file, target_file, scan_version_id)
+            VALUES (@source_service_id, @target_service_id, @protocol, @method, @path, @source_file, @target_file, @scan_version_id)
+          `);
+        }
       }
     }
 
@@ -671,20 +706,38 @@ export class QueryEngine {
   }
 
   /**
-   * Inserts or replaces a service row.
+   * Inserts or replaces a service row. Always returns the stable row id —
+   * looks up by (repo_id, name) UNIQUE key when the prepared statement reports
+   * lastInsertRowid=0 (UPDATE path) or returns a stale rowid from a prior
+   * INSERT on a different table. (#TRUST-03 idempotency: caller wires
+   * serviceIdMap from this return value, so a stale rowid from a sibling
+   * INSERT in the same connection produced cross-wired connection FK
+   * references on re-scan.)
+   *
    * @param {{ repo_id: number, name: string, root_path: string, language: string }} serviceData
    * @returns {number} Row id
    */
   upsertService(serviceData) {
-    const result = this._stmtUpsertService.run(
-      sanitizeBindings({
-        type: "service",
-        scan_version_id: null,
-        boundary_entry: null,
-        ...serviceData,
-      })
+    const sanitized = sanitizeBindings({
+      type: "service",
+      scan_version_id: null,
+      boundary_entry: null,
+      ...serviceData,
+    });
+    this._stmtUpsertService.run(sanitized);
+    // lastInsertRowid is unreliable on the ON CONFLICT DO UPDATE path
+    // (returns 0 or a stale rowid from a prior INSERT on another table).
+    // Always look up by the UNIQUE(repo_id, name) tuple to get the stable id.
+    if (!this._stmtSelectServiceByRepoName) {
+      this._stmtSelectServiceByRepoName = this._db.prepare(
+        "SELECT id FROM services WHERE repo_id = ? AND name = ?"
+      );
+    }
+    const row = this._stmtSelectServiceByRepoName.get(
+      sanitized.repo_id,
+      sanitized.name
     );
-    return result.lastInsertRowid;
+    return row ? row.id : null;
   }
 
   /**
@@ -693,20 +746,83 @@ export class QueryEngine {
    * @returns {number} Row id
    */
   upsertConnection(connData) {
-    const result = this._stmtUpsertConnection.run(
-      sanitizeBindings({
-        method: null,
-        path: null,
-        source_file: null,
-        target_file: null,
-        scan_version_id: null,
-        crossing: null,
-        confidence: null,
-        evidence: null,
-        ...connData,
-      })
-    );
+    const sanitized = sanitizeBindings({
+      method: null,
+      path: null,
+      source_file: null,
+      target_file: null,
+      scan_version_id: null,
+      crossing: null,
+      confidence: null,
+      evidence: null,
+      path_template: null,
+      ...connData,
+    });
+    // If the prepared statement does NOT include path_template (pre-migration-013),
+    // strip the key so better-sqlite3 doesn't complain about an extra named param.
+    if (!this._hasPathTemplate) delete sanitized.path_template;
+    const result = this._stmtUpsertConnection.run(sanitized);
     return result.lastInsertRowid;
+  }
+
+  // --------------------------------------------------------------------------
+  // path_template merge helpers (TRUST-03)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Merge a new template into an existing comma-separated list, dedup'd by
+   * literal-equality. Returns the joined string. Used by persistFindings
+   * before INSERT OR REPLACE clobbers the existing path_template value.
+   *
+   * @param {string|null} existingCsv - Current path_template value (may be null/empty)
+   * @param {string|null} newTemplate - The agent's raw conn.path
+   * @returns {string|null}
+   */
+  _mergePathTemplates(existingCsv, newTemplate) {
+    if (!newTemplate) return existingCsv ?? null;
+    if (!existingCsv) return newTemplate;
+    const parts = existingCsv
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.includes(newTemplate)) return existingCsv;
+    parts.push(newTemplate);
+    return parts.join(",");
+  }
+
+  /**
+   * Read the current path_template value for the row that would be hit by an
+   * upsertConnection call, identified by the 5-col UNIQUE tuple
+   * (source, target, protocol, method, canonical path). Returns null when no
+   * row exists yet, or when the schema is pre-migration-013.
+   *
+   * Note: `method IS ?` (not `=`) so NULL methods compare correctly.
+   *
+   * @param {number} sourceId
+   * @param {number} targetId
+   * @param {string} protocol
+   * @param {string|null} method
+   * @param {string|null} canonicalPath
+   * @returns {string|null}
+   */
+  _getExistingPathTemplate(sourceId, targetId, protocol, method, canonicalPath) {
+    if (!this._hasPathTemplate) return null;
+    if (!this._stmtSelectExistingPathTemplate) {
+      this._stmtSelectExistingPathTemplate = this._db.prepare(`
+        SELECT path_template FROM connections
+        WHERE source_service_id = ? AND target_service_id = ?
+          AND protocol = ? AND method IS ? AND path IS ?
+        LIMIT 1
+      `);
+    }
+    const row = this._stmtSelectExistingPathTemplate.get(
+      sourceId,
+      targetId,
+      protocol,
+      method,
+      canonicalPath
+    );
+    return row ? row.path_template : null;
   }
 
   /**
@@ -1266,12 +1382,29 @@ export class QueryEngine {
       // Unknown internal target — still skip; we have no row to point at.
       if (!targetId) continue;
 
+      // TRUST-03: canonicalize path ({xxx} -> {_}) and merge path_template.
+      // Reading the existing path_template BEFORE the INSERT OR REPLACE prevents
+      // clobbering on re-scan (the REPLACE deletes-then-inserts).
+      const protocol = conn.protocol || "unknown";
+      const method = conn.method || null;
+      const rawPath = conn.path || null;
+      const canonicalPath = canonicalizePath(rawPath);
+      const existingTemplate = this._getExistingPathTemplate(
+        sourceId,
+        targetId,
+        protocol,
+        method,
+        canonicalPath
+      );
+      const mergedTemplate = this._mergePathTemplates(existingTemplate, rawPath);
+
       const connId = this.upsertConnection({
         source_service_id: sourceId,
         target_service_id: targetId,
-        protocol: conn.protocol || "unknown",
-        method: conn.method || null,
-        path: conn.path || null,
+        protocol,
+        method,
+        path: canonicalPath,
+        path_template: mergedTemplate,
         source_file: conn.source_file || null,
         target_file: conn.target_file || null,
         scan_version_id: scanVersionId ?? null,
