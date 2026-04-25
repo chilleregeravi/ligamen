@@ -22,10 +22,16 @@ const pool = new Map();
 
 /**
  * Compute the per-project data directory.
+ *
+ * Exported (NAV-01, plan 114-01) so that `cmdList` and other read-only CLI
+ * handlers can stat the resolved DB path without re-implementing the
+ * sha256(project_root)[0:12] convention. Previously module-private — adding
+ * `export` is purely additive and does not change call-site behaviour.
+ *
  * @param {string} projectRoot
  * @returns {string}
  */
-function projectHashDir(projectRoot) {
+export function projectHashDir(projectRoot) {
   const hash = crypto
     .createHash("sha256")
     .update(projectRoot)

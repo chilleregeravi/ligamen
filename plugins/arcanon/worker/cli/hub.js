@@ -36,6 +36,7 @@ import {
 } from "../hub-sync/index.js";
 import { resolveConfigPath } from "../lib/config-path.js";
 import { resolveDataDir } from "../lib/data-dir.js";
+import { projectHashDir } from "../db/pool.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -514,6 +515,47 @@ async function cmdVerify(flags) {
   process.exit(allOk ? 0 : 1);
 }
 
+/**
+ * cmdList — Concise read-only project overview (NAV-01, plan 114-01).
+ *
+ * Composes from existing endpoints — does not write to the DB, does not
+ * register new HTTP routes, does not introduce a new auth surface.
+ *
+ *   - Project detection: stat ${projectHashDir(cwd)}/impact-map.db. If absent,
+ *     `process.exit(0)` with no output (silent contract per RESEARCH §6).
+ *   - Repos count: direct sqlite3 SELECT COUNT(*) FROM repos via openDb().
+ *   - Services / Connections / Actors: parallel fetch /graph + /api/scan-quality.
+ *   - Hub status: queueStats() + resolveCredentials() reuse — same pattern as
+ *     cmdStatus (RESEARCH §3 / hub.js:140-191).
+ *
+ * Flags:
+ *   --json   Emit machine-readable JSON instead of the 5-line human report.
+ *   --repo   Override project root (defaults to process.cwd()).
+ *
+ * Exit codes:
+ *   0 — overview printed (or silent no-op in non-Arcanon dir).
+ *
+ * Task 1 (this commit): scaffold only — silent-no-project + handler dispatch.
+ * Task 2: full composition + output formatter.
+ */
+async function cmdList(flags) {
+  const repoPath = path.resolve(flags.repo || process.cwd());
+
+  // Project detection — silent no-op in non-Arcanon directories (NAV-01 contract).
+  // Re-resolve dataDir on every call so the env var is honored on each fresh
+  // node process (pool.js caches dataDir at module-load, but each `bash hub.sh`
+  // invocation spawns a new process so this is correct).
+  const dbPath = path.join(projectHashDir(repoPath), "impact-map.db");
+  if (!fs.existsSync(dbPath)) {
+    // Silent contract — no stdout, no stderr, exit 0.
+    process.exit(0);
+  }
+
+  // Task 1 scaffold: emit a placeholder so the handler is reachable end-to-end.
+  // Task 2 replaces the body below with the full composition + output formatter.
+  emit({ ok: true, project_root: repoPath }, flags, "");
+}
+
 async function cmdQueue(flags) {
   const rows = listAllUploads();
   if (flags.json) {
@@ -542,6 +584,7 @@ const HANDLERS = {
   sync: cmdSync,
   queue: cmdQueue,
   verify: cmdVerify, // TRUST-01
+  list: cmdList,     // NAV-01
 };
 
 async function main() {
