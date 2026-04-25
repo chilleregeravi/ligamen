@@ -25,12 +25,18 @@ Hard-remove `runtime-deps.json`. Single source of truth = `package.json`. Replac
 **: `install-deps.sh` exits 0 on all paths (non-blocking). Genuine install failure is logged to stderr and surfaced via worker startup, not by failing the SessionStart hook.
 - [x] **INST-06
 **: `scripts/mcp-wrapper.sh` reduced to `exec node "${PLUGIN_ROOT}/worker/mcp/server.js"` plus the existing CLAUDE_PLUGIN_ROOT resolution. No self-heal block. No npm install fallback.
-- [ ] **INST-07**: bats test — sentinel matches AND binding loads → install-deps.sh exits in <100ms with no npm process spawned (lsof / process count assertion)
-- [ ] **INST-08**: bats test — broken binding (delete `node_modules/better-sqlite3/build/Release/`) → install-deps.sh detects and triggers `npm rebuild better-sqlite3` (or full reinstall) → binding loads after
-- [ ] **INST-09**: bats test — `npm install` succeeds with prebuild-install silent failure simulation (mock npm install that wipes `build/Release/`) → install-deps.sh detects via `require()` and triggers rebuild
-- [ ] **INST-10**: bats test — fresh install (empty `node_modules/`) → install-deps.sh creates `node_modules/`, installs deps, validates binding, writes sentinel, exits 0
-- [ ] **INST-11**: bats test — sentinel mismatch → install-deps.sh runs `npm install`, validates binding, updates sentinel
-- [ ] **INST-12**: No regression in fresh-install flow: `claude plugin marketplace add` + `claude plugin install` + first session start → worker daemon healthy, MCP server starts, slash commands work
+- [x] **INST-07
+**: bats test — sentinel matches AND binding loads → install-deps.sh exits in <100ms with no npm process spawned (lsof / process count assertion)
+- [x] **INST-08
+**: bats test — broken binding (delete `node_modules/better-sqlite3/build/Release/`) → install-deps.sh detects and triggers `npm rebuild better-sqlite3` (or full reinstall) → binding loads after
+- [x] **INST-09
+**: bats test — `npm install` succeeds with prebuild-install silent failure simulation (mock npm install that wipes `build/Release/`) → install-deps.sh detects via `require()` and triggers rebuild
+- [x] **INST-10
+**: bats test — fresh install (empty `node_modules/`) → install-deps.sh creates `node_modules/`, installs deps, validates binding, writes sentinel, exits 0
+- [x] **INST-11
+**: bats test — sentinel mismatch → install-deps.sh runs `npm install`, validates binding, updates sentinel
+- [x] **INST-12
+**: No regression in fresh-install flow: `claude plugin marketplace add` + `claude plugin install` + first session start → worker daemon healthy, MCP server starts, slash commands work
 
 ### Update-check Timeout Fix (UPD) — THE-1027
 
