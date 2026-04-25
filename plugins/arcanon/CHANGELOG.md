@@ -17,6 +17,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the worker if it is not running. Pure markdown command (no Node-side
   handler); the existing `/arcanon:map view` keystroke is preserved for
   back-compat.
+- **`/arcanon:doctor` command** (NAV-03). 8 smoke-test diagnostics with
+  PASS/WARN/FAIL/SKIP per check and structured exit codes (0 = all pass or
+  only non-critical WARN; 1 = critical fail). Critical checks: worker
+  reachable, data dir writable, DB integrity. Non-critical: version match,
+  schema head, config + linked repos, MCP smoke (liveness probe — server
+  starts cleanly without crashing on import), hub credentials. Migration
+  head computed dynamically from filesystem glob (no hard-coded constant).
+  Supports `--json` for machine consumption. Silent in non-Arcanon
+  directories. Read-only — uses an isolated read-only SQLite connection for
+  the integrity check (does not touch the worker's process-cached DB pool).
 
 ## [0.1.3] - 2026-04-25
 

@@ -929,17 +929,90 @@ async function cmdDoctor(flags) {
     }),
   );
 
-  // Check 3 — DB schema head matches migration head (non-critical, Task 2 stub).
+  // Check 3 — DB schema head matches migration head (non-critical).
+  //
+  // Migration head is computed at runtime from the filesystem glob
+  // worker/db/migrations/[0-9]+_*.js — NOT a hardcoded constant. This is
+  // forward-compatible with Phase 117 (017_scan_overrides.js) etc.; the
+  // doctor stays correct without a source change on every migration.
+  //
+  // DB head comes from a fresh isolated read-only connection (BLOCK 2 — do
+  // NOT use openDb()).
   checks.push(
     await runCheck(3, "schema_head", "non-critical", async () => {
-      return { status: "WARN", detail: "schema head check pending Task 2" };
+      const migDir = path.join(__dirname, "..", "db", "migrations");
+      let files;
+      try {
+        files = fs.readdirSync(migDir);
+      } catch (e) {
+        return { status: "WARN", detail: `migrations dir unreadable: ${e.code || e.message}` };
+      }
+      const versions = files
+        .filter((f) => /^[0-9]+_.*\.js$/.test(f) && !f.endsWith(".test.js"))
+        .map((f) => parseInt(f.match(/^([0-9]+)_/)[1], 10))
+        .filter((n) => Number.isFinite(n));
+      if (versions.length === 0) {
+        return { status: "WARN", detail: "no migrations found on disk" };
+      }
+      const fsHead = Math.max(...versions);
+      const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+      let dbHead;
+      try {
+        const row = db.prepare("SELECT MAX(version) AS v FROM schema_versions").get();
+        dbHead = row && typeof row.v === "number" ? row.v : 0;
+      } catch (e) {
+        db.close();
+        return { status: "WARN", detail: `schema_versions read failed: ${e.message}` };
+      } finally {
+        db.close();
+      }
+      return dbHead === fsHead
+        ? { status: "PASS", detail: `${dbHead} == ${fsHead}` }
+        : { status: "WARN", detail: `db schema ${dbHead} < migration head ${fsHead}` };
     }),
   );
 
-  // Check 4 — config + linked repos resolve (non-critical, Task 2 stub).
+  // Check 4 — arcanon.config.json parses + linked-repos resolve (non-critical).
+  //
+  // Reads arcanon.config.json from the project root via resolveConfigPath()
+  // (already imported at hub.js:37). Then for each entry in the optional
+  // top-level `linked-repos` array, asserts the resolved path exists on disk.
+  // Missing config is WARN (most projects don't ship one in early Plan-114
+  // territory); parse error is WARN; missing linked-repo dir is WARN with
+  // the offending path in the detail.
   checks.push(
     await runCheck(4, "config_linked_repos", "non-critical", async () => {
-      return { status: "WARN", detail: "config check pending Task 2" };
+      let cfgPath;
+      try {
+        cfgPath = resolveConfigPath(cwd);
+      } catch (e) {
+        return { status: "WARN", detail: `config path resolution failed: ${e.message}` };
+      }
+      if (!fs.existsSync(cfgPath)) {
+        return { status: "WARN", detail: `arcanon.config.json missing at ${cfgPath}` };
+      }
+      let cfg;
+      try {
+        cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      } catch (e) {
+        return { status: "WARN", detail: `parse error: ${e.message}` };
+      }
+      const linked = Array.isArray(cfg["linked-repos"]) ? cfg["linked-repos"] : [];
+      if (linked.length === 0) {
+        return { status: "PASS", detail: "config parsed, no linked repos" };
+      }
+      // Each entry may be a string (path) or an object {path: "..."}.
+      const resolved = linked.map((entry) => {
+        const raw = typeof entry === "string" ? entry : entry?.path;
+        if (!raw) return { raw: JSON.stringify(entry), abs: null };
+        return { raw, abs: path.resolve(cwd, raw) };
+      });
+      const missing = resolved.filter((e) => !e.abs || !fs.existsSync(e.abs));
+      if (missing.length === 0) {
+        return { status: "PASS", detail: `${linked.length} linked repos resolved` };
+      }
+      const names = missing.map((m) => m.raw).join(", ");
+      return { status: "WARN", detail: `missing: ${names}` };
     }),
   );
 
@@ -986,15 +1059,118 @@ async function cmdDoctor(flags) {
     }),
   );
 
-  // Check 7 — MCP server liveness probe (non-critical, Task 2 stub).
+  // Check 7 — MCP server liveness probe (non-critical).
+  //
+  // Per FLAG 5 / RESEARCH §4 decision: Option B (liveness probe). Spawn the
+  // bundled MCP server, give it 1 second to reach its message loop, then
+  // SIGTERM. This is a smoke test (proves the server starts cleanly without
+  // crashing on import) — NOT a conformance test. We do not send tools/list
+  // and do not implement the initialize handshake; that level of verification
+  // is left to a dedicated MCP-conformance suite.
+  //
+  // Rationale: most MCP-server breakage in practice is import-time (missing
+  // dep, bad require path, syntax error). Liveness covers that.
+  //
+  // PASS conditions (whichever fires first):
+  //   1. Any valid JSON-RPC line appears on stdout (server is actively
+  //      emitting — proves message loop reached AND active).
+  //   2. The process is still alive at the 1s deadline (server reached
+  //      its stdio-read loop and is blocked waiting for input — exactly
+  //      what a healthy MCP server does without a client connected). This
+  //      is the OBSERVED behaviour of the @modelcontextprotocol/sdk stdio
+  //      transport: it does not write anything until the client sends a
+  //      request, so a clean startup looks like "silent process for 1s".
+  //
+  // WARN conditions:
+  //   - Process exits before the deadline with a non-zero code (crash on
+  //     import or in setup).
+  //   - Spawn error (ENOENT etc.).
   checks.push(
     await runCheck(7, "mcp_smoke", "non-critical", async () => {
-      return { status: "WARN", detail: "mcp smoke check pending Task 2" };
+      const serverPath = path.join(__dirname, "..", "mcp", "server.js");
+      if (!fs.existsSync(serverPath)) {
+        return { status: "WARN", detail: `mcp server.js missing at ${serverPath}` };
+      }
+      const t0 = Date.now();
+      return new Promise((resolve) => {
+        const proc = spawn(process.execPath, [serverPath], {
+          stdio: ["pipe", "pipe", "pipe"],
+          // Inherit env so the server's data-dir resolution matches the
+          // doctor's (otherwise the spawned child would default to ~/.arcanon).
+          env: process.env,
+        });
+        let stderrBuf = "";
+        let stdoutBuf = "";
+        let resolved = false;
+        const finish = (result) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timer);
+          try { proc.kill("SIGTERM"); } catch { /* swallow */ }
+          resolve(result);
+        };
+        // 1s deadline: if the process is still alive at this point with no
+        // crash and no error, it's reached the stdio-read loop — PASS.
+        const timer = setTimeout(() => {
+          finish({ status: "PASS", detail: `mcp server alive in ${Date.now() - t0}ms` });
+        }, 1000);
+
+        proc.stdout.on("data", (chunk) => {
+          stdoutBuf += chunk.toString();
+          const lines = stdoutBuf.split("\n");
+          stdoutBuf = lines.pop() || "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const msg = JSON.parse(trimmed);
+              if (msg && (msg.jsonrpc === "2.0" || typeof msg.id !== "undefined" || msg.method)) {
+                // Active emission proves the message loop is running.
+                finish({ status: "PASS", detail: `mcp server alive in ${Date.now() - t0}ms` });
+                return;
+              }
+            } catch {
+              /* not yet a complete JSON line — keep buffering */
+            }
+          }
+        });
+
+        // Capture stderr so a crash-on-import can include the first error
+        // line in the detail (helps the operator diagnose).
+        proc.stderr.on("data", (chunk) => {
+          stderrBuf += chunk.toString();
+        });
+
+        proc.on("error", (e) => {
+          finish({ status: "WARN", detail: `mcp spawn error: ${e.code || e.message}` });
+        });
+
+        proc.on("exit", (code, signal) => {
+          // SIGTERM is our own kill — ignore. Anything else before the
+          // deadline means the server crashed.
+          if (signal !== "SIGTERM" && !resolved) {
+            const firstStderr = stderrBuf.split("\n").map((l) => l.trim()).find((l) => l) || "";
+            const stderrSnippet = firstStderr ? ` (${firstStderr.slice(0, 120)})` : "";
+            finish({
+              status: "WARN",
+              detail: `mcp server exited with code ${code} before deadline${stderrSnippet}`,
+            });
+          }
+        });
+      });
     }),
   );
 
-  // Check 8 — hub credentials. SKIP cleanly when no creds are configured.
-  // Task 2 will add the round-trip when creds ARE present.
+  // Check 8 — hub credentials round-trip (non-critical).
+  //
+  // SKIP when no credentials are configured (this is the common case for
+  // local-only operators and is NOT a failure mode). When creds ARE present,
+  // GET ${hubUrl}/api/version with a 5s timeout via fetchWithTimeout. PASS
+  // on 2xx, WARN on 401/403 ("auth rejected"), WARN on any other failure
+  // ("hub unreachable"). Never logs the bearer token.
+  //
+  // resolveCredentials() returns { apiKey, hubUrl, source } — note the
+  // camelCase field names (NOT api_key / hub_url).
   checks.push(
     await runCheck(8, "hub_credentials", "non-critical", async () => {
       let creds;
@@ -1003,8 +1179,21 @@ async function cmdDoctor(flags) {
       } catch {
         return { status: "SKIP", detail: "no credentials configured" };
       }
-      // creds present — round-trip pending Task 2.
-      return { status: "SKIP", detail: `round-trip pending Task 2 (creds via ${creds.source})` };
+      const hubUrl = creds.hubUrl;
+      if (!hubUrl) {
+        return { status: "WARN", detail: "credentials present but no hubUrl resolved" };
+      }
+      const probeUrl = `${hubUrl.replace(/\/$/, "")}/api/version`;
+      const r = await fetchWithTimeout(probeUrl, 5000, {
+        headers: { Authorization: `Bearer ${creds.apiKey}` },
+      });
+      if (r.ok) {
+        return { status: "PASS", detail: `hub ${hubUrl} authenticated` };
+      }
+      if (r.status === 401 || r.status === 403) {
+        return { status: "WARN", detail: `hub auth rejected: ${r.status}` };
+      }
+      return { status: "WARN", detail: `hub unreachable: ${r.error || `HTTP ${r.status}`}` };
     }),
   );
 

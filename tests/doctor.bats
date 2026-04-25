@@ -241,3 +241,130 @@ teardown() {
   grep -E '^allowed-tools:' "${REPO_ROOT}/plugins/arcanon/commands/doctor.md"
   grep -q 'Bash' "${REPO_ROOT}/plugins/arcanon/commands/doctor.md"
 }
+
+# ---------------------------------------------------------------------------
+# Test 7 — schema head WARN: seed DB normally (head=16), then downgrade
+# schema_versions to 14. Check 3 must report WARN with the "db schema 14 <
+# migration head 16" detail; overall exit 0 (non-critical).
+# ---------------------------------------------------------------------------
+@test "NAV-03: doctor reports WARN for check 3 when DB schema lags migration head" {
+  local hash
+  hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
+  local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
+  bash "$SEED_SH" "$PROJECT_ROOT" "$db_path" --schema-version 14
+  _start_worker
+
+  cd "$PROJECT_ROOT"
+  run bash "$HUB_SH" doctor --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.checks[] | select(.id == 3) | .status == "WARN"' >/dev/null
+  echo "$output" | jq -e '.checks[] | select(.id == 3) | .detail | startswith("db schema 14 < migration head ")' >/dev/null
+  echo "$output" | jq -e '.summary.exit_code == 0' >/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Test 8 — MCP smoke happy path: all-pass scenario; check 7 reports PASS
+# with detail like `mcp server alive in NNNms`. Per FLAG 5 / Option B the
+# probe PASSes when the server stays alive past the 1s deadline (= reached
+# the stdio-read loop without crashing on import).
+# ---------------------------------------------------------------------------
+@test "NAV-03: doctor reports check 7 PASS for MCP liveness probe" {
+  local hash
+  hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
+  local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
+  bash "$SEED_SH" "$PROJECT_ROOT" "$db_path"
+  _start_worker
+
+  cd "$PROJECT_ROOT"
+  run bash "$HUB_SH" doctor --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.checks[] | select(.id == 7) | .status == "PASS"' >/dev/null
+  echo "$output" | jq -e '.checks[] | select(.id == 7) | .detail | startswith("mcp server alive in ")' >/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Test 9 — hub round-trip success against the mock-hub fixture (FLAG 6).
+# Spawn the mock hub on $MOCK_HUB_PORT, write creds + hub_url under HOME,
+# run doctor, assert check 8 PASS.
+# ---------------------------------------------------------------------------
+@test "NAV-03: doctor reports check 8 PASS when hub round-trip succeeds" {
+  local hash
+  hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
+  local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
+  bash "$SEED_SH" "$PROJECT_ROOT" "$db_path"
+  _start_worker
+
+  # Spawn mock hub in the background; capture PID for teardown.
+  MOCK_HUB_PORT=$MOCK_HUB_PORT node "$MOCK_HUB_JS" >"$BATS_TEST_TMPDIR/mock-hub.log" 2>&1 &
+  echo $! > "$BATS_TEST_TMPDIR/mock-hub.pid"
+  for _ in $(seq 1 10); do
+    if curl -sf "http://127.0.0.1:${MOCK_HUB_PORT}/api/version" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.1
+  done
+
+  # Seed creds under the per-test $HOME (setup() already isolated HOME).
+  mkdir -p "$HOME/.arcanon"
+  cat > "$HOME/.arcanon/config.json" <<EOF
+{"api_key":"arc_test_key_doctor_round_trip","hub_url":"http://127.0.0.1:${MOCK_HUB_PORT}"}
+EOF
+
+  cd "$PROJECT_ROOT"
+  run bash "$HUB_SH" doctor --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.checks[] | select(.id == 8) | .status == "PASS"' >/dev/null
+  echo "$output" | jq -e ".checks[] | select(.id == 8) | .detail | contains(\"http://127.0.0.1:${MOCK_HUB_PORT}\")" >/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Test 10 — hub round-trip failure: creds present but hub URL is unreachable
+# (port 1 connects-and-RSTs / refuses on most systems). Check 8 must report
+# WARN (NOT FAIL — non-critical); overall exit 0.
+# ---------------------------------------------------------------------------
+@test "NAV-03: doctor reports check 8 WARN when hub unreachable" {
+  local hash
+  hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
+  local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
+  bash "$SEED_SH" "$PROJECT_ROOT" "$db_path"
+  _start_worker
+
+  mkdir -p "$HOME/.arcanon"
+  cat > "$HOME/.arcanon/config.json" <<'EOF'
+{"api_key":"arc_test_key_unreachable","hub_url":"http://127.0.0.1:1"}
+EOF
+
+  cd "$PROJECT_ROOT"
+  run bash "$HUB_SH" doctor --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.checks[] | select(.id == 8) | .status == "WARN"' >/dev/null
+  echo "$output" | jq -e '.summary.exit_code == 0' >/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Test 11 — config 4 linked-repos with one missing dir: WARN with detail
+# naming the missing path; overall exit 0.
+# ---------------------------------------------------------------------------
+@test "NAV-03: doctor reports check 4 WARN when a linked-repo dir is missing" {
+  local hash
+  hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
+  local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
+  bash "$SEED_SH" "$PROJECT_ROOT" "$db_path"
+  _start_worker
+
+  # Create 3 real repo directories + 1 phantom path.
+  mkdir -p "$PROJECT_ROOT/api" "$PROJECT_ROOT/worker" "$PROJECT_ROOT/web"
+  cat > "$PROJECT_ROOT/arcanon.config.json" <<'EOF'
+{
+  "project-name": "doctor-test",
+  "linked-repos": ["./api", "./worker", "./web", "./does-not-exist"]
+}
+EOF
+
+  cd "$PROJECT_ROOT"
+  run bash "$HUB_SH" doctor --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.checks[] | select(.id == 4) | .status == "WARN"' >/dev/null
+  # Detail must mention the missing path.
+  echo "$output" | jq -e '.checks[] | select(.id == 4) | .detail | contains("does-not-exist")' >/dev/null
+}
