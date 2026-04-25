@@ -240,7 +240,13 @@ Full details: `.planning/milestones/v0.1.3-ROADMAP.md`
 
 Three new read-only slash commands: `/arcanon:list` reads the impact-map via worker HTTP and prints a project overview (linked repos, services by type, connection counts by confidence, actor count, hub status); `/arcanon:view` is a top-level alias for the existing `/arcanon:map view` graph UI launcher; `/arcanon:doctor` runs 7 diagnostic checks (worker reachability, version match, schema-version match against migration head 16, config + linked-repo resolution, data-dir perms, DB integrity via `PRAGMA quick_check`, MCP smoke via `tools/list`, hub credential check) with PASS/FAIL/WARN per check and structured exit codes. Commands stay silent in non-Arcanon directories.
 
-**Plan-phase pre-flight requirement (from v0.1.3 → v0.1.4 audit):** plan must spec the dispatch precedence for `/arcanon:view` against the existing `/arcanon:map view` subcommand. Top-level `/arcanon:view` takes precedence; implementation must guard against double-dispatch when both routes resolve.
+**Plan-phase pre-flight requirement (from v0.1.3 → v0.1.4 audit):** plan must spec the dispatch precedence for `/arcanon:view` against the existing `/arcanon:map view` subcommand. Top-level `/arcanon:view` takes precedence; implementation must guard against double-dispatch when both routes resolve. **Resolved by Phase 114 research (see 114-RESEARCH.md §2):** Claude Code resolves slash commands by exact filename match against `commands/<name>.md`; no router-level double-dispatch exists. No guard ships — only a regression test asserting `worker/cli/hub.js` never grows a `view: cmdView` HANDLERS entry.
+
+**Plans:** 3 plans
+Plans:
+- [ ] 114-01-PLAN.md — `/arcanon:list` (NAV-01): cmdList in hub.js + worker-client.sh `_arcanon_is_project_dir()` helper + bats E2E
+- [ ] 114-02-PLAN.md — `/arcanon:view` (NAV-02): pure markdown alias cloning map.md:22-32; no Node handler; commands-surface regression
+- [ ] 114-03-PLAN.md — `/arcanon:doctor` (NAV-03): cmdDoctor with 8 checks (filesystem-glob migration head + process-spawn MCP smoke + hub round-trip); exit-code matrix + --json
 
 ### Phase 115: Scan-Version Diff Command (`/diff`)
 
