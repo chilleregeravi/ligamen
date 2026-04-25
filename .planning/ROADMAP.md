@@ -210,7 +210,7 @@ Full details: `.planning/milestones/v0.1.2-ROADMAP.md`
 
 - [ ] **Phase 107: Install Architecture Cleanup** — Drop `runtime-deps.json`, rewrite `install-deps.sh` with sha256 sentinel + binding-load validation + rebuild fallback, simplify `mcp-wrapper.sh` to plain exec
 - [x] **Phase 108: Update-check Timeout Fix + Deprecated Command Removal** — Decouple `/arcanon:update --check` offline-decision from 5s refresh outcome; delete `/arcanon:upload` stub + tests + docs
-- [ ] **Phase 109: Path Canonicalization + Evidence at Ingest** — Migration 013 (`connections.path_template`); `persistFindings` rejects prose-only evidence; template-variant collapse on upsert
+- [x] **Phase 109: Path Canonicalization + Evidence at Ingest** — Migration 013 (`connections.path_template` + `uq_connections_dedup` UNIQUE INDEX); `persistFindings` rejects prose-only evidence; template-variant collapse on upsert (TRUST-02, 03, 10, 11 all complete; 21 new tests)
 - [ ] **Phase 110: services.base_path End-to-End** — Migration 014 (`services.base_path`); agent-prompt-service emits `base_path`; connection resolution strips base_path before path matching
 - [ ] **Phase 111: Quality Score + Reconciliation Audit Trail** — Migrations 015 (`scan_versions.quality_score`) + 016 (`enrichment_log`); endScan computes score; reconciliation writes audit rows; new `impact_audit_log` MCP tool
 - [ ] **Phase 112: `/arcanon:verify` Command** — New verify command re-reads cited evidence; returns ok/moved/missing/method_mismatch verdict per connection
@@ -718,16 +718,19 @@ Plans:
 - [x] 108-01-PLAN.md — UPD: Decouple update.sh --check offline-gate from refresh-process timeout (UPD-01..06)
 - [x] 108-02-PLAN.md — DEP: Delete /arcanon:upload stub + scrub README/CHANGELOG/SKILL refs (DEP-01..06)
 
-### Phase 109: Path Canonicalization + Evidence at Ingest
+### Phase 109: Path Canonicalization + Evidence at Ingest [COMPLETE]
 **Goal**: The scan ingest pipeline rejects evidence that does not literally appear in the cited source file, and connections whose only difference is a template variable name collapse to a single canonical row — strengthening data trust at the write boundary
 **Depends on**: Phase 108 (independent, but ordered after install + cleanup so the bats baseline is stable). Migration 013 (`connections.path_template`) ships in this phase since the column is required by canonicalization writes.
-**Requirements**: TRUST-02, TRUST-03, TRUST-10, TRUST-11
+**Requirements**: TRUST-02, TRUST-03, TRUST-10, TRUST-11 — **all complete**
 **Success Criteria** (what must be TRUE):
-  1. When the agent emits a connection whose `evidence` is prose with no literal substring match against `source_file` at ±3 lines of `line_start`, `persistFindings` skips the connection and logs a warning to the structured logger; the rest of the scan completes successfully
-  2. Two connections emitted with template variants (`/runtime/streams/{stream_id}` vs `/runtime/streams/{name}`) collapse to one row in `connections`, with both original templates preserved in the new `connections.path_template` column for display
-  3. Migration 013 adds `connections.path_template TEXT` idempotently — running it twice does not error; existing rows have `path_template` populated from `path` on first run
-  4. A node test exercises the persistFindings rejection path (prose evidence vs real-code source file) and asserts the connection is absent from the database while a warning is logged
-**Plans**: TBD
+  1. [x] When the agent emits a connection whose `evidence` is prose with no literal substring match against `source_file`, `persistFindings` skips the connection and logs a warning; the rest of the scan completes successfully _(implemented as whole-file substring check per CONTEXT D-03 since connections schema has no `line_start` column)_
+  2. [x] Two connections emitted with template variants (`/runtime/streams/{stream_id}` vs `/runtime/streams/{name}`) collapse to one row in `connections`, with both original templates preserved comma-joined in `connections.path_template` for display
+  3. [x] Migration 013 adds `connections.path_template TEXT` idempotently — running it twice does not error. _(Backfill of historic rows DEFERRED per CONTEXT D-06 — silent canonicalization could collapse legitimately-distinct rows. Documented as known behavior; new scans populate `path_template`.)_
+  4. [x] A node test exercises the persistFindings rejection path (prose evidence vs real-code source file) and asserts the connection is absent from the database while a warning is logged
+**Additional landed scope**: Migration 013 also creates `UNIQUE INDEX uq_connections_dedup` (the plan assumed this existed but it did not; required for collapse semantics to work). `upsertService` now returns the stable row id via SELECT lookup rather than relying on better-sqlite3's connection-level `lastInsertRowid` (was poisoning idempotent re-scans).
+**Plans**: 2 plans
+  - [x] 109-01-PLAN.md — Migration 013 connections.path_template column + idempotency test (TRUST-03)
+  - [x] 109-02-PLAN.md — persistFindings canonicalization + evidence-substring guard (TRUST-02, 03, 10, 11)
 
 ### Phase 110: services.base_path End-to-End
 **Goal**: A new `services.base_path` column lets the scanner declare a service-level path prefix (e.g., `/api`); the agent prompt instructs services to emit it; and connection resolution strips `base_path` from frontend-to-backend matches before comparing paths — eliminating a class of false-mismatch findings

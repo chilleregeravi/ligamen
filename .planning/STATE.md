@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.1.3
 milestone_name: Trust & Foundations
 status: completed
-stopped_at: Completed 107-03-PLAN.md (Phase 107 complete)
-last_updated: "2026-04-25T12:35:41.441Z"
-last_activity: "2026-04-25 — Plan 108-02 landed: /arcanon:upload deprecated stub deleted, README + CHANGELOG scrubbed, DEP-03 regression-guard added (DEP-01..06)"
+stopped_at: Completed 109-02-PLAN.md (Phase 109 complete)
+last_updated: "2026-04-25T14:46:00.000Z"
+last_activity: "2026-04-25 — Plan 109-02 landed: persistFindings now canonicalizes {xxx} -> {_} and rejects prose evidence (TRUST-02, TRUST-03, TRUST-10, TRUST-11). Migration 013 also gained UNIQUE INDEX uq_connections_dedup. upsertService now returns stable row id."
 progress:
   total_phases: 32
   completed_phases: 0
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 ## Current Position
 
-Phase: Wave 1 (Phases 107 + 108) in flight; Phase 109 spawning
-Plans complete: 107-01, 107-02, 108-01, 108-02 — 4/14 plans complete
-Status: INST-01..06 + UPD-01..06 + DEP-01..06 marked done in REQUIREMENTS.md (next up: 107-03 bats rewrite, 109-01 migration 013)
-Last activity: 2026-04-25 — Plan 108-02 landed: /arcanon:upload deprecated stub deleted, README + CHANGELOG scrubbed, DEP-03 regression-guard added (DEP-01..06)
+Phase: Phase 109 (Wave 2) complete; Phase 110 next
+Plans complete: 107-01, 107-02, 107-03, 108-01, 108-02, 109-01, 109-02 — 7/14 plans complete
+Status: INST-01..12 + UPD-01..06 + DEP-01..06 + TRUST-02, 03, 10, 11 marked done in REQUIREMENTS.md (next up: 110-01 services.base_path migration 012)
+Last activity: 2026-04-25 — Plan 109-02 landed: persistFindings canonicalizes {xxx} -> {_} and rejects prose evidence; migration 013 gains UNIQUE INDEX uq_connections_dedup; upsertService returns stable row id (TRUST-02, TRUST-03, TRUST-10, TRUST-11)
 
 ## v0.1.3 Phase Map
 
@@ -51,9 +51,9 @@ Last activity: 2026-04-25 — Plan 108-02 landed: /arcanon:upload deprecated stu
 
 **Velocity:**
 
-- Total plans completed: 197 (v1.0–v5.8.0 + v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans + v0.1.3 4 plans)
+- Total plans completed: 200 (v1.0–v5.8.0 + v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans + v0.1.3 7 plans)
 - Total milestones shipped: 21 (Ligamen v1.0–v5.8.0 + Arcanon v0.1.0 + v0.1.1 + v0.1.2)
-- v0.1.3 in progress: 7 phases planned, 14 plans drafted, 4 plans complete (107-01, 107-02, 108-01, 108-02)
+- v0.1.3 in progress: 7 phases planned, 14 plans drafted, 7 plans complete (107-01, 107-02, 107-03, 108-01, 108-02, 109-01, 109-02). Phase 109 closed.
 
 | Phase | Plan | Tasks | Files | Duration |
 | ----- | ---- | ----- | ----- | -------- |
@@ -62,6 +62,8 @@ Last activity: 2026-04-25 — Plan 108-02 landed: /arcanon:upload deprecated stu
 | 108   | 01   | 2     | 2     | ~10 min  |
 | 108   | 02   | 2     | 4     | ~16 min  |
 | Phase 107 P03 | 30 min | 2 tasks | 3 files |
+| 109   | 01   | 1     | 2     | ~2 min   |
+| 109   | 02   | 2     | 4     | ~45 min  |
 
 ## Accumulated Context
 
@@ -78,6 +80,9 @@ Last activity: 2026-04-25 — Plan 108-02 landed: /arcanon:upload deprecated stu
 - Plan 108-01 (THE-1027) complete: --check offline gate is now file-existence based (UPD-01..06)
 - Phase 108-02 complete: /arcanon:upload deprecated stub deleted, 5 CLN-05 bats tests removed, DEP-03 regression-guard added, README + CHANGELOG scrubbed (DEP-01..06)
 - Phase 107 complete: all 12 INST requirements landed with bats spec coverage
+- Phase 109-01 complete: migration 013 adds connections.path_template TEXT (TRUST-03 schema)
+- Phase 109-02 complete: canonicalizePath helper exported; persistFindings canonicalizes {xxx} -> {_}, merges path_template comma-joined on collapse, rejects prose evidence with stderr warning. Migration 013 extended with UNIQUE INDEX uq_connections_dedup (was missing in codebase despite plan assumption). upsertService now returns stable row id (lastInsertRowid was returning stale connection-level value on UPDATE path) (TRUST-02, 03, 10, 11)
+- Phase 109 complete: all 4 TRUST requirements landed with 21 new tests; verification doc at .planning/phases/109-path-canonicalization-and-evidence/109-VERIFICATION.md
 
 ### Pending Todos
 
@@ -91,6 +96,6 @@ Last activity: 2026-04-25 — Plan 108-02 landed: /arcanon:upload deprecated stu
 
 ## Session Continuity
 
-Last session: 2026-04-25T12:35:41.431Z
-Stopped at: Completed 107-03-PLAN.md (Phase 107 complete)
+Last session: 2026-04-25T14:46:00.000Z
+Stopped at: Completed 109-02-PLAN.md (Phase 109 complete)
 Resume file: None
