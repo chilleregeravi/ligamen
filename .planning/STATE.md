@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v0.1.3
 milestone_name: Trust & Foundations
-status: defining_requirements
-stopped_at: Milestone v0.1.3 started
-last_updated: "2026-04-25T11:30:00.000Z"
+status: roadmap_complete
+stopped_at: Roadmap created (Phases 107-113)
+last_updated: "2026-04-25T12:00:00.000Z"
 last_activity: 2026-04-25
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -25,17 +25,35 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Roadmap complete; ready for `/gsd-plan-phase 107`
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-25 — Milestone v0.1.3 started
+Status: Roadmap complete (7 phases, 45/45 requirements mapped)
+Last activity: 2026-04-25 — Roadmap created with Phases 107-113
+
+## v0.1.3 Phase Map
+
+| Phase | Goal | Requirements |
+|-------|------|--------------|
+| 107 | Install Architecture Cleanup — drop runtime-deps.json, sentinel + binding-load validation, simplified mcp-wrapper.sh | INST-01..12 (12) |
+| 108 | Update-check Timeout Fix + `/arcanon:upload` Removal | UPD-01..06, DEP-01..06 (12) |
+| 109 | Path Canonicalization + Evidence at Ingest (migration 013) | TRUST-02, 03, 10, 11 (4) |
+| 110 | services.base_path End-to-End (migration 012) | TRUST-04, 12 (2) |
+| 111 | Quality Score + Reconciliation Audit Trail (migrations 014, 015) | TRUST-05, 06, 13, 14 (4) |
+| 112 | `/arcanon:verify` Command | TRUST-01, 07, 08, 09 (4) |
+| 113 | Verification Gate (release pin) | VER-01..07 (7) |
+
+**Wave-able phases (can run in parallel within constraints):**
+- Phase 108 is independent of Phase 107 once Phase 107 lands the install path
+- Phases 110/111/112 each depend on Phase 109 landing first (migration 013 path_template)
+- Phase 113 always last
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 193 (v1.0–v5.8.0 rolled into v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans)
+- Total plans completed: 193 (v1.0–v5.8.0 + v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans)
 - Total milestones shipped: 21 (Ligamen v1.0–v5.8.0 + Arcanon v0.1.0 + v0.1.1 + v0.1.2)
+- v0.1.3 in progress: 7 phases planned, 0 plans drafted, 0 plans complete
 
 ## Accumulated Context
 
@@ -45,19 +63,21 @@ Last activity: 2026-04-25 — Milestone v0.1.3 started
 - **`/arcanon:upload` removal brought forward from v0.2.0 → v0.1.3.** v0.1.2 already shipped a breaking change (LIGAMEN_* purge); one more removal in the same wave is consistent. Documented in CHANGELOG `### BREAKING`.
 - **THE-1028 supersedes runtime-deps.json.** Single source of truth = `package.json`. Drop runtime-deps.json entirely. The `--omit=dev` flag already gives runtime-only behavior.
 - **Validate, don't guess.** install-deps.sh and mcp-wrapper.sh's file-existence checks are replaced with `require("better-sqlite3")` validation. Fixes Node 25 binding bug class permanently.
+- **Phase ordering trades migration grouping for REQ atomicity.** Migrations 012-015 each ship in the same phase as the runtime code that exercises them, so each REQ maps to exactly one phase. Phase 109 lands migration 013 + path canonicalization writes; Phase 110 lands migration 012 + base_path scan/resolution; Phase 111 lands migrations 014 + 015 + their wiring. Cleaner than splitting "all migrations first."
+- **`/arcanon:verify` lives in Phase 112 (after data-shape phases).** The verify command reads scan data + connections.path_template + persisted evidence; depends on data shape stabilizing. Independent of Phase 110 (base_path) and Phase 111 (quality_score) but ordered after for stable test fixtures.
 
 ### Pending Todos
 
-None. Awaiting requirements definition + roadmap.
+- Run `/gsd-plan-phase 107` to draft plans for the install-architecture cleanup phase
 
 ### Blockers/Concerns
 
 - 2 pre-existing node test failures unrelated to v0.1.2 (`server-search.test.js` queryScan drift, `manager.test.js` incremental prompt mock) — filed for a future milestone.
 - PreToolUse hook p99 latency on macOS is 130ms vs the 50ms Linux target — documented caveat, not a regression.
-- `/arcanon:update --check` 5s timeout addressed by THE-1027 in this milestone.
+- `/arcanon:update --check` 5s timeout addressed by THE-1027 in this milestone (Phase 108).
 
 ## Session Continuity
 
-Last session: 2026-04-25T11:30:00.000Z
-Stopped at: v0.1.3 Trust & Foundations milestone started
-Resume file: None
+Last session: 2026-04-25T12:00:00.000Z
+Stopped at: Roadmap created — 7 phases (107-113) defined, 45/45 requirements mapped, traceability table populated
+Resume file: None — ready for `/gsd-plan-phase 107`

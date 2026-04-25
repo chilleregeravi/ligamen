@@ -106,55 +106,64 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| INST-01 | TBD | Pending |
-| INST-02 | TBD | Pending |
-| INST-03 | TBD | Pending |
-| INST-04 | TBD | Pending |
-| INST-05 | TBD | Pending |
-| INST-06 | TBD | Pending |
-| INST-07 | TBD | Pending |
-| INST-08 | TBD | Pending |
-| INST-09 | TBD | Pending |
-| INST-10 | TBD | Pending |
-| INST-11 | TBD | Pending |
-| INST-12 | TBD | Pending |
-| UPD-01 | TBD | Pending |
-| UPD-02 | TBD | Pending |
-| UPD-03 | TBD | Pending |
-| UPD-04 | TBD | Pending |
-| UPD-05 | TBD | Pending |
-| UPD-06 | TBD | Pending |
-| TRUST-01 | TBD | Pending |
-| TRUST-02 | TBD | Pending |
-| TRUST-03 | TBD | Pending |
-| TRUST-04 | TBD | Pending |
-| TRUST-05 | TBD | Pending |
-| TRUST-06 | TBD | Pending |
-| TRUST-07 | TBD | Pending |
-| TRUST-08 | TBD | Pending |
-| TRUST-09 | TBD | Pending |
-| TRUST-10 | TBD | Pending |
-| TRUST-11 | TBD | Pending |
-| TRUST-12 | TBD | Pending |
-| TRUST-13 | TBD | Pending |
-| TRUST-14 | TBD | Pending |
-| DEP-01 | TBD | Pending |
-| DEP-02 | TBD | Pending |
-| DEP-03 | TBD | Pending |
-| DEP-04 | TBD | Pending |
-| DEP-05 | TBD | Pending |
-| DEP-06 | TBD | Pending |
-| VER-01 | TBD | Pending |
-| VER-02 | TBD | Pending |
-| VER-03 | TBD | Pending |
-| VER-04 | TBD | Pending |
-| VER-05 | TBD | Pending |
-| VER-06 | TBD | Pending |
-| VER-07 | TBD | Pending |
+| INST-01 | Phase 107 | Pending |
+| INST-02 | Phase 107 | Pending |
+| INST-03 | Phase 107 | Pending |
+| INST-04 | Phase 107 | Pending |
+| INST-05 | Phase 107 | Pending |
+| INST-06 | Phase 107 | Pending |
+| INST-07 | Phase 107 | Pending |
+| INST-08 | Phase 107 | Pending |
+| INST-09 | Phase 107 | Pending |
+| INST-10 | Phase 107 | Pending |
+| INST-11 | Phase 107 | Pending |
+| INST-12 | Phase 107 | Pending |
+| UPD-01 | Phase 108 | Pending |
+| UPD-02 | Phase 108 | Pending |
+| UPD-03 | Phase 108 | Pending |
+| UPD-04 | Phase 108 | Pending |
+| UPD-05 | Phase 108 | Pending |
+| UPD-06 | Phase 108 | Pending |
+| TRUST-01 | Phase 112 | Pending |
+| TRUST-02 | Phase 109 | Pending |
+| TRUST-03 | Phase 109 | Pending |
+| TRUST-04 | Phase 110 | Pending |
+| TRUST-05 | Phase 111 | Pending |
+| TRUST-06 | Phase 111 | Pending |
+| TRUST-07 | Phase 112 | Pending |
+| TRUST-08 | Phase 112 | Pending |
+| TRUST-09 | Phase 112 | Pending |
+| TRUST-10 | Phase 109 | Pending |
+| TRUST-11 | Phase 109 | Pending |
+| TRUST-12 | Phase 110 | Pending |
+| TRUST-13 | Phase 111 | Pending |
+| TRUST-14 | Phase 111 | Pending |
+| DEP-01 | Phase 108 | Pending |
+| DEP-02 | Phase 108 | Pending |
+| DEP-03 | Phase 108 | Pending |
+| DEP-04 | Phase 108 | Pending |
+| DEP-05 | Phase 108 | Pending |
+| DEP-06 | Phase 108 | Pending |
+| VER-01 | Phase 113 | Pending |
+| VER-02 | Phase 113 | Pending |
+| VER-03 | Phase 113 | Pending |
+| VER-04 | Phase 113 | Pending |
+| VER-05 | Phase 113 | Pending |
+| VER-06 | Phase 113 | Pending |
+| VER-07 | Phase 113 | Pending |
 
 **Coverage:**
 - v1 requirements: 45 total
-- Mapped to phases: 0, Unmapped: 45 (roadmapper fills this)
+- Mapped to phases: 45, Unmapped: 0
+
+**Phase distribution:**
+- Phase 107 (Install Architecture Cleanup): 12 requirements (INST-01..12)
+- Phase 108 (Update-check Timeout + Deprecated Command Removal): 12 requirements (UPD-01..06, DEP-01..06)
+- Phase 109 (Path Canonicalization + Evidence at Ingest): 4 requirements (TRUST-02, TRUST-03, TRUST-10, TRUST-11)
+- Phase 110 (services.base_path End-to-End): 2 requirements (TRUST-04, TRUST-12)
+- Phase 111 (Quality Score + Reconciliation Audit Trail): 4 requirements (TRUST-05, TRUST-06, TRUST-13, TRUST-14)
+- Phase 112 (`/arcanon:verify` Command): 4 requirements (TRUST-01, TRUST-07, TRUST-08, TRUST-09)
+- Phase 113 (Verification Gate): 7 requirements (VER-01..07)
 
 ---
-*Requirements defined: 2026-04-25*
+*Requirements defined: 2026-04-25 — Roadmap traceability filled by gsd-roadmapper 2026-04-25*
