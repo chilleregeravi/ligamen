@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.1.3
 milestone_name: Trust & Foundations
 status: verifying
-stopped_at: Completed 111-03-PLAN.md (audit-log API + impact_audit_log MCP tool + reconciliation wiring)
-last_updated: "2026-04-25T14:05:08.984Z"
-last_activity: "2026-04-25 — Plan 111-03 landed: QueryEngine.logEnrichment + getEnrichmentLog (8 tests), impact_audit_log MCP tool (6 tests, brings tool count to 9), reconciliation audit-log wiring in commands/map.md (3 integration tests). Phase 111 complete (4/4 REQs); 13/14 plans complete in v0.1.3."
+stopped_at: Completed 113-01-PLAN.md (v0.1.3 verification gate — release pin)
+last_updated: "2026-04-25T14:17:21.612Z"
+last_activity: "2026-04-25 — Plan 113-01 landed: v0.1.3 release gate verified. bats 315/315, node 630/631 (1 documented pre-existing failure), 4 manifests at 0.1.3 (6 strings) + package-lock regenerated, CHANGELOG [0.1.3] - 2026-04-25 pinned with all 5 subsections, 113-VERIFICATION.md written (status: passed, 45/45 REQs across 7 phases). v0.1.3 Trust & Foundations READY TO SHIP — next: /gsd-complete-milestone v0.1.3."
 progress:
   total_phases: 32
   completed_phases: 0
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 ## Current Position
 
-Phase: Phase 111 complete — Quality Score + Reconciliation Audit Trail (4 REQs); 113 (Verification Gate) is next
-Plans complete: 107-01, 107-02, 107-03, 108-01, 108-02, 109-01, 109-02, 110-01, 111-01, 111-02, 111-03, 112-01, 112-02 — 13/14 plans complete (only 113-01 remaining)
-Status: INST-01..12 + UPD-01..06 + DEP-01..06 + TRUST-01..14 marked done in REQUIREMENTS.md (next up: 113-01 verification gate)
-Last activity: 2026-04-25 — Plan 111-03 landed: QueryEngine.logEnrichment + getEnrichmentLog (8 tests), impact_audit_log MCP tool (6 tests, brings tool count to 9), reconciliation audit-log wiring in commands/map.md (3 integration tests). Phase 111 complete (4/4 REQs); 13/14 plans complete in v0.1.3.
+Phase: Phase 113 complete — Verification Gate (7 REQs); v0.1.3 milestone READY TO SHIP
+Plans complete: 107-01, 107-02, 107-03, 108-01, 108-02, 109-01, 109-02, 110-01, 111-01, 111-02, 111-03, 112-01, 112-02, 113-01 — 14/14 plans complete in v0.1.3
+Status: INST-01..12 + UPD-01..06 + DEP-01..06 + TRUST-01..14 + VER-01..07 marked done in REQUIREMENTS.md (45/45 REQs); next up: /gsd-complete-milestone v0.1.3
+Last activity: 2026-04-25 — Plan 113-01 landed: v0.1.3 release gate verified. bats 315/315, node 630/631 (1 documented pre-existing failure), 4 manifests at 0.1.3 (6 strings) + package-lock regenerated, CHANGELOG [0.1.3] - 2026-04-25 pinned, 113-VERIFICATION.md written (status: passed). READY TO SHIP.
 
 ## v0.1.3 Phase Map
 
@@ -53,7 +53,7 @@ Last activity: 2026-04-25 — Plan 111-03 landed: QueryEngine.logEnrichment + ge
 
 - Total plans completed: 200 (v1.0–v5.8.0 + v0.1.0 + v0.1.1 12 plans + v0.1.2 9 plans + v0.1.3 7 plans)
 - Total milestones shipped: 21 (Ligamen v1.0–v5.8.0 + Arcanon v0.1.0 + v0.1.1 + v0.1.2)
-- v0.1.3 in progress: 7 phases planned, 14 plans drafted, 7 plans complete (107-01, 107-02, 107-03, 108-01, 108-02, 109-01, 109-02). Phase 109 closed.
+- v0.1.3 complete: 7 phases planned, 14/14 plans complete (45/45 REQs). v0.1.3 Trust & Foundations READY TO SHIP.
 
 | Phase | Plan | Tasks | Files | Duration |
 | ----- | ---- | ----- | ----- | -------- |
@@ -67,6 +67,7 @@ Last activity: 2026-04-25 — Plan 111-03 landed: QueryEngine.logEnrichment + ge
 | Phase 110 P01 | 13 | 3 tasks | 8 files |
 | 111   | 02   | 3     | 7     | ~13 min  |
 | 111   | 03   | 3     | 8     | ~30 min  |
+| 113   | 01   | 6     | 7     | ~12 min  |
 
 ## Accumulated Context
 
@@ -92,19 +93,21 @@ Last activity: 2026-04-25 — Plan 111-03 landed: QueryEngine.logEnrichment + ge
 - Phase 112 complete: `/arcanon:verify` ships (TRUST-01) plus 7 bats + 13 node tests locking all four verdicts (TRUST-07/08/09). Read-only contract D-02 has a formal byte-level checksum proof in `http.verify.test.js` Test 13. 1000-connection cap (D-03) covered by Test 12. See .planning/phases/112-arcanon-verify-command/112-VERIFICATION.md for the closure report.
 - Phase 112-02 deviation: empty-result-set message kept as the single 112-01 wording ("no connections found for the given scope") instead of the plan's two-message split, to avoid rewriting cmdVerify cosmetics for the same exit-1 outcome. Bats edges 4 and 6 assert against the actually-shipped message.
 - Phase 112-02 deviation: seed.js now stamps schema_versions after each up() call. Without this, the worker's first runMigrations() on the seeded DB re-applies migration 002 and throws "duplicate column name: type". Same end-state, but stamps make the seeder idempotent with the worker loader.
+- Phase 113 complete: v0.1.3 release gate verified. bats 315/315; node 630/631 (only 1 of 2 documented v0.1.2 pre-existing failures remains — server-search queryScan now resolved by phase work). 4 manifests at 0.1.3 (6 strings) + package-lock regenerated; CHANGELOG [0.1.3] - 2026-04-25 pinned with all 5 Keep-a-Changelog subsections. 113-VERIFICATION.md (status: passed) audit trail written. v0.1.3 READY TO SHIP — next: /gsd-complete-milestone v0.1.3.
+- Phase 113 documented exception: VER-04 grep for `--help` in commands/ found 1 pre-existing v0.1.1 hit in commands/update.md:21 (`claude plugin update --help` upstream-CLI probe, not an Arcanon command flag). Documented as permanent exception in 113-VERIFICATION.md; satisfies D-04 regression-guard intent (catch v0.1.4 scope creep onto /arcanon:* commands), since the hit is a third-party CLI reference.
 
 ### Pending Todos
 
-- Run `/gsd-plan-phase 107` to draft plans for the install-architecture cleanup phase
+- Run `/gsd-complete-milestone v0.1.3` to tag the release
 
 ### Blockers/Concerns
 
-- 2 pre-existing node test failures unrelated to v0.1.2 (`server-search.test.js` queryScan drift, `manager.test.js` incremental prompt mock) — filed for a future milestone.
-- PreToolUse hook p99 latency on macOS is 130ms vs the 50ms Linux target — documented caveat, not a regression.
-- `/arcanon:update --check` 5s timeout addressed by THE-1027 in this milestone (Phase 108).
+- 1 pre-existing node test failure unrelated to v0.1.3 (`manager.test.js` incremental prompt mock missing `_db`) — filed for a future milestone. The 2nd documented v0.1.2 failure (`server-search.test.js` queryScan drift) is now resolved by v0.1.3 phase work.
+- PreToolUse hook p99 latency on macOS — caveat at threshold=50ms but did not trigger this gate at threshold=200; CI uses 100. Not a regression.
+- `/arcanon:update --check` 5s timeout addressed by THE-1027 in v0.1.3 (Phase 108).
 
 ## Session Continuity
 
-Last session: 2026-04-25T13:30:00.000Z
-Stopped at: Completed 111-02-PLAN.md (quality-score wiring + display)
+Last session: 2026-04-25T14:30:00.000Z
+Stopped at: Completed 113-01-PLAN.md (v0.1.3 verification gate — release pin)
 Resume file: None

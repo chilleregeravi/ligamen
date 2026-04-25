@@ -22,7 +22,7 @@
 - ✅ **v5.8.0 Library Drift & Language Parity** — Phases 92-96 (shipped 2026-04-19)
 - ✅ **v0.1.1 Command Cleanup + Update + Ambient Hooks** — Phases 97-100 (shipped 2026-04-21)
 - ✅ **v0.1.2 Ligamen Residue Purge** — Phases 101-105 (shipped 2026-04-23)
-- ⏳ **v0.1.3 Trust & Foundations** — Phases 107-113 (in progress, started 2026-04-25)
+- ⏳ **v0.1.3 Trust & Foundations** — Phases 107-113 (gate passed 2026-04-25 → READY TO SHIP, awaiting `/gsd-complete-milestone v0.1.3`)
 
 ## Phases
 
@@ -815,10 +815,10 @@ Plans:
 | 92-96 | v5.8.0 | 16/16 | Complete | 2026-04-19 |
 | 97-100 | v0.1.1 | 12/12 | Complete | 2026-04-21 |
 | 101-105 | v0.1.2 | 9/9 | Complete | 2026-04-23 |
-| 107 | v0.1.3 | 1/3 | In progress | 2026-04-25 |
+| 107 | v0.1.3 | 3/3 | Complete | 2026-04-25 |
 | 108 | v0.1.3 | 2/2 | Complete | 2026-04-25 |
-| 109 | v0.1.3 | 0/TBD | Not started | - |
-| 110 | v0.1.3 | 0/1 | Not started | - |
-| 111 | v0.1.3 | 2/3 | In progress | 2026-04-25 |
-| 112 | v0.1.3 | 0/2 | Not started | - |
-| 113 | v0.1.3 | 0/1 | Not started | - |
+| 109 | v0.1.3 | 2/2 | Complete | 2026-04-25 |
+| 110 | v0.1.3 | 1/1 | Complete | 2026-04-25 |
+| 111 | v0.1.3 | 3/3 | Complete | 2026-04-25 |
+| 112 | v0.1.3 | 2/2 | Complete | 2026-04-25 |
+| 113 | v0.1.3 | 1/1 | Complete | 2026-04-25 |

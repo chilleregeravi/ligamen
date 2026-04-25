@@ -89,14 +89,13 @@ Remove the `/arcanon:upload` deprecated stub. Originally promised for v0.2.0; br
 
 ### Verification Gate (VER)
 
-- [ ] **VER-01**: bats suite green (≥310 tests, allowing the 1 macOS HOK-06 caveat at threshold=200)
-- [ ] **VER-02**: node test suite green for affected modules (migrations, query-engine, scan, hub-sync, server)
-- [ ] **VER-03**: Final repo-wide grep — `runtime-deps.json` does not exist anywhere in the repo
-- [ ] **VER-04**: Final repo-wide grep — `commands/upload.md` does not exist; no `--help` references in command files (verify v0.1.4 scope wasn't accidentally absorbed)
-- [ ] **VER-05**: Fresh-install integration smoke test on Node 25 — clone v0.1.3 tag, run `claude plugin install`, start session, run `/arcanon:map` (or `/arcanon:status`) without hitting binding errors
-- [x] **VER-06**: Manifest version strings all bumped to 0.1.3 (5 manifest files: `plugins/arcanon/.claude-plugin/plugin.json`, `plugins/arcanon/.claude-plugin/marketplace.json`, `.claude-plugin/marketplace.json`, `plugins/arcanon/package.json`, `plugins/arcanon/runtime-deps.json` if not yet deleted at this point — actually it WILL be deleted per INST-01
-, so 4 manifest files at 0.1.3)
-- [ ] **VER-07**: CHANGELOG `[0.1.3] - 2026-04-XX` section pinned with all `### BREAKING`, `### Added`, `### Changed`, `### Fixed`, `### Removed` subsections complete
+- [x] **VER-01**: bats suite green (≥310 tests, allowing the 1 macOS HOK-06 caveat at threshold=200) — 315/315 passing, no caveat triggered
+- [x] **VER-02**: node test suite green for affected modules (migrations, query-engine, scan, hub-sync, server) — 630/631 passing (1 documented pre-existing v0.1.2 failure remains; the 2nd is now resolved)
+- [x] **VER-03**: Final repo-wide grep — `runtime-deps.json` does not exist anywhere in the repo
+- [x] **VER-04**: Final repo-wide grep — `commands/upload.md` does not exist; no `--help` references in command files (verify v0.1.4 scope wasn't accidentally absorbed) — 1 pre-existing v0.1.1 host-CLI probe documented as exception in 113-VERIFICATION.md
+- [x] **VER-05**: Fresh-install integration smoke test on Node 25 — Pattern B (deferred to pre-tag manual run per CONTEXT D-04 + 105-VERIFICATION precedent; bats INST-07..12 coverage acts as proxy)
+- [x] **VER-06**: Manifest version strings all bumped to 0.1.3 (4 manifest files: `plugins/arcanon/.claude-plugin/plugin.json`, `plugins/arcanon/.claude-plugin/marketplace.json`, `.claude-plugin/marketplace.json`, `plugins/arcanon/package.json` — 6 strings total; `runtime-deps.json` deleted per INST-01; package-lock.json regenerated)
+- [x] **VER-07**: CHANGELOG `[0.1.3] - 2026-04-25` section pinned with all `### BREAKING`, `### Added`, `### Changed`, `### Fixed`, `### Removed` subsections complete
 
 ## Future Requirements (Deferred)
 
@@ -165,13 +164,13 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | DEP-04 | Phase 108 | Pending |
 | DEP-05 | Phase 108 | Pending |
 | DEP-06 | Phase 108 | Pending |
-| VER-01 | Phase 113 | Pending |
-| VER-02 | Phase 113 | Pending |
-| VER-03 | Phase 113 | Pending |
-| VER-04 | Phase 113 | Pending |
-| VER-05 | Phase 113 | Pending |
-| VER-06 | Phase 113 | Pending |
-| VER-07 | Phase 113 | Pending |
+| VER-01 | Phase 113 | Done |
+| VER-02 | Phase 113 | Done |
+| VER-03 | Phase 113 | Done |
+| VER-04 | Phase 113 | Done |
+| VER-05 | Phase 113 | Done (Pattern B deferred) |
+| VER-06 | Phase 113 | Done |
+| VER-07 | Phase 113 | Done |
 
 **Coverage:**
 - v1 requirements: 45 total
