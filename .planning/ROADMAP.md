@@ -212,7 +212,7 @@ Full details: `.planning/milestones/v0.1.2-ROADMAP.md`
 - [x] **Phase 108: Update-check Timeout Fix + Deprecated Command Removal** — Decouple `/arcanon:update --check` offline-decision from 5s refresh outcome; delete `/arcanon:upload` stub + tests + docs
 - [x] **Phase 109: Path Canonicalization + Evidence at Ingest** — Migration 013 (`connections.path_template` + `uq_connections_dedup` UNIQUE INDEX); `persistFindings` rejects prose-only evidence; template-variant collapse on upsert (TRUST-02, 03, 10, 11 all complete; 21 new tests)
 - [ ] **Phase 110: services.base_path End-to-End** — Migration 014 (`services.base_path`); agent-prompt-service emits `base_path`; connection resolution strips base_path before path matching
-- [ ] **Phase 111: Quality Score + Reconciliation Audit Trail** — Migrations 015 (`scan_versions.quality_score`) + 016 (`enrichment_log`); endScan computes score; reconciliation writes audit rows; new `impact_audit_log` MCP tool
+- [x] **Phase 111: Quality Score + Reconciliation Audit Trail** — Migrations 015 (`scan_versions.quality_score`) + 016 (`enrichment_log`); endScan computes score; reconciliation writes audit rows; new `impact_audit_log` MCP tool (TRUST-05, 06, 13, 14 complete; 39 phase-scoped tests + 17 plan 111-03 tests; closure: 111-VERIFICATION.md)
 - [x] **Phase 112: `/arcanon:verify` Command** — New verify command re-reads cited evidence; returns ok/moved/missing/method_mismatch verdict per connection (TRUST-01, 07, 08, 09 complete; 7 bats + 13 node tests; closure: 112-VERIFICATION.md)
 - [ ] **Phase 113: Verification Gate** — bats + node green; repo-wide grep for `runtime-deps.json` and `commands/upload.md`; manifest version bumps to 0.1.3; CHANGELOG `[0.1.3]` section pinned
 
@@ -757,9 +757,9 @@ Plans:
   5. New MCP tool `impact_audit_log(scan_version_id)` returns the rows for that scan version, callable from any project context
 **Plans**: 3 plans
 Plans:
-- [ ] 111-01-PLAN.md — Migrations 015 (scan_versions.quality_score) + 016 (enrichment_log) — schema only
+- [x] 111-01-PLAN.md — Migrations 015 (scan_versions.quality_score) + 016 (enrichment_log) — schema only _(complete 2026-04-25)_
 - [x] 111-02-PLAN.md — endScan computes quality_score; QueryEngine getters; /api/scan-quality endpoint; /arcanon:map and /arcanon:status output _(complete 2026-04-25 — TRUST-05, TRUST-13)_
-- [ ] 111-03-PLAN.md — QueryEngine logEnrichment/getEnrichmentLog; impact_audit_log MCP tool; reconciliation audit-log writes in /arcanon:map
+- [x] 111-03-PLAN.md — QueryEngine logEnrichment/getEnrichmentLog; impact_audit_log MCP tool; reconciliation audit-log writes in /arcanon:map _(complete 2026-04-25 — TRUST-06, TRUST-14)_
 
 ### Phase 112: `/arcanon:verify` Command
 **Goal**: A new read-only `/arcanon:verify` command lets users (and Claude) re-check that cited evidence still exists at the recorded location — returning a per-connection verdict (`ok` / `moved` / `missing` / `method_mismatch`) so stale scan data can be detected without re-running a full `/arcanon:map`

@@ -65,7 +65,7 @@ Six items from the v0.1.0 external review, deferred since 2026-04-21. Adds a ver
 - [x] **TRUST-04
 **: New migration adds `services.base_path TEXT` column; agent-prompt-service.md instructs the scanner to emit a `base_path` field per service (e.g., `/api`); connection resolution strips `base_path` from frontend-to-backend matches before comparing paths
 - [x] **TRUST-05**: New migration adds `scan_versions.quality_score REAL` column. End-of-scan output computes and persists quality score = (high_confidence_count + 0.5 × low_confidence_count) / total_connections. Surface in `/arcanon:status` output (when worker has graph data) AND end of `/arcanon:map` output. Format: `"Scan quality: 87% high-confidence, 3 prose-evidence warnings"`. _(Phase 111-01 + 111-02 — migration 015; endScan persists; new GET /api/scan-quality + getScanQualityBreakdown; format strings match D-01)_
-- [ ] **TRUST-06**: New migration adds `enrichment_log` table (`scan_version_id INTEGER REFERENCES scan_versions(id)`, `enricher TEXT`, `target_kind TEXT`, `target_id INTEGER`, `field TEXT`, `from_value TEXT`, `to_value TEXT`, `reason TEXT`, `created_at TEXT`). Post-scan reconciliation (`external` → `cross-service` reclassification) writes a row per change. New MCP tool `impact_audit_log(scan_version_id)` exposes the log.
+- [x] **TRUST-06**: New migration adds `enrichment_log` table (`scan_version_id INTEGER REFERENCES scan_versions(id)`, `enricher TEXT`, `target_kind TEXT`, `target_id INTEGER`, `field TEXT`, `from_value TEXT`, `to_value TEXT`, `reason TEXT`, `created_at TEXT`). Post-scan reconciliation (`external` → `cross-service` reclassification) writes a row per change. New MCP tool `impact_audit_log(scan_version_id)` exposes the log. _(Phase 111-01 + 111-03 — migration 016; QueryEngine.logEnrichment + getEnrichmentLog; commands/map.md Step 3 captures _reconciliation, Step 5 writes audit rows; new MCP tool with handleImpactAuditLog handler)_
 - [x] **TRUST-07**: bats test — verify command happy path (cited evidence still present in source) → returns `ok` _(Phase 112-02 — `tests/verify.bats` Test 1; 3 ok verdicts + exit 0)_
 - [x] **TRUST-08**: bats test — verify command file-moved path (source file no longer exists at the recorded path) → returns `moved` _(Phase 112-02 — `tests/verify.bats` Test 2; deleted users.js → 1 moved + 2 ok + exit 1)_
 - [x] **TRUST-09**: bats test — verify command evidence-removed path (file exists but the snippet is gone) → returns `missing` _(Phase 112-02 — `tests/verify.bats` Test 3; rewritten users.js → 1 missing + 2 ok + exit 1)_
@@ -74,7 +74,7 @@ Six items from the v0.1.0 external review, deferred since 2026-04-21. Adds a ver
 - [x] **TRUST-12
 **: node test — `services.base_path` migration runs idempotently; agent prompt populates the field; connection resolution honors it
 - [x] **TRUST-13**: node test — `scan_versions.quality_score` populated by `endScan()`; readable via `getQualityScore(scan_version_id)` _(Phase 111-02 — `worker/db/query-engine.quality-score.test.js`, 10 cases incl. mixed/all-high/all-low/with-NULL/zero-conn/getter/breakdown/pre-015/scope)_
-- [ ] **TRUST-14**: node test — `enrichment_log` table created by migration; reconciliation writes one row per crossing-value change
+- [x] **TRUST-14**: node test — `enrichment_log` table created by migration; reconciliation writes one row per crossing-value change _(Phase 111-01 + 111-03 — `worker/db/migration-016.test.js` 7 cases incl. FK CASCADE; `worker/db/query-engine.enrichment-log.test.js` 8 cases for write/read/filter/sort/pre-016/CHECK; `worker/db/query-engine.reconciliation-audit.test.js` 3 integration tests; `worker/mcp/server.impact-audit-log.test.js` 6 MCP tool tests)_
 
 ### Deprecated Command Removal (DEP) — scope addition
 
@@ -150,7 +150,7 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | TRUST-03 | Phase 109 | Done |
 | TRUST-04 | Phase 110 | Pending |
 | TRUST-05 | Phase 111 | Done |
-| TRUST-06 | Phase 111 | Pending |
+| TRUST-06 | Phase 111 | Done |
 | TRUST-07 | Phase 112 | Done |
 | TRUST-08 | Phase 112 | Done |
 | TRUST-09 | Phase 112 | Done |
@@ -158,7 +158,7 @@ Populated by gsd-roadmapper during ROADMAP.md creation.
 | TRUST-11 | Phase 109 | Done |
 | TRUST-12 | Phase 110 | Pending |
 | TRUST-13 | Phase 111 | Done |
-| TRUST-14 | Phase 111 | Pending |
+| TRUST-14 | Phase 111 | Done |
 | DEP-01 | Phase 108 | Pending |
 | DEP-02 | Phase 108 | Pending |
 | DEP-03 | Phase 108 | Pending |
