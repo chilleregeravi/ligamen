@@ -611,6 +611,51 @@ export class QueryEngine {
       // service_dependencies table not present (pre-migration-010 db)
       this._stmtUpsertDependency = null;
     }
+
+    // --- quality_score statements (migration 015 / TRUST-05, TRUST-13) ---
+    // The breakdown SQL counts confidence='high' and confidence='low' rows in
+    // a single scan. Wrapped in try/catch so a pre-migration-015 db (no
+    // quality_score column) cleanly disables persistence — endScan stays
+    // best-effort.
+    //
+    // Lock-phrase (Phase 111 CONTEXT D-02, verbatim — kept on a single line so
+    // the source-grep test in query-engine.quality-score.test.js can verify it):
+    // NULL confidence is counted in `total` but contributes 0 to the numerator — agent omissions do not count as 'low'.
+    this._stmtUpdateQualityScore = null;
+    this._stmtSelectQualityScore = null;
+    this._stmtSelectQualityBreakdown = null;
+    try {
+      this._stmtUpdateQualityScore = db.prepare(
+        "UPDATE scan_versions SET quality_score = ? WHERE id = ?"
+      );
+      this._stmtSelectQualityScore = db.prepare(
+        "SELECT quality_score FROM scan_versions WHERE id = ?"
+      );
+      this._stmtSelectQualityBreakdown = db.prepare(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN confidence = 'high' THEN 1 ELSE 0 END) AS high,
+          SUM(CASE WHEN confidence = 'low'  THEN 1 ELSE 0 END) AS low,
+          SUM(CASE WHEN confidence IS NULL  THEN 1 ELSE 0 END) AS null_count
+        FROM connections
+        WHERE scan_version_id = ?
+      `);
+      // Probe: a pre-015 db has scan_versions but no quality_score column. The
+      // SELECT above does not reference quality_score, so the prepare succeeds
+      // even on pre-015. We must explicitly verify the column exists before
+      // arming the writer; otherwise endScan would throw at run() time.
+      const cols = db.prepare("PRAGMA table_info(scan_versions)").all();
+      if (!cols.some((c) => c.name === "quality_score")) {
+        this._stmtUpdateQualityScore = null;
+        this._stmtSelectQualityScore = null;
+        this._stmtSelectQualityBreakdown = null;
+      }
+    } catch {
+      // scan_versions table absent (pre-migration-005) — disable.
+      this._stmtUpdateQualityScore = null;
+      this._stmtSelectQualityScore = null;
+      this._stmtSelectQualityBreakdown = null;
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -1159,6 +1204,26 @@ export class QueryEngine {
     }
     this._stmtEndScan.run(new Date().toISOString(), scanVersionId);
 
+    // TRUST-05: compute quality_score = (high + 0.5 * low) / total and persist
+    // it on the scan_versions row. NULL when total = 0 (no connections in this
+    // scan). NULL confidence rows count toward `total` but contribute 0 to the
+    // numerator (Phase 111 D-02). Best-effort — a write failure here MUST NOT
+    // prevent the bracket close, so the call is wrapped in try/catch.
+    if (this._stmtSelectQualityBreakdown && this._stmtUpdateQualityScore) {
+      try {
+        const row = this._stmtSelectQualityBreakdown.get(scanVersionId);
+        const total = row?.total ?? 0;
+        const high = row?.high ?? 0;
+        const low = row?.low ?? 0;
+        const score = total > 0 ? (high + 0.5 * low) / total : null;
+        this._stmtUpdateQualityScore.run(score, scanVersionId);
+      } catch (err) {
+        const warn =
+          this._logger?.warn?.bind(this._logger) ?? console.warn;
+        warn(`[arcanon] endScan: quality_score write failed: ${err.message}`);
+      }
+    }
+
     // Clean up orphaned schema rows BEFORE deleting stale connections
     // (schemas FK references connections — must delete child rows first to avoid FK violation)
     //
@@ -1213,6 +1278,87 @@ export class QueryEngine {
    */
   getRepoByPath(repoPath) {
     return this._stmtGetRepoByPath.get(repoPath) ?? null;
+  }
+
+  /**
+   * Returns the persisted quality_score for the given scan version, or null
+   * when the value has not been written (column absent on a pre-015 db, the
+   * scan_version row is missing, or endScan has not yet run for this scan).
+   *
+   * The score formula and NULL semantics are documented at the SQL site in the
+   * constructor and in `endScan` — see Phase 111 CONTEXT D-02. (TRUST-05.)
+   *
+   * @param {number} scanVersionId
+   * @returns {number | null}
+   */
+  getQualityScore(scanVersionId) {
+    if (!this._stmtSelectQualityScore) return null;
+    try {
+      const row = this._stmtSelectQualityScore.get(scanVersionId);
+      return row?.quality_score ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Returns the full quality breakdown for a scan version. Used by the
+   * /api/scan-quality HTTP endpoint and by `/arcanon:map` end-of-output.
+   *
+   * Shape:
+   *   {
+   *     scan_version_id: number,
+   *     total: number,
+   *     high: number,
+   *     low: number,
+   *     null_count: number,
+   *     prose_evidence_warnings: number,   // D-01: 0 placeholder for v0.1.3
+   *     service_count: number,
+   *     quality_score: number | null,
+   *     completed_at: string | null,
+   *   }
+   *
+   * `prose_evidence_warnings` returns 0 today — the TRUST-02 prose-evidence
+   * rejection logic logs to stderr but does not persist a counter. A future
+   * ticket will add a `scan_versions.prose_evidence_warnings INTEGER` column
+   * populated by `persistFindings` (out of v0.1.3 scope per CONTEXT D-01).
+   *
+   * Returns null when the quality_score column is absent (pre-015 db) or when
+   * the scan_version row does not exist.
+   *
+   * @param {number} scanVersionId
+   * @returns {object | null}
+   */
+  getScanQualityBreakdown(scanVersionId) {
+    if (!this._stmtSelectQualityBreakdown) return null;
+    try {
+      const breakdown = this._stmtSelectQualityBreakdown.get(scanVersionId);
+      const sv = this._db
+        .prepare(
+          "SELECT id, completed_at, quality_score, repo_id FROM scan_versions WHERE id = ?",
+        )
+        .get(scanVersionId);
+      if (!sv) return null;
+      const serviceCount =
+        this._db
+          .prepare("SELECT COUNT(*) AS n FROM services WHERE scan_version_id = ?")
+          .get(scanVersionId)?.n ?? 0;
+      return {
+        scan_version_id: scanVersionId,
+        total: breakdown?.total ?? 0,
+        high: breakdown?.high ?? 0,
+        low: breakdown?.low ?? 0,
+        null_count: breakdown?.null_count ?? 0,
+        // TODO(post-v0.1.3): persist prose_evidence_warnings counter on
+        // scan_versions and surface it here. See CONTEXT.md D-01.
+        prose_evidence_warnings: 0,
+        service_count: serviceCount,
+        quality_score: sv.quality_score ?? null,
+        completed_at: sv.completed_at ?? null,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /**
