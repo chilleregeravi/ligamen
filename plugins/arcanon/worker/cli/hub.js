@@ -152,6 +152,15 @@ async function cmdStatus(flags) {
     }
   })();
 
+  // TRUST-05: best-effort latest-scan quality. Resolves the worker port from
+  // <dataDir>/worker.port (mirrors the cmdVerify pattern), GETs the new
+  // /api/scan-quality endpoint with a 2-second timeout, and formats the line
+  // per CONTEXT D-01:
+  //   "Latest scan: NN% high-confidence (S services, C connections)"
+  // Falls back silently to null on any error — the worker may be offline,
+  // unreachable, or running an older version without the endpoint.
+  const latestScan = await _fetchLatestScanLine(process.cwd());
+
   const report = {
     plugin_version: readPackageVersion(),
     data_dir: resolveDataDir(),
@@ -160,6 +169,7 @@ async function cmdStatus(flags) {
     hub_auto_sync: hubAutoSync,
     credentials: hasCreds ? "present" : "missing",
     queue: stats,
+    latest_scan: latestScan?.report ?? null,
   };
 
   if (flags.json) {
@@ -174,7 +184,66 @@ async function cmdStatus(flags) {
     `  queue:        ${stats.pending} pending, ${stats.dead} dead${stats.oldestPending ? `, oldest ${stats.oldestPending}` : ""}`,
     `  data dir:     ${report.data_dir}`,
   ];
+  if (latestScan?.line) {
+    lines.push(`  ${latestScan.line}`);
+  }
   emit(report, flags, lines.join("\n"));
+}
+
+/**
+ * Fetches the latest-scan quality breakdown from the worker and formats it
+ * for the /arcanon:status output (TRUST-05, CONTEXT D-01).
+ *
+ * Best-effort: returns null on any failure (worker offline, no scan data,
+ * old worker without the endpoint, network error). Callers MUST tolerate a
+ * null return — the status output gracefully omits the line.
+ *
+ * @param {string} projectRoot - Absolute path passed as ?project= to the worker
+ * @returns {Promise<{ line: string, report: object } | null>}
+ */
+async function _fetchLatestScanLine(projectRoot) {
+  let workerPort = 37888;
+  try {
+    const portFile = path.join(resolveDataDir(), "worker.port");
+    const raw = fs.readFileSync(portFile, "utf8").trim();
+    const parsed = Number(raw);
+    if (Number.isInteger(parsed) && parsed > 0) workerPort = parsed;
+  } catch {
+    if (process.env.ARCANON_WORKER_PORT) {
+      const parsed = Number(process.env.ARCANON_WORKER_PORT);
+      if (Number.isInteger(parsed) && parsed > 0) workerPort = parsed;
+    }
+  }
+
+  const url = `http://127.0.0.1:${workerPort}/api/scan-quality?project=${encodeURIComponent(projectRoot)}`;
+
+  // 2-second timeout — consistent with worker-client.sh worker_running().
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+  let response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } catch {
+    clearTimeout(timer);
+    return null; // worker offline / unreachable / aborted
+  }
+  clearTimeout(timer);
+
+  if (!response.ok) return null; // 404 / 503 / 500 — silently omit
+
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    return null;
+  }
+  if (!body || body.error) return null;
+
+  const pct = body.quality_score === null
+    ? "n/a"
+    : `${Math.round(body.quality_score * 100)}%`;
+  const line = `Latest scan: ${pct} high-confidence (${body.service_count} services, ${body.total_connections} connections)`;
+  return { line, report: body };
 }
 
 /**

@@ -298,6 +298,16 @@ node --input-type=module -e "
   qe.persistFindings(repoId, findings, findings.commit || null, scanVersionId);
   qe.endScan(repoId, scanVersionId);
   console.log('saved');
+  // TRUST-05: surface scan quality at end-of-output. Format string locked in
+  // CONTEXT D-01 — \"Scan quality: NN% high-confidence, M prose-evidence warnings\".
+  // prose_evidence_warnings is a 0 placeholder for v0.1.3 (D-01).
+  const breakdown = qe.getScanQualityBreakdown(scanVersionId);
+  if (breakdown && breakdown.quality_score !== null) {
+    const pct = Math.round(breakdown.quality_score * 100);
+    console.log('Scan quality: ' + pct + '% high-confidence, ' + breakdown.prose_evidence_warnings + ' prose-evidence warnings');
+  } else if (breakdown) {
+    console.log('Scan quality: n/a (' + breakdown.total + ' connections)');
+  }
 "
 rm -f "${FINDINGS_FILE}"
 ```
