@@ -12,10 +12,10 @@ setup() {
 @test "CLN-09: all surviving command files exist" {
   # Iteration list extended (114-01 / NIT 8) to cover the full v0.1.4-WIP
   # command surface. The original CLN-09 list was the seven v0.1.1 survivors;
-  # `verify` and `update` shipped in v0.1.3 and `list` ships in v0.1.4 (NAV-01)
-  # but neither was added to this loop until now. (`view`/`doctor` from plans
-  # 114-02 / 114-03 will join via additive edits in those plans.)
-  for cmd in map drift impact sync login status export verify update list; do
+  # `verify` and `update` shipped in v0.1.3, `list` ships in v0.1.4 (NAV-01)
+  # and `view` ships in v0.1.4 (NAV-02 — this plan, 114-02). `doctor` from
+  # plan 114-03 will join via an additive edit in that plan.
+  for cmd in map drift impact sync login status export verify update list view; do
     [ -f "$PLUGIN_DIR/commands/$cmd.md" ] || {
       echo "MISSING: commands/$cmd.md"
       return 1
@@ -24,7 +24,7 @@ setup() {
 }
 
 @test "CLN-09: all surviving commands have description frontmatter" {
-  for cmd in map drift impact sync login status export verify update list; do
+  for cmd in map drift impact sync login status export verify update list view; do
     run grep -c '^description:' "$PLUGIN_DIR/commands/$cmd.md"
     [ "$status" -eq 0 ]
     [ "$output" -ge 1 ]
@@ -65,4 +65,41 @@ setup() {
   [ "$status" -eq 0 ]
   grep -q 'upload' "$PLUGIN_DIR/commands/sync.md"
   grep -q -i 'drain' "$PLUGIN_DIR/commands/sync.md"
+}
+
+# NAV-02 (114-02): /arcanon:view is a top-level slash-command alias for the
+# graph UI. Pure markdown command — NO Node-side handler. Frontmatter must
+# declare allowed-tools: Bash so the body's bash block can run; body must
+# contain the worker-start auto-launch substring (cloned verbatim from
+# map.md:22-32) so the command actually opens the UI.
+@test "NAV-02: /arcanon:view exists with frontmatter and worker-start block" {
+  [ -f "$PLUGIN_DIR/commands/view.md" ]
+  run grep -E '^description:' "$PLUGIN_DIR/commands/view.md"
+  [ "$status" -eq 0 ]
+  run grep -E '^allowed-tools:' "$PLUGIN_DIR/commands/view.md"
+  [ "$status" -eq 0 ]
+  grep -q 'Bash' "$PLUGIN_DIR/commands/view.md"
+  # Proves the auto-start block is present (cloned from map.md:22-32).
+  grep -q 'worker-start.sh' "$PLUGIN_DIR/commands/view.md"
+  # Proves no Node-side handler is invoked — there is no `cmdView` in hub.js.
+  ! grep -q 'bash hub.sh view' "$PLUGIN_DIR/commands/view.md"
+}
+
+# NAV-02 (114-02): regression guard — the existing `/arcanon:map view`
+# keystroke MUST keep working. `commands/map.md` still routes the `view`
+# subcommand inline. RESEARCH §2 dispatch-precedence finding: Claude resolves
+# slash commands by exact filename (so `/arcanon:view` → view.md, never map.md);
+# the `view` subcommand inside map.md is interpreted via $ARGUMENTS narrative.
+@test "NAV-02: /arcanon:map still contains the inline 'If \`view\` flag' block" {
+  grep -q 'If `view` flag' "$PLUGIN_DIR/commands/map.md"
+}
+
+# NAV-02 (114-02): defensive negative — `worker/cli/hub.js` MUST NOT register
+# `view: cmdView` in HANDLERS. The dispatch-precedence finding (RESEARCH §2)
+# says Claude resolves `/arcanon:view` by filename to commands/view.md; adding
+# a Node handler would create a phantom dispatch ambiguity that the v0.1.3
+# audit warned about. This test guards against a future contributor re-adding
+# such a handler.
+@test "NAV-02: worker/cli/hub.js does NOT register a view handler" {
+  ! grep -q 'view: cmdView' "$PLUGIN_DIR/worker/cli/hub.js"
 }

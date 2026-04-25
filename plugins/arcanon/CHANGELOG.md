@@ -12,6 +12,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   services partitioned by type, connection counts by confidence, external actor
   count, and hub sync status. Read-only via worker HTTP. Silent in non-Arcanon
   directories. Supports `--json` for machine consumption.
+- **`/arcanon:view` command** (NAV-02). Top-level slash-command alias for
+  `/arcanon:map view` — opens the graph UI in your default browser. Auto-starts
+  the worker if it is not running. Pure markdown command (no Node-side
+  handler); the existing `/arcanon:map view` keystroke is preserved for
+  back-compat.
 
 ## [0.1.3] - 2026-04-25
 
