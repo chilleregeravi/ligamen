@@ -142,11 +142,13 @@ Three sub-items: offline mode, explicit specs, externals catalog.
 
 - [ ] **INT-01**: New config flag `hub.evidence_mode: "full" | "hash-only" | "none"`. Default `"full"` for back-compat. In `"hash-only"` mode, the hub upload payload's `evidence` field is replaced with `{ "hash": "<sha256>", "start_line": N, "end_line": M }` instead of the raw evidence string.
 
-- [ ] **INT-02**: `/arcanon:sync --offline` exits 0 with a "scan persisted locally, no upload" message. No-op if hub is intentionally disabled OR unreachable. Differentiates "offline" (intentional) from "hub unreachable" (transient — still no-op but with a different exit message).
+- [x] **INT-02
+**: `/arcanon:sync --offline` exits 0 with a "scan persisted locally, no upload" message. No-op if hub is intentionally disabled OR unreachable. Differentiates "offline" (intentional) from "hub unreachable" (transient — still no-op but with a different exit message).
 
 - [ ] **INT-03**: Hub Payload schema (existing `worker/hub-sync/payload.js`) extended to accept hashed evidence form. Backward-compatible: payload remains valid v1.1; hash-only is a new optional shape on the `evidence` field.
 
-- [ ] **INT-04**: `/arcanon:drift openapi --spec <path>` — explicit spec path, bypasses `discoverOpenApiSpecs()` discovery. Repeatable: `--spec repoA/spec.yaml --spec repoB/spec.yaml` compares the two.
+- [x] **INT-04
+**: `/arcanon:drift openapi --spec <path>` — explicit spec path, bypasses `discoverOpenApiSpecs()` discovery. Repeatable: `--spec repoA/spec.yaml --spec repoB/spec.yaml` compares the two.
 
 - [ ] **INT-05**: New file `plugins/arcanon/data/known-externals.yaml` with ~20 common third parties:
   - Stripe API (`api.stripe.com`)

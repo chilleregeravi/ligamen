@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1.4
 milestone_name: Operator Surface
-status: verifying
-stopped_at: Completed 119-02-PLAN.md
-last_updated: "2026-04-27T05:51:07.577Z"
+status: executing
+stopped_at: Completed 120-02-PLAN.md
+last_updated: "2026-04-27T06:21:17.017Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 21
-  completed_plans: 13
-  percent: 62
+  completed_plans: 15
+  percent: 71
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-25)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 119 — Shadow Scan + Atomic Promote
+**Current focus:** Phase 120 — Integration Data Layer
 
 ## Current Position
 
-Phase: 119 (Shadow Scan + Atomic Promote) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 120 (Integration Data Layer) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-27
 
 ## Performance Metrics
@@ -60,6 +60,7 @@ Last activity: 2026-04-27
 - evictLiveQueryEngine clears BOTH the pool.js Map AND the database.js _db singleton (Rule 1 deviation - new _resetDbSingleton export)
 - Active scan-lock guard via filesystem scan + PID liveness check (T-119-02-04) refuses promote during any live scan referencing repos under cwd
 - cmdDiff --shadow reuses Phase 115 diffScanVersions(dbA, dbB, scanIdA, scanIdB) engine via dynamic import - Shape A landed verbatim, no fallback needed
+- INT-02 + INT-04 shipped: --offline short-circuit (Step 0.5, no hub.sh) and --spec repeatable (bypasses find_openapi_spec). Markdown-as-spec testing convention; 10 new bats tests
 
 ### Pending Todos
 
@@ -72,6 +73,6 @@ None. Awaiting requirements definition + roadmap.
 
 ## Session Continuity
 
-Last session: 2026-04-27T05:51:07.568Z
-Stopped at: Completed 119-02-PLAN.md
+Last session: 2026-04-27T06:21:10.713Z
+Stopped at: Completed 120-02-PLAN.md
 Resume file: None
