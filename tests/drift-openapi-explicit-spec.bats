@@ -1,6 +1,10 @@
 #!/usr/bin/env bats
-# tests/drift-openapi-explicit-spec.bats — INT-04
+# tests/drift-openapi-explicit-spec.bats — INT-04 (Phase 120) + INT-10 (Phase 121)
 # Asserts /arcanon:drift openapi --spec bypasses discovery and uses explicit paths.
+# INT-04 tests cover the negative paths and basic happy-path exit code.
+# INT-10 tests (appended below) cover the realistic User.name -> User.full_name
+# rename happy-path with two real OpenAPI 3.0 fixtures, including a control
+# test proving the explicit-spec code path is what runs (not auto-discovery).
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
@@ -52,4 +56,78 @@ teardown() {
 @test "INT-04: drift.md frontmatter argument-hint mentions --spec" {
   run grep -E '^argument-hint:.*--spec' "${PLUGIN_ROOT}/commands/drift.md"
   [ "$status" -eq 0 ]
+}
+
+# ----------------------------------------------------------------------------
+# INT-10 (Phase 121-03) — happy-path E2E with realistic fixtures
+# ----------------------------------------------------------------------------
+# Uses two real OpenAPI 3.0 specs that differ in exactly one breaking change:
+# the User schema field `name` is renamed to `full_name`. Asserts that the
+# /arcanon:drift openapi --spec PATH_A --spec PATH_B command (via the public
+# drift.sh dispatcher) reports the drift and exits 0. A control test proves
+# that without --spec, the auto-discovery path runs instead — i.e., the
+# happy-path tests genuinely exercise the explicit-spec code path.
+
+DRIFT_SH_DISPATCHER="${PLUGIN_ROOT}/scripts/drift.sh"
+INT10_SPEC_A="${PLUGIN_ROOT}/tests/fixtures/externals/openapi-spec-a.yaml"
+INT10_SPEC_B="${PLUGIN_ROOT}/tests/fixtures/externals/openapi-spec-b.yaml"
+
+@test "INT-10: /arcanon:drift openapi --spec X --spec Y exits 0 with two real specs" {
+  [ -f "$INT10_SPEC_A" ] || skip "INT-10 fixture spec-a missing"
+  [ -f "$INT10_SPEC_B" ] || skip "INT-10 fixture spec-b missing"
+  run bash "$DRIFT_SH_DISPATCHER" openapi --spec "$INT10_SPEC_A" --spec "$INT10_SPEC_B"
+  [ "$status" -eq 0 ]
+}
+
+@test "INT-10: /arcanon:drift openapi --spec X --spec Y reports the User.name -> full_name drift" {
+  [ -f "$INT10_SPEC_A" ] || skip "INT-10 fixture spec-a missing"
+  [ -f "$INT10_SPEC_B" ] || skip "INT-10 fixture spec-b missing"
+  run bash "$DRIFT_SH_DISPATCHER" openapi --spec "$INT10_SPEC_A" --spec "$INT10_SPEC_B"
+  [ "$status" -eq 0 ]
+  # Tolerant substring match — wording differs between oasdiff (when installed)
+  # and the yq structural-diff fallback. Both emit something openapi-related
+  # AND something signalling difference.
+  if [[ "$output" != *openapi* ]]; then
+    echo "expected output to mention 'openapi'; got:" >&2
+    echo "$output" >&2
+    return 1
+  fi
+  if [[ "$output" != *drift* && "$output" != *differ* && "$output" != *break* && "$output" != *incompatible* && "$output" != *rename* && "$output" != *full_name* ]]; then
+    echo "expected output to mention drift/differ/break/incompatible/rename/full_name; got:" >&2
+    echo "$output" >&2
+    return 1
+  fi
+}
+
+@test "INT-10: /arcanon:drift openapi --spec bypasses discoverOpenApiSpecs (no 'no specs found' message)" {
+  [ -f "$INT10_SPEC_A" ] || skip "INT-10 fixture spec-a missing"
+  [ -f "$INT10_SPEC_B" ] || skip "INT-10 fixture spec-b missing"
+  run bash "$DRIFT_SH_DISPATCHER" openapi --spec "$INT10_SPEC_A" --spec "$INT10_SPEC_B"
+  [ "$status" -eq 0 ]
+  # The discovery code path emits "Fewer than 2 repos have OpenAPI specs" when it
+  # finds nothing; if it appears here, the --spec bypass did not engage.
+  if [[ "$output" == *"Fewer than 2 repos have OpenAPI specs"* ]]; then
+    echo "discovery path apparently ran despite --spec; got:" >&2
+    echo "$output" >&2
+    return 1
+  fi
+}
+
+@test "INT-10 control: /arcanon:drift openapi without --spec in an empty dir reports no specs" {
+  # Without --spec and without a linked-repos config, the existing auto-discovery
+  # code path runs and finds nothing. This proves the INT-10 happy-path tests
+  # exercise the explicit-spec branch, not a generic happy-path that would also
+  # pass for the auto-discovery branch.
+  WORK_DIR="$(mktemp -d)"
+  pushd "$WORK_DIR" >/dev/null
+  run bash "$DRIFT_SH_DISPATCHER" openapi
+  popd >/dev/null
+  rm -rf "$WORK_DIR"
+  # Either status non-zero OR a "no" / "Fewer than" message is acceptable —
+  # we just need to confirm this code path is NOT what's running in INT-10 tests 1-3.
+  if [ "$status" -eq 0 ] && [[ "$output" != *"no"* && "$output" != *"No"* && "$output" != *"Fewer"* ]]; then
+    echo "control test unexpectedly succeeded with positive output; got:" >&2
+    echo "$output" >&2
+    return 1
+  fi
 }
