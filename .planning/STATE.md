@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1.4
 milestone_name: Operator Surface
-status: executing
-stopped_at: Completed 119-01-PLAN.md
-last_updated: "2026-04-27T05:32:26.523Z"
+status: verifying
+stopped_at: Completed 119-02-PLAN.md
+last_updated: "2026-04-27T05:51:07.577Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 21
-  completed_plans: 12
-  percent: 57
+  completed_plans: 13
+  percent: 62
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 Phase: 119 (Shadow Scan + Atomic Promote) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-27
 
 ## Performance Metrics
@@ -56,6 +56,10 @@ Last activity: 2026-04-27
 - 119-01: Always-fresh uncached shadow QE (RESEARCH §1 Option B) — sidesteps openDb singleton problem; live and shadow can never collide
 - 119-01: options.skipHubSync flag added to scanRepos and FORCED true by /scan-shadow route handler — synthetic shadow data must NEVER upload (T-119-01-06)
 - 119-01: live DB read READ-ONLY (fresh better-sqlite3 handle, NOT through getQueryEngine pool) for repo-list lookup — going through pool would flip journal_mode pragma and break byte-identity (Test 8)
+- WAL sidecars renamed alongside main DB on both backup and promote steps
+- evictLiveQueryEngine clears BOTH the pool.js Map AND the database.js _db singleton (Rule 1 deviation - new _resetDbSingleton export)
+- Active scan-lock guard via filesystem scan + PID liveness check (T-119-02-04) refuses promote during any live scan referencing repos under cwd
+- cmdDiff --shadow reuses Phase 115 diffScanVersions(dbA, dbB, scanIdA, scanIdB) engine via dynamic import - Shape A landed verbatim, no fallback needed
 
 ### Pending Todos
 
@@ -68,6 +72,6 @@ None. Awaiting requirements definition + roadmap.
 
 ## Session Continuity
 
-Last session: 2026-04-27T05:32:16.572Z
-Stopped at: Completed 119-01-PLAN.md
+Last session: 2026-04-27T05:51:07.568Z
+Stopped at: Completed 119-02-PLAN.md
 Resume file: None

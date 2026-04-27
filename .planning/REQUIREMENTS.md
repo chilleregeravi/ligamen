@@ -127,11 +127,14 @@ Run a scan to a separate DB namespace; diff vs live; promote when ready.
 - [x] **SHADOW-01
 **: `/arcanon:shadow-scan` writes to `$ARCANON_DATA_DIR/projects/<hash>/impact-map-shadow.db` instead of `impact-map.db`. Same scan code path, different DB target via env var or scan flag.
 
-- [ ] **SHADOW-02**: `/arcanon:diff --shadow` compares shadow vs live for the current project (or `--shadow <projectA>` for a specific project).
+- [x] **SHADOW-02
+**: `/arcanon:diff --shadow` compares shadow vs live for the current project (or `--shadow <projectA>` for a specific project).
 
-- [ ] **SHADOW-03**: `/arcanon:promote-shadow` atomically: (1) backs up `impact-map.db` to `impact-map.db.pre-promote-<timestamp>`, (2) renames `impact-map-shadow.db` → `impact-map.db`, (3) reports the backup path.
+- [x] **SHADOW-03
+**: `/arcanon:promote-shadow` atomically: (1) backs up `impact-map.db` to `impact-map.db.pre-promote-<timestamp>`, (2) renames `impact-map-shadow.db` → `impact-map.db`, (3) reports the backup path.
 
-- [ ] **SHADOW-04**: bats tests — shadow scan writes to the shadow file (not live); diff --shadow shows differences; promote-shadow swaps and creates backup.
+- [x] **SHADOW-04
+**: bats tests — shadow scan writes to the shadow file (not live); diff --shadow shows differences; promote-shadow swaps and creates backup.
 
 ### Integration Improvements (INT) — THE-1026
 
