@@ -1665,12 +1665,27 @@ export class QueryEngine {
 
     const mismatches = this.detectMismatches();
 
-    // Fetch actors and their connected services (graceful if migration 008 not applied)
+    // Fetch actors and their connected services (graceful if migration 008 not applied).
+    // INT-06 (Phase 121): label column added by migration 018. On pre-018 DBs the SELECT
+    // throws "no such column: label" — fall back to the pre-018 SELECT and synthesize
+    // label: null per row.
     let actors = [];
     try {
-      const actorRows = this._db
-        .prepare("SELECT id, name, kind, direction, source FROM actors")
-        .all();
+      let actorRows;
+      try {
+        actorRows = this._db
+          .prepare("SELECT id, name, kind, direction, source, label FROM actors")
+          .all();
+      } catch (innerErr) {
+        if (String(innerErr.message).includes("no such column: label")) {
+          const oldRows = this._db
+            .prepare("SELECT id, name, kind, direction, source FROM actors")
+            .all();
+          actorRows = oldRows.map((r) => ({ ...r, label: null }));
+        } else {
+          throw innerErr;
+        }
+      }
 
       const actorConnStmt = this._db.prepare(`
         SELECT ac.protocol, ac.path, ac.direction, s.name as service_name, s.id as service_id

@@ -39,6 +39,9 @@ import { resolveConfigPath } from "../lib/config-path.js";
 import { extractAuthAndDb } from "./enrichment/auth-db-extractor.js";
 import { applyPendingOverrides } from "./overrides.js";
 import { syncFindings, hasCredentials } from "../hub-sync/index.js";
+// INT-06 (Phase 121): externals catalog + per-repo actor labeling pass
+import { loadShippedCatalog } from "./enrichment/externals-catalog.js";
+import { runActorLabeling } from "./enrichment/actor-labeler.js";
 
 // Register CODEOWNERS enricher once at module load (OWN-01).
 // Module-level registration runs before the first scan.
@@ -621,6 +624,12 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
   const scanMode = options.full === true ? 'full' : 'incremental';
   slog('INFO', 'scan BEGIN', { repoCount: repoPaths.length, mode: scanMode });
 
+  // INT-06: Load the shipped externals catalog ONCE per scanRepos invocation.
+  // Cached at module level inside externals-catalog.js, so subsequent scans in
+  // the same worker process re-use the parse. Restart the worker to pick up
+  // catalog edits.
+  const _externalsCatalog = loadShippedCatalog(undefined, _logger);
+
   // Load shared prompt components once
   const commonRules = readFileSync(join(__dirname, "agent-prompt-common.md"), "utf8");
   const schemaJson = readFileSync(join(__dirname, "agent-schema.json"), "utf8");
@@ -871,6 +880,31 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
           });
         }
       }
+      // INT-06 (Phase 121): per-repo actor labeling pass.
+      // Runs after the per-service enrichment loop (so any future per-service
+      // enrichers that touch actors have already done so) and BEFORE the
+      // 'enrichment done' log line so the labels are observable as part of
+      // the same scan completion. Defense-in-depth try/catch — actor-labeler
+      // already swallows its own errors.
+      try {
+        const { matched, considered } = await runActorLabeling(
+          r.repoId,
+          queryEngine._db,
+          _logger,
+          _externalsCatalog,
+        );
+        slog('INFO', 'actor-labeling done', {
+          repoPath: r.repoPath,
+          matched,
+          considered,
+        });
+      } catch (err) {
+        slog('WARN', 'actor-labeling pass error', {
+          repoPath: r.repoPath,
+          error: err.message,
+        });
+      }
+
       // SCAN-02: Log enrichment done with number of services enriched
       slog('INFO', 'enrichment done', { repoPath: r.repoPath, enricherCount: services.length });
       // DEP-06: Log dep-scan coverage — ecosystems_scanned makes gaps visible
