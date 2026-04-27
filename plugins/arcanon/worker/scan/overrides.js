@@ -54,6 +54,19 @@ const KIND_ACTION_MATRIX = {
  * @returns {Promise<{applied: number, skipped: number, errors: number}>}
  */
 export async function applyPendingOverrides(scanVersionId, queryEngine, slog) {
+  // Defensive no-op for queryEngine handles that lack the 117-01 helpers
+  // (pre-mig-017 db where the constructor try/catch left the statements
+  // disabled, OR test stubs that supply only beginScan/persistFindings/
+  // endScan). Keeps the apply-hook a fast no-op in those cases — matches
+  // the same downgrade-safe contract as getPendingOverrides itself.
+  if (typeof queryEngine.getPendingOverrides !== 'function' ||
+      typeof queryEngine.markOverrideApplied !== 'function') {
+    slog('INFO', 'overrides apply BEGIN', { count: 0 });
+    const counters = { applied: 0, skipped: 0, errors: 0 };
+    slog('INFO', 'overrides apply DONE', counters);
+    return counters;
+  }
+
   const pending = queryEngine.getPendingOverrides();
   slog('INFO', 'overrides apply BEGIN', { count: pending.length });
 
