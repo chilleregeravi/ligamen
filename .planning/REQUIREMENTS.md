@@ -99,7 +99,8 @@ New `scan_overrides` table. New `/arcanon:correct` command. New `/arcanon:rescan
   - `created_by TEXT` (defaults to `system` or whatever user-tracking we have)
   - Index on `kind + target_id` for lookup during scan
 
-- [ ] **CORRECT-02**: New `/arcanon:correct` command supporting four actions:
+- [x] **CORRECT-02
+**: New `/arcanon:correct` command supporting four actions:
   - `/arcanon:correct connection <id> --action delete` — removes connection on next scan
   - `/arcanon:correct connection <id> --action update --source <svc> --target <svc>` — re-points connection
   - `/arcanon:correct service <name> --action rename --new <name>` — renames service across all references
@@ -107,13 +108,16 @@ New `scan_overrides` table. New `/arcanon:correct` command. New `/arcanon:rescan
 
 - [ ] **CORRECT-03**: Scan pipeline reads `scan_overrides` BEFORE `endScan` and applies pending overrides to the persisted findings. Override is marked `applied_in_scan_version_id` on apply. Already-applied overrides skipped on subsequent scans.
 
-- [ ] **CORRECT-04**: `/arcanon:rescan <repo-path>` — re-scans exactly one repo. Bypasses the incremental-change-detection skip. Updates `scan_versions` for that repo only; other repos in the linked-repos config are not touched.
+- [x] **CORRECT-04
+**: `/arcanon:rescan <repo-path>` — re-scans exactly one repo. Bypasses the incremental-change-detection skip. Updates `scan_versions` for that repo only; other repos in the linked-repos config are not touched.
 
 - [ ] **CORRECT-05**: `/arcanon:rescan` accepts the repo path or the repo `name` as registered in `repos` table.
 
-- [ ] **CORRECT-06**: Node tests — migration 017 idempotent; insert/select scan_overrides; apply override during scan flow; idempotent re-apply.
+- [x] **CORRECT-06
+**: Node tests — migration 017 idempotent; insert/select scan_overrides; apply override during scan flow; idempotent re-apply.
 
-- [ ] **CORRECT-07**: bats tests — `/arcanon:correct connection` happy paths for each action; `/arcanon:rescan` happy path; rescan on non-existent repo exits 2 with friendly error.
+- [x] **CORRECT-07
+**: bats tests — `/arcanon:correct connection` happy paths for each action; `/arcanon:rescan` happy path; rescan on non-existent repo exits 2 with friendly error.
 
 ### Shadow Scan Workflow (SHADOW) — THE-1024 Item #4
 

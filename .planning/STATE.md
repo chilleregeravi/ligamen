@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.1.4
 milestone_name: Operator Surface
 status: executing
-stopped_at: "Completed 114-03-PLAN.md (/arcanon:doctor)"
-last_updated: "2026-04-25T22:27:12.075Z"
-last_activity: 2026-04-25
+stopped_at: Completed 118-01-PLAN.md
+last_updated: "2026-04-27T04:56:42.306Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 9
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  completed_phases: 4
+  total_plans: 21
+  completed_plans: 10
+  percent: 48
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-25)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 114 — Read-Only Navigability Commands
+**Current focus:** Phase 118 — scan_overrides Operator Commands
 
 ## Current Position
 
-Phase: 114 (Read-Only Navigability Commands) — EXECUTING
-Plan: 3 of 3
+Phase: 118 (scan_overrides Operator Commands) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-25
+Last activity: 2026-04-27
 
 ## Performance Metrics
 
@@ -47,6 +47,9 @@ Last activity: 2026-04-25
 - **`hub.evidence_mode` defaults to `"full"` for back-compat.** `"hash-only"` is opt-in; existing CI flows keep working.
 - **Shadow-scan namespace at `$ARCANON_DATA_DIR/projects/<hash>/impact-map-shadow.db`** (sibling of `impact-map.db`). Atomic promote = backup + swap.
 - NAV-02 ships /arcanon:view as a pure markdown command (no Node handler) per RESEARCH §2 dispatch-precedence finding. Negative regression test in commands-surface.bats guards against future contributors adding view: cmdView to hub.js HANDLERS.
+- 118-01: Service-name resolver extracted into separate worker/cli/correct-resolver.js for testability
+- 118-01: Resolver throws structured { code, message, exitCode } objects (not Error instances) so callers control I/O
+- 118-01: created_by='cli' marker distinguishes operator-staged overrides from system-generated rows
 
 ### Pending Todos
 
@@ -59,6 +62,6 @@ None. Awaiting requirements definition + roadmap.
 
 ## Session Continuity
 
-Last session: 2026-04-25T22:27:12.067Z
-Stopped at: Completed 114-03-PLAN.md (/arcanon:doctor)
+Last session: 2026-04-27T04:56:34.527Z
+Stopped at: Completed 118-01-PLAN.md
 Resume file: None
