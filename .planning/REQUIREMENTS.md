@@ -183,11 +183,16 @@ Three sub-items: offline mode, explicit specs, externals catalog.
 
 ### Verification Gate (VER)
 
-- [ ] **VER-01**: bats suite green (≥315 baseline + new HELP/NAV/CORRECT/SHADOW/INT tests; allow 1 macOS HOK-06 caveat at threshold=200)
-- [ ] **VER-02**: node test suite green for affected modules (migrations 017, query-engine + scan_overrides reads, scan apply flow, hub-sync payload modes, known-externals catalog)
-- [ ] **VER-03**: All 9 → 13+ commands have `## Help` sections; `/arcanon:<cmd> --help` returns non-empty output for all
-- [ ] **VER-04**: Repo-wide grep for `--help` in commands/ — only acceptable hits are within `## Help` sections themselves OR the documented `commands/update.md` `claude plugin update --help` host-CLI reference. Grep refined from VER-04 in v0.1.3 (which expected zero hits) to `/arcanon:.*--help` outside `## Help` blocks.
-- [ ] **VER-05**: Fresh-install integration smoke on Node 25 — `claude plugin install` + first session + `/arcanon:doctor` reports all PASS
+- [x] **VER-01
+**: bats suite green (≥315 baseline + new HELP/NAV/CORRECT/SHADOW/INT tests; allow 1 macOS HOK-06 caveat at threshold=200)
+- [x] **VER-02
+**: node test suite green for affected modules (migrations 017, query-engine + scan_overrides reads, scan apply flow, hub-sync payload modes, known-externals catalog)
+- [x] **VER-03
+**: All 9 → 13+ commands have `## Help` sections; `/arcanon:<cmd> --help` returns non-empty output for all
+- [x] **VER-04**: Repo-wide grep for `--help` in commands/ — only acceptable hits are within `## Help` sections themselves OR the documented `commands/update.md` `claude plugin update --help` host-CLI reference. Grep refined from VER-04
+ in v0.1.3 (which expected zero hits) to `/arcanon:.*--help` outside `## Help` blocks.
+- [x] **VER-05
+**: Fresh-install integration smoke on Node 25 — `claude plugin install` + first session + `/arcanon:doctor` reports all PASS
 - [ ] **VER-06**: 4 manifest files at version 0.1.4 + lockfile regenerated (mirrors v0.1.3 release pin)
 - [ ] **VER-07**: CHANGELOG `[0.1.4] - 2026-04-XX` section pinned with all 5 subsections (`### Added` for new commands, `### Changed` for status output, `### Fixed` for any bugs caught, `### Deprecated`/`### Removed` if anything trims, plus `### BREAKING` if applicable — `scan_overrides` table is additive, not breaking)
 

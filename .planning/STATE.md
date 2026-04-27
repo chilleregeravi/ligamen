@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1.4
 milestone_name: Operator Surface
-status: verifying
-stopped_at: Completed 121-03-PLAN.md (INT-10)
-last_updated: "2026-04-27T07:02:32.534Z"
+status: executing
+stopped_at: Completed 122-01-PLAN.md
+last_updated: "2026-04-27T07:24:24.974Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 21
-  completed_plans: 19
-  percent: 90
+  completed_plans: 20
+  percent: 95
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-25)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 121 — Integration Consumption Layer
+**Current focus:** Phase 122 — Verification Gate + Release Pin
 
 ## Current Position
 
-Phase: 121 (Integration Consumption Layer) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 122 (Verification Gate + Release Pin) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-27
 
 ## Performance Metrics
@@ -71,6 +71,8 @@ Last activity: 2026-04-27
 - INT-10 bats: tolerant substring match for oasdiff vs yq fallback wording
 - INT-10 bats: control test pinned in to prove tests exercise the explicit-spec path not auto-discovery
 - INT-10 bats: append (don't replace) the existing tests/drift-openapi-explicit-spec.bats from Phase 120 — preserves 5 INT-04 negative-path tests
+- Plan 122-01 deviation: substituted plan's pinned --help smoke recipe with substantive lib/help.sh sourcing (hub.sh dispatch only handles a subset of commands)
+- Plan 122-01 Pattern A (install machinery) PASS + Pattern B (doctor smoke deferred) per 113-VERIFICATION.md:26 precedent
 
 ### Pending Todos
 
@@ -83,6 +85,6 @@ None. Awaiting requirements definition + roadmap.
 
 ## Session Continuity
 
-Last session: 2026-04-27T07:02:32.526Z
-Stopped at: Completed 121-03-PLAN.md (INT-10)
+Last session: 2026-04-27T07:24:16.974Z
+Stopped at: Completed 122-01-PLAN.md
 Resume file: None
