@@ -209,6 +209,41 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ### Active
 
+- [ ] **THE-1029** — `X-Org-Id` on scan upload + auto-default via `/auth/whoami` (paired with hub-side THE-1030; personal-credential model) — v0.1.5
+- [ ] **THE-1031** — PII path masking at egress seams (MCP, HTTP, logger, exports; belt-and-suspenders agent contract assertion) — v0.1.5
+
+## Current Milestone: v0.1.5 Identity & Privacy
+
+**Goal:** Adopt the hub's new personal-credential auth model and stop home-dir PII from leaking out of the worker — two cross-cutting trust gaps that block public-beta credibility.
+
+**Target work (2 high-priority Linear items):**
+
+1. **THE-1029 — Personal-credential hub auth (blocked by hub-side THE-1030)**
+   - `uploadScan()` sends `X-Org-Id`; missing → fail-fast `HubError`. Per-error-code parsing (`missing_x_org_id`, `invalid_x_org_id`, `insufficient_scope`, `key_not_authorized_for_org`, `not_a_member`, `forbidden_scan`, `invalid_key`) → actionable user messages.
+   - **NEW** `worker/hub-sync/whoami.js` → `getKeyInfo(apiKey, hubUrl)` calls `GET /api/v1/auth/whoami`, returns `{ user_id, key_id, scopes, grants }`.
+   - `resolveCredentials()` precedence: `opts.orgId` → `ARCANON_ORG_ID` env → `~/.arcanon/config.json` `default_org_id`. Returns `{ apiKey, hubUrl, orgId, source }`.
+   - `_readHubConfig` (manager.js) reads per-repo `cfg.hub.org_id` override; threads orgId through `uploadScan`.
+   - `/arcanon:login arc_xxx [--org-id <uuid>]`: with `--org-id`, validates against whoami (warn-but-allow on mismatch); without `--org-id`, calls whoami → 1 grant auto-selects, N grants prompt via AskUserQuestion, 0 grants fail clearly.
+   - `/arcanon:status` shows resolved org id + source, key preview, scopes, authorized-orgs list.
+   - `arcanon.config.json.example` shows `hub.org_id`. Docs (`hub-integration.md`, `getting-started.md`, `configuration.md`) cover the new field, env var, and login flow.
+
+2. **THE-1031 — PII path masking at egress seams**
+   - **NEW** `worker/lib/path-mask.js` with `maskHome(p)` and `maskHomeDeep(obj)` — idempotent, walks path-keyed properties.
+   - Apply at **🔴 MCP tool responses** (`worker/mcp/server.js`) — only egress to a third party (Anthropic).
+   - Apply at **🟠 HTTP responses** (`worker/server/http.js`: `/api/scan-freshness`, `/api/repos`, `/graph`).
+   - Apply at **🟠 worker logger** (`worker/lib/logger.js`: stack traces + `extra` fields).
+   - Apply at **🟡 export outputs** (`worker/cli/export*.js`: mermaid/dot/html).
+   - Belt-and-suspenders: `parseAgentOutput` in `worker/scan/findings.js` rejects `source_file` starting with `/` (WARN + drop).
+   - Tests: node `path-mask.test.js` (round-trips); bats grep-assertion that no `/Users/` strings appear in MCP responses, export outputs, worker logs, or `/api/scan-freshness` JSON.
+
+**Hard dependency:** THE-1029 cannot ship until arcanon-hub THE-1030 (server-side personal-credential rewrite + `whoami` + `X-Org-Id` enforcement) lands. Brief upload outage between merges accepted — neither has shipped publicly.
+
+**Storage model:** Single credential triple in `~/.arcanon/config.json` (apiKey + hubUrl + default_org_id). NO multi-cred map. One key serves all authorized orgs; plugin only tracks the *default*.
+
+**Scope discipline:** No new commands. No skills/agents work — that remains v0.2.0. No multi-org switching, no per-org credential profiles, no service-account credentials — all deferred to v2.3+ (per THE-1029 Out of Scope).
+
+**Phase numbering:** Continues from v0.1.4 (last phase 122) → v0.1.5 starts at Phase 123.
+
 ## Current State
 
 **Shipped:** v0.1.4 Operator Surface (2026-04-27) — 9 phases, 21 plans, 41 REQs, 117 commits, +33,305/-371 LOC. Architectural correction at release prep eliminated the worker-HTTP-route shape for `/arcanon:rescan` and `/arcanon:shadow-scan` (re-architected as markdown-orchestrated, cloning `/arcanon:map`'s pattern). Zero deferred items at ship.
@@ -219,12 +254,11 @@ Every edit is automatically formatted and linted, every quality check runs with 
 
 ## Next Milestone Goals
 
-After v0.1.4 ships, the next milestone is undecided — to be defined via `/gsd-new-milestone`. Pre-existing candidates:
+After v0.1.5 ships:
 
+- **v0.1.6 Hub Surface follow-on** — multi-level scope (product/project/repo grants) per arcanon-hub APIKEY-01; service-account credentials per APIKEY-02. Both deferred from THE-1029.
 - **v0.2.0 Skills & Agents** — Design the skills layer on top of shipped hooks, refactor inline `Explore` agent calls, add MCP-tool-composing investigator agent. Intentionally deferred since v0.1.1.
 - Platform extensions, observability surface, agent runtime work, or new Linear backlog items not yet captured.
-
-The next `/gsd-new-milestone` cycle (questioning → research → requirements → roadmap) will pick from these or surface new direction.
 
 ## (archived) Milestone: v0.1.3 Trust & Foundations
 
@@ -287,7 +321,7 @@ Architecture: commands/ for user-invoked features, skills/ for auto-invoked know
 Known tech debt: db/database.js has console.log in script-mode guard, getQueryEngineByHash inline migration workaround, renderLibraryConnections() unused `outgoing` parameter, node_metadata table unused (forward-looking for STRIDE/vuln views), impact-flow.bats imports stale module paths (pre-existing from v3.0 restructure), package.json bin entry references non-existent ligamen-init.js, graph-fit-to-screen.test.js has 2 stale assertions for inlined fitToScreen() (Phase 26 regression).
 
 ---
-*Last updated: 2026-04-27 — v0.1.4 shipped (Operator Surface)*
+*Last updated: 2026-04-27 — v0.1.5 milestone started (Identity & Privacy)*
 
 ## Constraints
 
@@ -359,6 +393,9 @@ Known tech debt: db/database.js has console.log in script-mode guard, getQueryEn
 | Zero-tolerance on Ligamen refs — v0.1.2 | No back-compat, no two-read fallbacks, no deprecation warnings. Back-compat stubs permanently encode the legacy name; just remove. Breaking change for v5.x users accepted. | ✓ Good |
 | Rename ChromaDB `COLLECTION_NAME` — v0.1.2 | Existing collections orphaned on upgrade; users rebuild via `/arcanon:map`. Acceptable since ChromaDB is optional and rebuildable, and policy demands zero ligamen refs. | ✓ Good |
 | Combined plan+execute for phases 102–105 — v0.1.2 | Scope well-understood after Phase 101 discovery; separate planner spawns would have been ceremony. Saved ~4 agent round-trips. | ✓ Good |
+| Single credential triple in `~/.arcanon/config.json` — v0.1.5 | THE-1030 personal-credential model: one key serves all authorized orgs. Multi-cred map adds complexity for no value at single-machine/single-user scope. | Pending validation |
+| Auto-default-org via `whoami` at login — v0.1.5 | Forcing user to type a UUID at `/arcanon:login` is hostile. Hub already knows which orgs the key is authorized for; plugin asks. | Pending validation |
+| Mask `$HOME` at egress seams, not in DB — v0.1.5 | DB needs absolute paths for git operations; masking-at-egress preserves runtime correctness while closing the third-party leak (MCP → Anthropic). | Pending validation |
 
 ---
-*Last updated: 2026-04-27 — v0.1.4 shipped (Operator Surface)*
+*Last updated: 2026-04-27 — v0.1.5 milestone started (Identity & Privacy)*
