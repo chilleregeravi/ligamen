@@ -15,7 +15,7 @@ setup() {
   # `verify` and `update` shipped in v0.1.3, `list` ships in v0.1.4 (NAV-01),
   # `view` ships in v0.1.4 (NAV-02), and `doctor` ships in v0.1.4 (NAV-03 —
   # this plan, 114-03).
-  for cmd in map drift impact sync login status export verify update list view doctor diff; do
+  for cmd in map drift impact sync login status export verify update list view doctor diff correct; do
     [ -f "$PLUGIN_DIR/commands/$cmd.md" ] || {
       echo "MISSING: commands/$cmd.md"
       return 1
@@ -24,7 +24,7 @@ setup() {
 }
 
 @test "CLN-09: all surviving commands have description frontmatter" {
-  for cmd in map drift impact sync login status export verify update list view doctor diff; do
+  for cmd in map drift impact sync login status export verify update list view doctor diff correct; do
     run grep -c '^description:' "$PLUGIN_DIR/commands/$cmd.md"
     [ "$status" -eq 0 ]
     [ "$output" -ge 1 ]
@@ -137,4 +137,19 @@ setup() {
 
 @test "NAV-04: worker/cli/hub.js registers diff: cmdDiff" {
   grep -q 'diff: cmdDiff' "$PLUGIN_DIR/worker/cli/hub.js"
+}
+
+# CORRECT-04 (118-01): /arcanon:correct must declare allowed-tools: Bash and
+# the Node-side handler must be registered in HANDLERS.
+@test "CORRECT-04: /arcanon:correct declares allowed-tools: Bash" {
+  [ -f "$PLUGIN_DIR/commands/correct.md" ]
+  run grep -E '^description:' "$PLUGIN_DIR/commands/correct.md"
+  [ "$status" -eq 0 ]
+  run grep -E '^allowed-tools:' "$PLUGIN_DIR/commands/correct.md"
+  [ "$status" -eq 0 ]
+  grep -q 'Bash' "$PLUGIN_DIR/commands/correct.md"
+}
+
+@test "CORRECT-04: worker/cli/hub.js registers correct: cmdCorrect" {
+  grep -q 'correct: cmdCorrect' "$PLUGIN_DIR/worker/cli/hub.js"
 }
