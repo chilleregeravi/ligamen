@@ -166,13 +166,15 @@ Three sub-items: offline mode, explicit specs, externals catalog.
   - SendGrid (`api.sendgrid.com`)
   - Plus 8-10 more chosen by usage-frequency analysis
 
-- [ ] **INT-06**: Scan enrichment pass loads `known-externals.yaml` and matches actor URLs/host patterns against the catalog. Matched actors get a friendly `label` field added to their record.
+- [x] **INT-06
+**: Scan enrichment pass loads `known-externals.yaml` and matches actor URLs/host patterns against the catalog. Matched actors get a friendly `label` field added to their record.
 
 - [ ] **INT-07**: User extension via `arcanon.config.json` `external_labels` key — same shape as the catalog; merged with the shipped catalog (user takes precedence on key collision).
 
 - [ ] **INT-08**: `/arcanon:list` (NAV-01) and graph UI show catalog-labeled external names instead of raw URLs.
 
-- [ ] **INT-09**: Node tests — known-externals loader, catalog match logic, user-extension merge.
+- [x] **INT-09
+**: Node tests — known-externals loader, catalog match logic, user-extension merge.
 
 - [ ] **INT-10**: bats test — `/arcanon:drift openapi --spec X --spec Y` happy path with two real OpenAPI fixtures.
 

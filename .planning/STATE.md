@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.1.4
 milestone_name: Operator Surface
 status: executing
-stopped_at: Completed 120-03-PLAN.md
-last_updated: "2026-04-27T06:25:53.286Z"
+stopped_at: Completed 121-01-PLAN.md
+last_updated: "2026-04-27T06:40:57.058Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 21
-  completed_plans: 16
-  percent: 76
+  completed_plans: 17
+  percent: 81
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-25)
 
 **Core value:** Every edit is automatically formatted and linted, every quality check runs with one command, and breaking changes across repos are caught before they ship.
-**Current focus:** Phase 120 — Integration Data Layer
+**Current focus:** Phase 121 — Integration Consumption Layer
 
 ## Current Position
 
-Phase: 120 (Integration Data Layer) — EXECUTING
-Plan: 3 of 3
+Phase: 121 (Integration Consumption Layer) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
 Last activity: 2026-04-27
 
@@ -62,6 +62,10 @@ Last activity: 2026-04-27
 - cmdDiff --shadow reuses Phase 115 diffScanVersions(dbA, dbB, scanIdA, scanIdB) engine via dynamic import - Shape A landed verbatim, no fallback needed
 - INT-02 + INT-04 shipped: --offline short-circuit (Step 0.5, no hub.sh) and --spec repeatable (bypasses find_openapi_spec). Markdown-as-spec testing convention; 10 new bats tests
 - INT-05 ships known-externals.yaml catalog as DATA-ONLY (zero Node code) — Phase 121 owns the consumer/loader/matcher. Glob-style host patterns (not regex), kebab-case names, list shape (not name-keyed map) for diff-friendly ordering.
+- 121-01: per-repo actor labeling pass over per-service — actors are global; one DB write per actor regardless of how many services connect to it
+- 121-01: self-healing UPDATE-with-NULL on non-match — removing a catalog entry clears stale labels on next scan
+- 121-01: loader accepts both 'entries:' (plan-assumed) and 'externals:' (Phase 120 actual) top-level keys; both map and list forms — single point of adaptation
+- 121-01: leading '*.foo.com' wildcard matches one-OR-MORE leading DNS labels (excluding bare suffix); mid-string '*' matches exactly one label
 
 ### Pending Todos
 
@@ -74,6 +78,6 @@ None. Awaiting requirements definition + roadmap.
 
 ## Session Continuity
 
-Last session: 2026-04-27T06:25:53.275Z
-Stopped at: Completed 120-03-PLAN.md
+Last session: 2026-04-27T06:40:57.049Z
+Stopped at: Completed 121-01-PLAN.md
 Resume file: None
