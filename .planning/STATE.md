@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1.4
 milestone_name: Operator Surface
-status: executing
-stopped_at: Completed 118-01-PLAN.md
-last_updated: "2026-04-27T04:56:42.306Z"
+status: verifying
+stopped_at: Completed 118-02-PLAN.md
+last_updated: "2026-04-27T05:13:43.725Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 21
-  completed_plans: 10
-  percent: 48
+  completed_plans: 11
+  percent: 52
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 Phase: 118 (scan_overrides Operator Commands) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-27
 
 ## Performance Metrics
@@ -50,6 +50,9 @@ Last activity: 2026-04-27
 - 118-01: Service-name resolver extracted into separate worker/cli/correct-resolver.js for testability
 - 118-01: Resolver throws structured { code, message, exitCode } objects (not Error instances) so callers control I/O
 - 118-01: created_by='cli' marker distinguishes operator-staged overrides from system-generated rows
+- 118-02: scanSingleRepo lives in manager.js as a thin scanRepos wrapper (single-line forces options.full=true) — encapsulates the bypass invariant in one place
+- 118-02: ARCANON_TEST_AGENT_RUNNER env-var stub installed in worker/index.js is the canonical mechanism for tests that drive scans inside the worker; production never sets it
+- 118-02: agentRunner-not-initialized in production is surfaced as 503 (not 500) with a clear message; production agent-runner wiring deferred to Phase 119+ (see deferred-items.md)
 
 ### Pending Todos
 
@@ -62,6 +65,6 @@ None. Awaiting requirements definition + roadmap.
 
 ## Session Continuity
 
-Last session: 2026-04-27T04:56:34.527Z
-Stopped at: Completed 118-01-PLAN.md
+Last session: 2026-04-27T05:13:43.717Z
+Stopped at: Completed 118-02-PLAN.md
 Resume file: None

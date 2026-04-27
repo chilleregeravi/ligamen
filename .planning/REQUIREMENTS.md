@@ -111,7 +111,8 @@ New `scan_overrides` table. New `/arcanon:correct` command. New `/arcanon:rescan
 - [x] **CORRECT-04
 **: `/arcanon:rescan <repo-path>` — re-scans exactly one repo. Bypasses the incremental-change-detection skip. Updates `scan_versions` for that repo only; other repos in the linked-repos config are not touched.
 
-- [ ] **CORRECT-05**: `/arcanon:rescan` accepts the repo path or the repo `name` as registered in `repos` table.
+- [x] **CORRECT-05
+**: `/arcanon:rescan` accepts the repo path or the repo `name` as registered in `repos` table.
 
 - [x] **CORRECT-06
 **: Node tests — migration 017 idempotent; insert/select scan_overrides; apply override during scan flow; idempotent re-apply.
