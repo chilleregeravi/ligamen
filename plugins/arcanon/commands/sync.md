@@ -83,3 +83,26 @@ The CLI prints `drain: attempted=N succeeded=K failed=M dead=D (pending=P)`. Int
 ## Migration note — `/arcanon:upload` Deprecated
 
 Prior to v0.1.1, manual pushes used `/arcanon:upload`. That command still exists in v0.1.1 as a Deprecated stub that forwards to `/arcanon:sync` with a stderr warning. It will be removed in v0.2.0 — update scripts and runbooks now.
+
+## Help
+
+**Usage:** `/arcanon:sync [--drain | --dry-run | --force] [--repo <path>] [--limit N] [--prune-dead]`
+
+Reconcile local scans with Arcanon Hub. Default (no flags) uploads the current
+repo's latest scan, then drains the offline retry queue.
+
+**Options:**
+- `--drain` — skip the upload step, only drain the queue (legacy `sync` behaviour)
+- `--repo <path>` — scope the upload step to a specific repo path instead of `$PWD`
+- `--dry-run` — print what would be pushed/drained without making any hub calls
+- `--force` — skip the missing-credentials preflight; fail with hub error instead of friendly stop
+- `--limit N` — cap queue drain to N rows per call (default 50)
+- `--prune-dead` — delete `status='dead'` rows before draining
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:sync` — "I just scanned — push + drain"
+- `/arcanon:sync --drain` — "Queue drained — don't re-upload"
+- `/arcanon:sync --repo ../api` — "Upload this other repo too"
+- `/arcanon:sync --dry-run` — "What would happen if I ran sync?"
+- `/arcanon:sync --drain --prune-dead` — "Clear dead rows and drain"

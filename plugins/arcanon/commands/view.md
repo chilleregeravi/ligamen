@@ -56,3 +56,16 @@ It does **not**:
 
 - `/arcanon:map` — re-scan repos and rebuild the graph
 - `/arcanon:list` — concise project overview (no UI)
+
+## Help
+
+**Usage:** `/arcanon:view`
+
+Open the Arcanon graph UI in your default browser. Top-level alias for
+`/arcanon:map view`. Auto-starts the worker if it is not running.
+
+**Options:**
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:view` — open the graph UI; auto-starts the worker if needed

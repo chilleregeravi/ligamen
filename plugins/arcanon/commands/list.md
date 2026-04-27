@@ -101,3 +101,20 @@ It does **not**:
 - Write to `enrichment_log`
 - Trigger a scan or a hub sync
 - Add new HTTP routes or new auth surface
+
+## Help
+
+**Usage:** `/arcanon:list [--json]`
+
+Concise project overview: linked repos, services partitioned by type,
+connection counts by confidence, external actors, and hub sync status.
+Read-only via worker HTTP. Silent in non-Arcanon directories.
+
+**Options:**
+- *(no flags)* — 5-line overview to stdout, exit 0
+- `--json` — single JSON object with the same fields, exit 0
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:list` — pretty 5-line overview after a scan
+- `/arcanon:list --json` — machine-readable for CI / pre-commit hooks

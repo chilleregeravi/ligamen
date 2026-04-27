@@ -54,7 +54,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/hub.sh doctor $ARGUMENTS
 Relay the output verbatim. Exit code propagates so callers (CI, pre-release
 gates) can branch on critical failure.
 
-## Help
+## Troubleshooting
 
 - **All PASS** → installation is healthy.
 - **Check 1 FAIL** → worker is not reachable. Try `/arcanon:status` to see the
@@ -73,3 +73,18 @@ gates) can branch on critical failure.
   if you intend to use `/arcanon:sync` or hub-backed enrichment.
 - **Check 8 WARN** → hub configured but unreachable or auth rejected. Verify
   `/arcanon:status` shows `credentials: present`, then check network.
+
+## Help
+
+**Usage:** `/arcanon:doctor [--json]`
+
+Run 8 read-only smoke tests against the current Arcanon installation and exit 0
+on all-pass / WARN, or 1 on any critical FAIL.
+
+**Options:**
+- `--json` — emit a single JSON object with `{version, project_root, checks[], summary}`
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:doctor` — pretty per-check table to stdout
+- `/arcanon:doctor --json` — machine-readable diagnostics for CI / pre-release gates

@@ -33,3 +33,20 @@ If the user wants to paste Mermaid into a doc, show them the contents of
 
 If the command errors with "no local scan", tell them to run `/arcanon:map`
 first.
+
+## Help
+
+**Usage:** `/arcanon:export [--format mermaid|dot|html|json|all] [--out <dir>]`
+
+Emit the local service graph in one or more formats. The HTML output is a
+single self-contained file with a cytoscape-powered viewer.
+
+**Options:**
+- `--format mermaid|dot|html|json|all` — output format(s); default `all`
+- `--out <dir>` — write outputs to this directory; default `.arcanon/reports/<timestamp>/`
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:export` — write all formats under `.arcanon/reports/<timestamp>/`
+- `/arcanon:export --format mermaid` — Mermaid only (good for "paste into a PR")
+- `/arcanon:export --format html --out /tmp/graph` — single self-contained HTML file

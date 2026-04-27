@@ -32,16 +32,27 @@ Silent (no output, exit 0) when run from a directory without an `impact-map.db`.
 
 ## Help
 
-Usage: `/arcanon:diff <scanA> <scanB> [--json]`
+**Usage:** `/arcanon:diff <scanA> <scanB> [--json]`
 
-Examples:
+Compare two scan versions and show services/connections added, removed, or
+modified between them.
+
+**Options:**
+- `--json` — single JSON object with engine result + `project_root`/`scanA`/`scanB` metadata
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
 - `/arcanon:diff 5 7` — integer scan IDs
 - `/arcanon:diff HEAD HEAD~1` — most recent vs one before
 - `/arcanon:diff 2026-04-20 2026-04-25` — ISO date cutoffs
 - `/arcanon:diff main feature-x` — branch heuristic
 - `/arcanon:diff HEAD HEAD~1 --json` — machine-readable
 
+## Step 1 — Run the diff
+
 ```bash
+source ${CLAUDE_PLUGIN_ROOT}/lib/help.sh
+arcanon_print_help_if_requested "$ARGUMENTS" "${CLAUDE_PLUGIN_ROOT}/commands/diff.md" && exit 0
 source ${CLAUDE_PLUGIN_ROOT}/lib/worker-client.sh
 if ! _arcanon_is_project_dir; then
   exit 0  # silent in non-Arcanon directories per NAV-04 contract

@@ -230,3 +230,24 @@ mention:
 
 > Want up-to-date cross-org impact? Run `/arcanon:sync` then re-query — the hub may have
 > fresher data from teammates.
+
+## Help
+
+**Usage:** `/arcanon:impact [target] [--direction downstream|upstream] [--hops N] [--changed] [--exclude <repo>]`
+
+Query cross-repo consumers and downstream impact for a service, endpoint, or
+schema. Auto-detects changed symbols from `git diff` when invoked with no
+target. Falls back to grep-based scanning when no dependency map is available.
+
+**Options:**
+- `<target>` — service name, endpoint path, or schema name (positional)
+- `--direction downstream|upstream` — `downstream` (default) = "what do I affect"; `upstream` = "what affects me"
+- `--hops N` — max traversal depth (default 3)
+- `--changed` — auto-detect changed symbols from `git diff HEAD` (implicit when no positional target)
+- `--exclude <repo>` — drop the named repo from results; repeatable
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:impact user-api` — downstream consumers of `user-api`
+- `/arcanon:impact --changed --exclude legacy-repo` — auto-detect git changes, ignore one repo
+- `/arcanon:impact /v1/auth --direction upstream --hops 5` — what calls this endpoint, 5 hops deep

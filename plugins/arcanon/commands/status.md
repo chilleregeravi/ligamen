@@ -31,3 +31,18 @@ If a `Latest scan: NN% high-confidence (S services, C connections)` line
 is shown, the percent is the high-confidence ratio of the most recent
 successful scan (formula: `(high + 0.5*low) / total`). The line is omitted
 when the worker is offline or no completed scan exists for the project.
+
+## Help
+
+**Usage:** `/arcanon:status [--json]`
+
+Print a one-line health check for the current repo: worker, hub credentials,
+upload queue, config, and latest-scan quality.
+
+**Options:**
+- `--json` — emit structured JSON instead of the human-readable report
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:status` — pretty multi-line status report
+- `/arcanon:status --json` — single JSON object suitable for scripts and CI

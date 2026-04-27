@@ -365,3 +365,23 @@ If this was the **first map build**, add `"impact-map": {"history": true}` to `a
 Map built successfully. View it with /arcanon:map view
 To enable agent-based impact checking, add the Arcanon MCP server to your .mcp.json.
 ```
+
+## Help
+
+**Usage:** `/arcanon:map [view|full]`
+
+Build or refresh the service dependency map by scanning linked repos with
+Claude agents. Stores findings in SQLite and renders them in the graph UI.
+
+**Subcommands:**
+- *(none)* — incremental scan of linked repos and rebuild the dependency graph
+- `view` — open the existing graph UI without scanning
+- `full` — force a full re-scan of all files (asks before deleting prior data)
+
+**Options:**
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:map` — incremental scan and rebuild graph
+- `/arcanon:map view` — just open the graph UI (no scanning)
+- `/arcanon:map full` — force full re-scan of all linked repos

@@ -164,3 +164,20 @@ Restart Claude Code to activate v{TARGET_VER}
 ```
 
 The restart sentence must appear verbatim (with the `{TARGET_VER}` placeholder replaced). Session restart is required because new commands/hooks in the updated plugin only load at Claude Code startup — this is a hard constraint from the plugin runtime.
+
+## Help
+
+**Usage:** `/arcanon:update [--check-only]`
+
+Check the installed plugin version against the latest on the Arcanon
+marketplace, show a short changelog preview, and (after Phase 98-02 + 98-03
+ship) orchestrate a clean self-update.
+
+**Options:**
+- *(no flags)* — check + (when newer) prompt to update; full apply flow
+- `--check-only` — print the version comparison and exit without prompting
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:update` — check for a newer release and apply it interactively
+- `/arcanon:update --check-only` — version comparison only, no apply

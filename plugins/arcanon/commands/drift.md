@@ -45,3 +45,26 @@ Linked repos: !`source "${CLAUDE_PLUGIN_ROOT}/lib/linked-repos.sh" && list_linke
 - `drift openapi` uses `oasdiff` when available; falls back to structural yq comparison
 - If no sibling repos are found, the command exits with a helpful message
 - Expected runtime: versions <5s, types <15s, openapi <10s for typical repo sets
+
+## Help
+
+**Usage:** `/arcanon:drift [graph|versions|types|openapi|--all]`
+
+Detect drift across linked repos: service-graph changes between scans, plus
+version, type, and OpenAPI mismatches across sibling repositories.
+
+**Subcommands:**
+- *(none)* — run all four drift checks (graph + versions + types + openapi)
+- `graph` — compare the two most recent scan snapshots only
+- `versions` — fastest check; package-version mismatches via bash + jq
+- `types` — heuristic interface/struct name drift, same-language only
+- `openapi` — OpenAPI spec drift via `oasdiff` (or yq fallback)
+
+**Options:**
+- `--all` — surface INFO-level findings in addition to CRITICAL and WARN
+- `--help`, `-h`, `help` — print this help and exit
+
+**Examples:**
+- `/arcanon:drift` — run every check; report CRITICAL + WARN
+- `/arcanon:drift versions` — package-version mismatches only
+- `/arcanon:drift --all` — include INFO-level findings (e.g. patch bumps)
