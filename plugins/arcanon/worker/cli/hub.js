@@ -1218,6 +1218,159 @@ async function cmdDoctor(flags) {
   process.exit(summary.exit_code);
 }
 
+/**
+ * cmdDiff — Compare two scan versions (NAV-04, plan 115-02).
+ *
+ * Read-only: opens the project DB via better-sqlite3 directly (no worker
+ * round-trip — diff is a direct SQL read).
+ *
+ * Selectors accepted by both <scanA> and <scanB>:
+ *   - integer scan ID (e.g. 5)
+ *   - HEAD or HEAD~N
+ *   - ISO 8601 date (YYYY-MM-DD or full timestamp)
+ *   - branch name (resolves via git rev-parse + repo_state.last_scanned_commit)
+ *
+ * Flags:
+ *   --json   Emit machine-readable JSON instead of human report.
+ *
+ * Exit codes (matches verify.md:65-71 convention):
+ *   0 — diff completed (with or without changes)
+ *   2 — usage error: missing args, unparseable selector, scan not found,
+ *        branch not found, HEAD~N out of range
+ *
+ * Silent in non-Arcanon directories (no impact-map.db) — exits 0 with no
+ * output, mirroring /arcanon:list and /arcanon:doctor.
+ */
+async function cmdDiff(flags, positional) {
+  const cwd = process.cwd();
+  const dbPath = path.join(projectHashDir(cwd), "impact-map.db");
+  if (!fs.existsSync(dbPath)) {
+    process.exit(0); // silent contract
+  }
+
+  if (!positional || positional.length < 2) {
+    process.stderr.write("usage: arcanon-hub diff <scanA> <scanB> [--json]\n");
+    process.exit(2);
+  }
+  const [selA, selB] = positional;
+
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  try {
+    const { resolveScanSelector } = await import("../diff/resolve-scan.js");
+    const { diffScanVersions } = await import("../diff/scan-version-diff.js");
+
+    let resolvedA, resolvedB;
+    try {
+      resolvedA = resolveScanSelector(db, selA, cwd);
+      resolvedB = resolveScanSelector(db, selB, cwd);
+    } catch (e) {
+      process.stderr.write(`error: ${e.message}\n`);
+      process.exit(2);
+    }
+
+    const result = diffScanVersions(db, db, resolvedA.scanId, resolvedB.scanId);
+
+    const scanMeta = (id) =>
+      db
+        .prepare(
+          "SELECT id, completed_at, quality_score FROM scan_versions WHERE id = ?",
+        )
+        .get(id);
+    const metaA = scanMeta(resolvedA.scanId);
+    const metaB = scanMeta(resolvedB.scanId);
+
+    if (flags.json) {
+      emit(
+        {
+          project_root: cwd,
+          scanA: {
+            ...resolvedA,
+            completed_at: metaA?.completed_at ?? null,
+            quality_score: metaA?.quality_score ?? null,
+          },
+          scanB: {
+            ...resolvedB,
+            completed_at: metaB?.completed_at ?? null,
+            quality_score: metaB?.quality_score ?? null,
+          },
+          ...result,
+        },
+        flags,
+      );
+      return;
+    }
+
+    if (result.same_scan) {
+      process.stdout.write(
+        `Diff: scan #${resolvedA.scanId} vs scan #${resolvedB.scanId} — identical\n`,
+      );
+      return;
+    }
+
+    const lines = [];
+    const headerA = `scan #${resolvedA.scanId} [${resolvedA.resolvedFrom}]${metaA?.completed_at ? ` (${metaA.completed_at})` : ""}`;
+    const headerB = `scan #${resolvedB.scanId} [${resolvedB.resolvedFrom}]${metaB?.completed_at ? ` (${metaB.completed_at})` : ""}`;
+    lines.push(`Diff: ${headerA} -> ${headerB}`);
+    lines.push("");
+
+    // Services
+    lines.push("Services");
+    lines.push(`  Added (${result.services.added.length}):`);
+    for (const s of result.services.added) {
+      lines.push(`    + ${s.repo_id}/${s.name} (${s.type})`);
+    }
+    lines.push(`  Removed (${result.services.removed.length}):`);
+    for (const s of result.services.removed) {
+      lines.push(`    - ${s.repo_id}/${s.name} (${s.type})`);
+    }
+    lines.push(`  Modified (${result.services.modified.length}):`);
+    for (const s of result.services.modified) {
+      const fieldStrs = (s.changed_fields || []).map((f) => {
+        if (f.field === "evidence") return "evidence changed";
+        return `${f.field} ${f.before ?? "null"} -> ${f.after ?? "null"}`;
+      });
+      lines.push(`    ~ ${s.repo_id}/${s.name}: ${fieldStrs.join(", ")}`);
+    }
+    lines.push("");
+
+    // Connections
+    lines.push("Connections");
+    const connStr = (c) =>
+      `${c.source_name} -> ${c.target_name} ${c.protocol}${c.method ? ` ${c.method}` : ""}${c.path ? ` ${c.path}` : ""}`;
+    lines.push(`  Added (${result.connections.added.length}):`);
+    for (const c of result.connections.added) lines.push(`    + ${connStr(c)}`);
+    lines.push(`  Removed (${result.connections.removed.length}):`);
+    for (const c of result.connections.removed) lines.push(`    - ${connStr(c)}`);
+    lines.push(`  Modified (${result.connections.modified.length}):`);
+    for (const c of result.connections.modified) {
+      const fieldStrs = (c.changed_fields || []).map((f) => {
+        if (f.field === "evidence") return "evidence changed";
+        return `${f.field} ${f.before ?? "null"} -> ${f.after ?? "null"}`;
+      });
+      lines.push(`    ~ ${connStr(c)}: ${fieldStrs.join(", ")}`);
+    }
+    lines.push("");
+
+    // Summary
+    const sv = result.summary.services;
+    const cn = result.summary.connections;
+    const svParts = [];
+    if (sv.added) svParts.push(`${sv.added} added`);
+    if (sv.removed) svParts.push(`${sv.removed} removed`);
+    if (sv.modified) svParts.push(`${sv.modified} modified`);
+    const cnParts = [];
+    if (cn.added) cnParts.push(`${cn.added} added`);
+    if (cn.removed) cnParts.push(`${cn.removed} removed`);
+    if (cn.modified) cnParts.push(`${cn.modified} modified`);
+    const summaryLine = `Summary: ${svParts.length ? svParts.join(", ") + " services" : "0 service changes"}; ${cnParts.length ? cnParts.join(", ") + " connections" : "0 connection changes"}`;
+    lines.push(summaryLine);
+
+    process.stdout.write(lines.join("\n") + "\n");
+  } finally {
+    db.close();
+  }
+}
+
 const HANDLERS = {
   version: cmdVersion,
   login: cmdLogin,
@@ -1228,10 +1381,11 @@ const HANDLERS = {
   verify: cmdVerify, // TRUST-01
   list: cmdList,     // NAV-01
   doctor: cmdDoctor, // NAV-03
+  diff: cmdDiff,     // NAV-04
 };
 
 async function main() {
-  const { sub, flags } = parseArgs(process.argv.slice(2));
+  const { sub, flags, positional } = parseArgs(process.argv.slice(2));
   const handler = HANDLERS[sub];
   if (!handler) {
     process.stderr.write(
@@ -1240,7 +1394,7 @@ async function main() {
     process.exit(2);
   }
   try {
-    await handler(flags);
+    await handler(flags, positional);
   } catch (err) {
     process.stderr.write(`error: ${err.message}\n`);
     if (process.env.ARCANON_DEBUG) process.stderr.write((err.stack || "") + "\n");

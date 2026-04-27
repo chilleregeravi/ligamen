@@ -27,6 +27,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   Supports `--json` for machine consumption. Silent in non-Arcanon
   directories. Read-only — uses an isolated read-only SQLite connection for
   the integrity check (does not touch the worker's process-cached DB pool).
+- **`/arcanon:diff <scanA> <scanB>` command** (NAV-04). Compare any two scan
+  versions — accepts integer scan IDs, `HEAD`/`HEAD~N` shorthand, ISO 8601
+  timestamps, or branch names (resolves via `repo_state.last_scanned_commit`).
+  Shows services + connections added/removed/modified. Read-only via direct
+  SQLite read; silent in non-Arcanon directories. Supports `--json` for
+  machine consumption. Diff engine factored into `worker/diff/` so Phase
+  119's `/arcanon:diff --shadow` can reuse it. Same-DB diff detects
+  added/removed only (production schema's UNIQUE constraints prevent same
+  row across two scans); true modify-detection requires shadow-DB pattern
+  (Phase 119).
 
 ## [0.1.3] - 2026-04-25
 

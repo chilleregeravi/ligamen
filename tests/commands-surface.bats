@@ -15,7 +15,7 @@ setup() {
   # `verify` and `update` shipped in v0.1.3, `list` ships in v0.1.4 (NAV-01),
   # `view` ships in v0.1.4 (NAV-02), and `doctor` ships in v0.1.4 (NAV-03 —
   # this plan, 114-03).
-  for cmd in map drift impact sync login status export verify update list view doctor; do
+  for cmd in map drift impact sync login status export verify update list view doctor diff; do
     [ -f "$PLUGIN_DIR/commands/$cmd.md" ] || {
       echo "MISSING: commands/$cmd.md"
       return 1
@@ -24,7 +24,7 @@ setup() {
 }
 
 @test "CLN-09: all surviving commands have description frontmatter" {
-  for cmd in map drift impact sync login status export verify update list view doctor; do
+  for cmd in map drift impact sync login status export verify update list view doctor diff; do
     run grep -c '^description:' "$PLUGIN_DIR/commands/$cmd.md"
     [ "$status" -eq 0 ]
     [ "$output" -ge 1 ]
@@ -122,4 +122,19 @@ setup() {
 # positively assert the dispatch path is intact.
 @test "NAV-03: worker/cli/hub.js registers doctor: cmdDoctor" {
   grep -q 'doctor: cmdDoctor' "$PLUGIN_DIR/worker/cli/hub.js"
+}
+
+# NAV-04 (115-02): /arcanon:diff must declare allowed-tools: Bash and
+# the Node-side handler must be registered.
+@test "NAV-04: /arcanon:diff declares allowed-tools: Bash" {
+  [ -f "$PLUGIN_DIR/commands/diff.md" ]
+  run grep -E '^description:' "$PLUGIN_DIR/commands/diff.md"
+  [ "$status" -eq 0 ]
+  run grep -E '^allowed-tools:' "$PLUGIN_DIR/commands/diff.md"
+  [ "$status" -eq 0 ]
+  grep -q 'Bash' "$PLUGIN_DIR/commands/diff.md"
+}
+
+@test "NAV-04: worker/cli/hub.js registers diff: cmdDiff" {
+  grep -q 'diff: cmdDiff' "$PLUGIN_DIR/worker/cli/hub.js"
 }
