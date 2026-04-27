@@ -183,14 +183,15 @@ async function cmdStatus(flags) {
     }
   })();
 
-  // TRUST-05: best-effort latest-scan quality. Resolves the worker port from
-  // <dataDir>/worker.port (mirrors the cmdVerify pattern), GETs the new
-  // /api/scan-quality endpoint with a 2-second timeout, and formats the line
-  // per CONTEXT D-01:
-  //   "Latest scan: NN% high-confidence (S services, C connections)"
-  // Falls back silently to null on any error — the worker may be offline,
-  // unreachable, or running an older version without the endpoint.
-  const latestScan = await _fetchLatestScanLine(process.cwd());
+  // FRESH-01/02 (Phase 116-02): best-effort latest-scan freshness via the new
+  // /api/scan-freshness endpoint. Surfaces both the quality line ("Latest scan:
+  // YYYY-MM-DD (NN% high-confidence)") and the per-repo drift line ("N repo(s)
+  // have new commits since last scan: <name> (M new), ..."). The drift line is
+  // suppressed when no repo has positive new_commits. Falls back silently to
+  // null on any error — worker offline / unreachable / old build without the
+  // endpoint. The /api/scan-quality route stays in place for back-compat but
+  // is no longer consumed by /arcanon:status.
+  const freshness = await _fetchScanFreshness(process.cwd());
 
   const report = {
     plugin_version: readPackageVersion(),
@@ -200,7 +201,7 @@ async function cmdStatus(flags) {
     hub_auto_sync: hubAutoSync,
     credentials: hasCreds ? "present" : "missing",
     queue: stats,
-    latest_scan: latestScan?.report ?? null,
+    scan_freshness: freshness?.report ?? null,
   };
 
   if (flags.json) {
@@ -215,24 +216,36 @@ async function cmdStatus(flags) {
     `  queue:        ${stats.pending} pending, ${stats.dead} dead${stats.oldestPending ? `, oldest ${stats.oldestPending}` : ""}`,
     `  data dir:     ${report.data_dir}`,
   ];
-  if (latestScan?.line) {
-    lines.push(`  ${latestScan.line}`);
+  if (freshness?.qualityLine) {
+    lines.push(`  ${freshness.qualityLine}`);
+  }
+  for (const line of freshness?.freshnessLines ?? []) {
+    lines.push(`  ${line}`);
   }
   emit(report, flags, lines.join("\n"));
 }
 
 /**
- * Fetches the latest-scan quality breakdown from the worker and formats it
- * for the /arcanon:status output (TRUST-05, CONTEXT D-01).
+ * Fetches scan freshness data from the worker (FRESH-03/04). Returns formatted
+ * status output lines plus the raw report for --json mode. Best-effort:
+ * returns null on any failure (worker offline, no scan data, network error,
+ * old worker without the endpoint). Callers MUST tolerate a null return —
+ * status output gracefully omits both freshness lines.
  *
- * Best-effort: returns null on any failure (worker offline, no scan data,
- * old worker without the endpoint, network error). Callers MUST tolerate a
- * null return — the status output gracefully omits the line.
+ * Output:
+ *   qualityLine     — "Latest scan: 2026-04-23 (87% high-confidence)" (FRESH-01)
+ *   freshnessLines  — ["1 repo has new commits since last scan: api (3 new)"]
+ *                     Empty array when no repo has positive new_commits drift.
+ *   report          — raw JSON for --json mode
  *
- * @param {string} projectRoot - Absolute path passed as ?project= to the worker
- * @returns {Promise<{ line: string, report: object } | null>}
+ * @param {string} projectRoot - Absolute path to the project root
+ * @returns {Promise<{
+ *   qualityLine: string,
+ *   freshnessLines: string[],
+ *   report: object,
+ * } | null>}
  */
-async function _fetchLatestScanLine(projectRoot) {
+async function _fetchScanFreshness(projectRoot) {
   let workerPort = 37888;
   try {
     const portFile = path.join(resolveDataDir(), "worker.port");
@@ -246,7 +259,7 @@ async function _fetchLatestScanLine(projectRoot) {
     }
   }
 
-  const url = `http://127.0.0.1:${workerPort}/api/scan-quality?project=${encodeURIComponent(projectRoot)}`;
+  const url = `http://127.0.0.1:${workerPort}/api/scan-freshness?project=${encodeURIComponent(projectRoot)}`;
 
   // 2-second timeout — consistent with worker-client.sh worker_running().
   const controller = new AbortController();
@@ -270,11 +283,24 @@ async function _fetchLatestScanLine(projectRoot) {
   }
   if (!body || body.error) return null;
 
-  const pct = body.quality_score === null
+  // FRESH-01 line: "Latest scan: 2026-04-23 (87% high-confidence)"
+  const datePart = (body.last_scan_iso || "").slice(0, 10) || "unknown";
+  const pctPart = body.scan_quality_pct === null || body.scan_quality_pct === undefined
     ? "n/a"
-    : `${Math.round(body.quality_score * 100)}%`;
-  const line = `Latest scan: ${pct} high-confidence (${body.service_count} services, ${body.total_connections} connections)`;
-  return { line, report: body };
+    : `${body.scan_quality_pct}% high-confidence`;
+  const qualityLine = `Latest scan: ${datePart} (${pctPart})`;
+
+  // FRESH-02 line(s): "N repo(s) have new commits since last scan: <name> (M new), ..."
+  // Suppressed entirely when no repo has positive new_commits.
+  const repos = Array.isArray(body.repos) ? body.repos : [];
+  const drifted = repos.filter((r) => Number.isInteger(r.new_commits) && r.new_commits > 0);
+  const freshnessLines = [];
+  if (drifted.length > 0) {
+    const noun = drifted.length === 1 ? "repo has" : "repos have";
+    const detail = drifted.map((r) => `${r.name} (${r.new_commits} new)`).join(", ");
+    freshnessLines.push(`${drifted.length} ${noun} new commits since last scan: ${detail}`);
+  }
+  return { qualityLine, freshnessLines, report: body };
 }
 
 /**
