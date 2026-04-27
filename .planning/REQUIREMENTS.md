@@ -124,7 +124,8 @@ New `scan_overrides` table. New `/arcanon:correct` command. New `/arcanon:rescan
 
 Run a scan to a separate DB namespace; diff vs live; promote when ready.
 
-- [ ] **SHADOW-01**: `/arcanon:shadow-scan` writes to `$ARCANON_DATA_DIR/projects/<hash>/impact-map-shadow.db` instead of `impact-map.db`. Same scan code path, different DB target via env var or scan flag.
+- [x] **SHADOW-01
+**: `/arcanon:shadow-scan` writes to `$ARCANON_DATA_DIR/projects/<hash>/impact-map-shadow.db` instead of `impact-map.db`. Same scan code path, different DB target via env var or scan flag.
 
 - [ ] **SHADOW-02**: `/arcanon:diff --shadow` compares shadow vs live for the current project (or `--shadow <projectA>` for a specific project).
 
