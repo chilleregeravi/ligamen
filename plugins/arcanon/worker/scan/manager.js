@@ -888,8 +888,14 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     results.push({ repoPath: r.repoPath, mode: r.mode, findings: r.findings });
   }
 
+  // SHADOW-01 (T-119-01-06): when called from /scan-shadow, callers set
+  // options.skipHubSync=true to suppress upload of synthetic shadow data.
+  // Default behaviour for live scans (no flag) is unchanged.
   // HUB-01: Optional Arcanon Hub sync — opt-in via ARCANON_API_KEY or config.hub.auto-sync.
   // Runs per-repo, fire-and-log — a hub failure never fails the scan.
+  if (options.skipHubSync) {
+    slog('INFO', 'hub auto-sync skipped — caller requested skipHubSync (shadow scan)');
+  } else {
   try {
     const { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled } = _readHubConfig();
     // Credential check spans env vars AND ~/.arcanon/config.json so that
@@ -953,6 +959,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
   } catch (err) {
     slog('WARN', 'hub sync skipped', { error: err.message });
   }
+  } // end else (options.skipHubSync) — SHADOW-01
 
   // SCAN-01: Emit END event with totals and wall-clock duration
   const totalServices = results.reduce((n, r) => n + (Array.isArray(r.findings?.services) ? r.findings.services.length : 0), 0);

@@ -70,9 +70,17 @@ setExtractorLogger(logger);
 if (process.env.ARCANON_TEST_AGENT_RUNNER) {
   setAgentRunner(async (_prompt, _repoPath) => {
     // Stub returns the minimal-valid agent output: a fenced ```json block
-    // wrapping an object with empty services/connections arrays. Both the
-    // discovery pass and the deep scan share the same runner; both accept
-    // this shape (parseAgentOutput tolerates empty arrays).
+    // wrapping an object with empty services/connections/schemas arrays.
+    // Both the discovery pass and the deep scan share the same runner.
+    //
+    // SHADOW-01 fix (Plan 119-01): added `schemas: []`. parseAgentOutput
+    // requires schemas to be a present array (worker/scan/findings.js:105).
+    // Without it, every stubbed scan returns findings:null and persistFindings
+    // is skipped — meaning shadow scans never write to the shadow DB. The
+    // 118-02 rescan tests didn't catch this because they assert on
+    // scan_versions COUNT (which beginScan increments before the parse
+    // failure). Shadow tests assert on the shadow_db_path file existence,
+    // and would silently pass with an empty file.
     return [
       "```json",
       JSON.stringify({
@@ -81,6 +89,7 @@ if (process.env.ARCANON_TEST_AGENT_RUNNER) {
         service_hints: [],
         services: [],
         connections: [],
+        schemas: [],
       }),
       "```",
     ].join("\n");

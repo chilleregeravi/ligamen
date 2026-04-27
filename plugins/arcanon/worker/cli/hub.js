@@ -1704,6 +1704,120 @@ async function cmdRescan(flags, positional) {
   );
 }
 
+/**
+ * cmdShadowScan — SHADOW-01 (Phase 119-01).
+ *
+ * Triggers a scan that writes into the project's SHADOW DB
+ * (impact-map-shadow.db) instead of the live impact-map.db. Same scan code
+ * path as /arcanon:map; the routing happens server-side via the
+ * getShadowQueryEngine pool helper. Live DB is byte-untouched.
+ *
+ * Behaviour (per PLAN 119-01 Task 2):
+ *   - Silent no-op when no impact-map.db at the project hash dir (NAV-01 contract).
+ *   - One-line stderr warning if a shadow DB already exists, then proceeds.
+ *   - POSTs to 127.0.0.1:${WORKER_PORT}/scan-shadow?project=<encoded-cwd>.
+ *   - Forwards --full as { options: { full: true } }.
+ *   - Human output: "Shadow scan complete (N repos scanned). Shadow DB: <path>\n
+ *     Next: /arcanon:diff --shadow to compare, /arcanon:promote-shadow to swap."
+ *   - --json: forwards the full server response { shadow_db_path, results, reused_existing }.
+ *
+ * Exit codes (mirrors cmdRescan):
+ *   0 — scan ran
+ *   1 — worker not running OR scan threw
+ *   2 — invocation error (currently no positional args, but reserved)
+ */
+async function cmdShadowScan(flags) {
+  const cwd = process.cwd();
+  const dbPath = path.join(projectHashDir(cwd), "impact-map.db");
+  if (!fs.existsSync(dbPath)) {
+    process.exit(0); // silent contract (NAV-01 / CORRECT-04 parity)
+  }
+
+  // Pre-check: warn if shadow DB already exists. The server overwrites in
+  // place; warning is non-interactive (RESEARCH §6 Q4).
+  const shadowPath = path.join(projectHashDir(cwd), "impact-map-shadow.db");
+  const reusedExistingHint = fs.existsSync(shadowPath);
+  if (reusedExistingHint) {
+    process.stderr.write(
+      "warn: Existing shadow DB will be overwritten. " +
+        "Use /arcanon:promote-shadow first if you want to keep it.\n",
+    );
+  }
+
+  // Resolve worker port (mirrors cmdRescan / cmdVerify pattern).
+  let workerPort = 37888;
+  try {
+    const portFile = path.join(resolveDataDir(), "worker.port");
+    const raw = fs.readFileSync(portFile, "utf8").trim();
+    const parsed = Number(raw);
+    if (Number.isInteger(parsed) && parsed > 0) workerPort = parsed;
+  } catch {
+    if (process.env.ARCANON_WORKER_PORT) {
+      const parsed = Number(process.env.ARCANON_WORKER_PORT);
+      if (Number.isInteger(parsed) && parsed > 0) workerPort = parsed;
+    }
+  }
+
+  // Build POST body — forward --full when present.
+  const body = {};
+  if (flags.full) body.options = { full: true };
+
+  const params = new URLSearchParams();
+  params.set("project", cwd);
+  const url = `http://127.0.0.1:${workerPort}/scan-shadow?${params.toString()}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const msg = `worker not running — run /arcanon:status to check, then /arcanon:map to start it (${err.message})`;
+    if (flags.json) {
+      emit({ ok: false, error: msg }, flags);
+    } else {
+      process.stderr.write(`error: ${msg}\n`);
+    }
+    process.exit(1);
+  }
+
+  let respBody;
+  try {
+    respBody = await response.json();
+  } catch (err) {
+    process.stderr.write(`error: invalid response from worker: ${err.message}\n`);
+    process.exit(1);
+  }
+
+  if (!response.ok) {
+    const errMsg = respBody?.error || `HTTP ${response.status}`;
+    if (flags.json) {
+      emit(
+        { ok: false, error: errMsg, status: response.status, ...(respBody || {}) },
+        flags,
+      );
+    } else {
+      process.stderr.write(`error: shadow scan failed: ${errMsg}\n`);
+    }
+    process.exit(1);
+  }
+
+  // Success.
+  const resultsLen = Array.isArray(respBody.results) ? respBody.results.length : 0;
+  emit(
+    {
+      shadow_db_path: respBody.shadow_db_path,
+      results: respBody.results,
+      reused_existing: respBody.reused_existing,
+    },
+    flags,
+    `Shadow scan complete (${resultsLen} repo${resultsLen === 1 ? "" : "s"} scanned). Shadow DB: ${respBody.shadow_db_path}\n` +
+      "Next: /arcanon:diff --shadow to compare, /arcanon:promote-shadow to swap.",
+  );
+}
+
 const HANDLERS = {
   version: cmdVersion,
   login: cmdLogin,
@@ -1717,6 +1831,7 @@ const HANDLERS = {
   diff: cmdDiff,     // NAV-04
   correct: cmdCorrect, // CORRECT-02 stage path (Phase 118-01)
   rescan: cmdRescan,   // CORRECT-04 / CORRECT-05 (Phase 118-02)
+  "shadow-scan": cmdShadowScan, // SHADOW-01 (Phase 119-01) — hyphenated key matches the slash-command name
 };
 
 async function main() {

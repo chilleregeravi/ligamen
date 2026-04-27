@@ -4,7 +4,7 @@ import fastifyCors from "@fastify/cors";
 import path from "path";
 import fs from "node:fs";
 import { fileURLToPath } from "url";
-import { listProjects, getQueryEngineByHash } from "../db/pool.js";
+import { listProjects, getQueryEngineByHash, getShadowQueryEngine } from "../db/pool.js";
 import { resolveConfigPath } from "../lib/config-path.js";
 import { getCommitsSince } from "../scan/git-state.js";
 
@@ -651,6 +651,149 @@ async function createHttpServer(queryEngine, options = {}) {
       httpLog('ERROR', err.message, { route: '/scan', stack: err.stack });
       return reply.code(500).send({ error: err.message });
     }
+  });
+
+  // 6a. POST /scan-shadow — scan into the project's SHADOW DB (SHADOW-01, Plan 119-01).
+  //
+  //   Mirrors POST /scan but routes writes to ${projectHashDir(root)}/impact-map-shadow.db
+  //   via getShadowQueryEngine(root, {create: true}). The live impact-map.db is
+  //   byte-untouched. Same scan code path (manager.js scanRepos) — the QE
+  //   argument is the only thing that changes.
+  //
+  //   Query: project=<absolute-root>
+  //   Body:  { repoPaths?: string[], options?: { full?: boolean } } — same shape as /scan.
+  //          When repoPaths omitted, every repo registered in the LIVE DB's
+  //          repos table is scanned (mirrors /arcanon:map's "all linked repos"
+  //          behaviour). The shadow DB starts empty so it has no repo list yet.
+  //
+  //   200 { ok: true, shadow_db_path: <abs>, reused_existing: <bool>, results: [...] }
+  //   400 { error: "missing required param: project" }
+  //   500 { error: <msg> }
+  //
+  //   *** GUARD RAIL ***
+  //   The shadow QE is uncached and never re-used (RESEARCH §1 / pool.js).
+  //   It MUST be closed in finally — failing to close leaks fds and prevents
+  //   the file from being renamed during /arcanon:promote-shadow (Plan 119-02).
+  //
+  //   *** HUB-SYNC SUPPRESSION ***
+  //   options.skipHubSync=true is forced here (T-119-01-06) so synthetic
+  //   shadow data NEVER uploads to the Arcanon Hub. Caller-supplied options
+  //   are merged but skipHubSync wins.
+  fastify.post("/scan-shadow", async (request, reply) => {
+    const projectRoot = request.body?.project || request.query?.project;
+    if (typeof projectRoot !== "string" || projectRoot.length === 0) {
+      return reply
+        .code(400)
+        .send({ error: "missing required param: project" });
+    }
+
+    // Detect whether shadow DB already exists BEFORE creating it (for the
+    // reused_existing flag returned in the response).
+    let reusedExisting = false;
+    let shadowDbPath = null;
+    try {
+      // Resolve the would-be shadow path purely so we can stat it before open.
+      // getShadowQueryEngine itself does not expose the path — we re-derive it
+      // here using the same projectHashDir convention. Cheap; runs once per call.
+      const { default: crypto } = await import("crypto");
+      const dataDirMod = await import("../lib/data-dir.js");
+      const hashed = crypto
+        .createHash("sha256")
+        .update(projectRoot)
+        .digest("hex")
+        .slice(0, 12);
+      shadowDbPath = path.join(
+        dataDirMod.resolveDataDir(),
+        "projects",
+        hashed,
+        "impact-map-shadow.db",
+      );
+      reusedExisting = fs.existsSync(shadowDbPath);
+    } catch {
+      /* fall through — non-fatal; reused_existing will report false */
+    }
+
+    // Resolve repoPaths: either caller-supplied OR derived from the LIVE DB's
+    // repos table (matches /arcanon:map's "all linked repos" semantics).
+    //
+    // *** READ-ONLY OPEN ***
+    // We deliberately open the live DB through a fresh READONLY better-sqlite3
+    // handle here instead of going through resolve(projectRoot) → getQueryEngine.
+    // Going through the pool would (a) cache a writable handle on the live path
+    // and (b) flip its journal_mode pragma to WAL, which writes the WAL header
+    // bytes back to the live file. That mutation would BREAK the byte-identity
+    // contract asserted in tests/shadow-scan.bats Test 8 (live impact-map.db
+    // sha256 must match before/after a shadow scan). The readonly open is
+    // strictly observational — no pragma writes, no sidecar creation.
+    const callerOpts = request.body?.options || {};
+    let repoPaths = Array.isArray(request.body?.repoPaths) ? request.body.repoPaths : null;
+    if (repoPaths === null && shadowDbPath) {
+      const liveDbPath = path.join(path.dirname(shadowDbPath), "impact-map.db");
+      if (fs.existsSync(liveDbPath)) {
+        let readonlyDb = null;
+        try {
+          const { default: Database } = await import("better-sqlite3");
+          readonlyDb = new Database(liveDbPath, { readonly: true });
+          // Do NOT set journal_mode on a readonly connection — readonly
+          // disallows writes including the pragma metadata write.
+          repoPaths = readonlyDb.prepare("SELECT path FROM repos").pluck().all();
+        } catch {
+          repoPaths = [];
+        } finally {
+          try { if (readonlyDb) readonlyDb.close(); } catch { /* ignore */ }
+        }
+      } else {
+        repoPaths = [];
+      }
+    }
+    if (!Array.isArray(repoPaths)) repoPaths = [];
+
+    if (repoPaths.length === 0) {
+      return reply.code(400).send({
+        error: "no repos to scan — pass repoPaths in body OR run /arcanon:map first to populate the live DB's repos table",
+      });
+    }
+
+    const shadowQE = getShadowQueryEngine(projectRoot, { create: true });
+    if (!shadowQE) {
+      return reply
+        .code(500)
+        .send({ error: "failed to open shadow QueryEngine" });
+    }
+
+    let results;
+    try {
+      const { scanRepos } = await import("../scan/manager.js");
+      // T-119-01-06: skipHubSync=true forces hub-sync suppression. Caller-
+      // supplied options can NOT override this (we spread caller first, then
+      // overwrite skipHubSync).
+      const mergedOpts = { ...callerOpts, skipHubSync: true };
+      results = await scanRepos(repoPaths, mergedOpts, shadowQE);
+    } catch (err) {
+      // Same agent-runner gap as /api/rescan (118-02). Surface as 503 with
+      // the same message so the operator sees a known bootstrap issue.
+      try { shadowQE._db.close(); } catch { /* already closed */ }
+      if (err && /agentRunner not initialized/i.test(String(err.message))) {
+        return reply.code(503).send({
+          error:
+            "worker bootstrap incomplete: agentRunner not initialized — shadow scan requires an agent runner injection (use ARCANON_TEST_AGENT_RUNNER=1 for tests, or run /arcanon:map from the host)",
+        });
+      }
+      httpLog('ERROR', err.message, { route: '/scan-shadow', stack: err.stack });
+      return reply.code(500).send({ ok: false, error: err.message });
+    }
+
+    // Always-fresh contract — close the QE deterministically. The finally-style
+    // close runs on the success path here (the catch branch above closes on
+    // failure). Either way, no fd leaks survive past this handler.
+    try { shadowQE._db.close(); } catch { /* already closed */ }
+
+    return reply.code(200).send({
+      ok: true,
+      shadow_db_path: shadowDbPath,
+      reused_existing: reusedExisting,
+      results,
+    });
   });
 
   // 6b. POST /api/rescan — re-scan exactly one repo (CORRECT-04, Plan 118-02)
