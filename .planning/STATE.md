@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.1.5
 milestone_name: Identity & Privacy
-status: defining requirements
-stopped_at: Awaiting requirements definition + roadmap for v0.1.5
-last_updated: "2026-04-27T20:43:00.000Z"
+status: roadmap approved
+stopped_at: Awaiting Phase 123 plan (PII Path Masking — first phase, ships independently of hub-side THE-1030)
+last_updated: "2026-04-27T23:05:00.000Z"
 last_activity: 2026-04-27
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 9
   completed_plans: 0
   percent: 0
 ---
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-27)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 123 (PII Path Masking) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-27 — Milestone v0.1.5 started
+Status: Roadmap approved (5 phases, 21 REQs, ~9 plans estimated). Awaiting Phase 123 plan.
+Last activity: 2026-04-27 — v0.1.5 roadmap created (phases 123-127); 10 pre-flight notes attached for high/medium predecessor-audit risks (C1, C2, C3, C4, C5, S1, S2, M1, X1, L1, X2)
 
 ## Performance Metrics
 
@@ -57,14 +57,20 @@ Last activity: 2026-04-27 — Milestone v0.1.5 started
 - **Auto-default-org via `whoami` at login** — forcing user to type a UUID is hostile; hub knows which orgs the key is authorized for.
 - **Mask `$HOME` at egress seams, not in DB** — DB needs absolute paths for git operations; masking-at-egress preserves runtime correctness while closing the third-party leak (MCP → Anthropic).
 - **THE-1029 ships only after hub-side THE-1030 lands** — brief upload outage between merges accepted (nothing has shipped publicly).
+- **Phase 123 (PII) ordered first** — independent of hub-side THE-1030; ships even if the hub PR slips. Phases 124-127 sequenced behind the hub deploy.
+- **AUTH-01 + AUTH-03 + AUTH-05 land in one phase (124)** — coupled signature/contract block per predecessor-audit C1+X1; AUTH-02 included in same phase since AUTH-06 depends on it.
+- **`hasCredentials()` semantics in C2** — to be decided at Phase 124 plan-phase: option (a) tolerate missing org_id and defer throw to upload time, OR option (b) tighten and surface a manager.js WARN when auto-sync gates off. Plan-phase picks one explicitly.
+- **AUTH-08 server error JSON shape** — coordinate at Phase 125 plan-phase with arcanon-hub THE-1030 owner; expected RFC 7807 `{type, title, status, detail, code}`.
+- **PII-04 logger seam** — single masking edit at `worker/lib/logger.js:42–68` between `Object.assign` and `JSON.stringify`; NOT 30 call-site edits.
+- **PII-03 routes** — REQUIREMENTS.md mentions `/api/repos`; the actual surface is `GET /projects` plus `repos[].path` arrays nested inside `/api/scan-freshness` and `/graph` response bodies. Plan must target the correct routes.
 
 ### Pending Todos
 
-None. Awaiting requirements definition + roadmap.
+None. Phase 123 plan is next.
 
 ### Blockers/Concerns
 
-- **THE-1029 hard-blocked by arcanon-hub THE-1030** (server-side personal-credential rewrite + `whoami` endpoint + `X-Org-Id` enforcement). Coordinate merge order so the hub PR lands first.
+- **THE-1029 hard-blocked by arcanon-hub THE-1030** (server-side personal-credential rewrite + `whoami` endpoint + `X-Org-Id` enforcement). Coordinate merge order so the hub PR lands first. Phase 123 (PII) is independent and can ship before the hub deploy lands.
 - macOS HOK-06 hook p99 latency caveat — platform constraint carried over from v0.1.1; CI uses threshold=100, not a regression.
 
 ## Deferred Items
@@ -79,6 +85,6 @@ These are operator-facing manual scenarios — phase 114 automated VERIFICATION.
 
 ## Session Continuity
 
-Last session: 2026-04-27T20:43:00.000Z
-Stopped at: Awaiting requirements definition + roadmap for v0.1.5
-Resume file: None
+Last session: 2026-04-27T23:05:00.000Z
+Stopped at: Roadmap approved; awaiting Phase 123 plan (PII Path Masking)
+Resume file: .planning/ROADMAP.md (Phase 123 details)

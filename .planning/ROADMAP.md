@@ -24,6 +24,7 @@
 - ✅ **v0.1.2 Ligamen Residue Purge** — Phases 101-105 (shipped 2026-04-23)
 - ✅ **v0.1.3 Trust & Foundations** — Phases 107-113 (shipped 2026-04-25)
 - ✅ **v0.1.4 Operator Surface** — Phases 114-122 (shipped 2026-04-27)
+- 🚧 **v0.1.5 Identity & Privacy** — Phases 123-127 (in progress)
 
 ## Phases
 
@@ -222,6 +223,17 @@ Full details: `.planning/milestones/v0.1.3-ROADMAP.md`
 - [x] Phase 114-122: 9 phases, 21 plans — 9 new operator slash commands (`/list`, `/view`, `/doctor`, `/diff`, `/correct`, `/rescan`, `/shadow-scan`, `/promote-shadow`, `/diff --shadow`); universal `--help` system via `lib/help.sh`; per-repo git-commits-since-scan freshness via new `GET /api/scan-freshness`; scan-corrections workflow (`scan_overrides` table mig 017, `applyPendingOverrides` apply-hook); validate-before-commit shadow-DB pattern (atomic POSIX rename with WAL sidecars); hub payload v1.2 envelope (byte-identical for v1.1 callers via Test M11); offline + explicit-spec drift; `known-externals.yaml` curated catalog with user `external_labels` extension and `actors.label` migration 018. Architectural correction at release prep: `/arcanon:rescan` and `/arcanon:shadow-scan` re-shaped from worker-HTTP to markdown-orchestrated (cloning `/arcanon:map`'s pattern), eliminating production agent-runner gap. Zero deferred items at ship.
 
 Full details: `.planning/milestones/v0.1.4-ROADMAP.md`
+
+</details>
+
+<details open>
+<summary>🚧 v0.1.5 Identity & Privacy (Phases 123-127) — IN PROGRESS</summary>
+
+- [ ] **Phase 123: PII Path Masking** — `worker/lib/path-mask.js` + apply at MCP / HTTP / logger / export egress seams + agent contract assertion + tests (PII-01..07). INDEPENDENT of hub-side THE-1030 — ships first to give the milestone shippable scope even if the hub PR slips.
+- [ ] **Phase 124: Hub Auth Core** — `uploadScan` `X-Org-Id` header + `whoami` client + `resolveCredentials` precedence chain + `~/.arcanon/config.json` `default_org_id` field + per-repo `hub.org_id` override (AUTH-01..05). Coupled signature/contract block — must land in one phase.
+- [ ] **Phase 125: Login & Status UX** — `/arcanon:login [--org-id]` whoami flow + `/arcanon:status` Identity block + structured server error-code parsing + docs (AUTH-06..09).
+- [ ] **Phase 126: Auth Test Suite** — `client.test.js`, `whoami.test.js`, `integration.test.js` covering header landing, missing-orgId fail-fast, error-code-to-message mapping, login flow, resolution-order precedence (AUTH-10).
+- [ ] **Phase 127: Verification & Release Gate** — manifest bumps to 0.1.5, CHANGELOG `[0.1.5]`, full bats + node green, end-to-end verification against a hub instance honoring THE-1030 (VER-01..04).
 
 </details>
 
@@ -697,6 +709,98 @@ Plans:
 
 <!-- v0.1.3 phase details archived to .planning/milestones/v0.1.3-ROADMAP.md -->
 
+---
+
+## v0.1.5 Identity & Privacy (Phases 123-127) — IN PROGRESS
+
+### Phase 123: PII Path Masking
+**Goal**: `$HOME` paths no longer leak from the worker process — every egress seam (MCP responses, HTTP responses, log lines, export outputs) emits `~`-prefixed paths, and the agent contract is hardened against future regressions
+**Depends on**: Phase 122 (v0.1.4 complete) — INDEPENDENT of hub-side THE-1030; ships first to give the milestone shippable scope
+**Requirements**: PII-01, PII-02, PII-03, PII-04, PII-05, PII-06, PII-07
+**Success Criteria** (what must be TRUE):
+  1. After a clean scan, an MCP tool call (`impact_query`, `impact_changed`, `impact_graph`, `impact_search`, `impact_scan`) returns a response containing zero `/Users/` or `/home/` strings — `repo_path`, `root_path`, `source_file`, and `target_file` are all `~`-prefixed
+  2. After a clean scan, the worker log file at `~/.arcanon/logs/worker.log` contains zero absolute `$HOME` paths — stack traces and `extra` fields are masked
+  3. Default-mode `/arcanon:export` outputs (mermaid, dot, html) contain zero `/Users/` or `/home/` strings
+  4. The `GET /graph`, `GET /api/scan-freshness`, and `GET /projects` HTTP responses contain zero absolute `$HOME` paths in any nested `repos[].path` array or per-service `repo_path` field
+  5. When the scanning agent emits a connection with an absolute `source_file`, the field is dropped with a WARN log and the connection still persists with the rest of its fields intact (the scan does not fail)
+**Plans**: TBD (estimate 3 plans — Wave-1 helper module + tests, Wave-2 four egress seams in parallel, Wave-3 agent contract assertion + integration tests)
+
+**Plan-phase pre-flight requirement (from predecessor audit):**
+
+- *(S1, PII-02)*: Plan must verify `maskHome` is idempotent on already-relative paths emitted by the agent (`agent-prompt-service.md:104` shows `root_path` as `src/`). The agent contract is documented to emit relative paths; PII-06 hardens this. Add a unit test under PII-07 confirming an already-relative path round-trips through `maskHome` unchanged. Verify a Claude-tool-call's downstream consumer (the `Explore` agent prompts in `agent-prompt-*.md`) still works with `~`-prefixed paths.
+
+- *(S2, PII-03)*: Plan must spec a single bats grep-assertion against `cmdStatus` JSON output (hub.js:196) confirming no `/Users/` or `/home/` strings escape after a clean scan. `session-start.sh` is confirmed not to render `repos[].path` today (grep returns 0 hits) so no script edit is needed; pin this as a structural regression guard in `commands-surface.bats`. **REQUIREMENTS.md note:** PII-03's REQ wording references `/api/repos`, but that route does not exist on the worker. The actual surface is `GET /projects` (project-list) plus the `repos[]` array nested inside `/api/scan-freshness` and `/graph` response bodies — target those routes.
+
+- *(M1, PII-04)*: Plan must add masking as a **single seam** in `worker/lib/logger.js` between lines 59 and 60 (after `Object.assign(lineObj, extra)`, before `JSON.stringify`). Do NOT add masking calls at the ~30 logger call sites scattered across `worker/`. Stack-trace masking: `extra.stack` is a string; `maskHomeDeep` must mask string values, not just keyed paths. Add a unit test asserting log line contains `~/path/to/repo` not `/Users/me/path/to/repo` after `logger.info('x', {stack: '/Users/me/foo.js:42'})`.
+
+- *(X2, PII-06)*: No composition risk with `applyPendingOverrides` (PII-06 fires at `parseAgentOutput`, well before `persistFindings`). Plan must spec: rejection logs WARN with the masked offending value, drops just the `source_file` field (not the whole connection), does not fail the scan. Belt-and-suspenders only — agent contract already mandates relative paths per `agent-prompt-service.md:89`.
+
+### Phase 124: Hub Auth Core
+**Goal**: Every scan upload carries `X-Org-Id` derived from a deterministic precedence chain (per-repo override → env → machine default), backed by a `whoami`-aware client and a config-file extension that preserves existing keys
+**Depends on**: Phase 123 (sequential — auth changes follow PII to keep diffs small) — HARD-DEPENDENT on hub-side arcanon-hub THE-1030 deploy
+**Requirements**: AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05
+**Success Criteria** (what must be TRUE):
+  1. Calling `uploadScan(payload, {apiKey, hubUrl, orgId})` sends an `X-Org-Id: <orgId>` header on the POST to `${hubUrl}/api/v1/scans/upload`; calling without `orgId` throws `HubError(status=400, code='missing_org_id')` **before** the network attempt
+  2. Calling `getKeyInfo(apiKey, hubUrl)` against a hub honoring THE-1030 returns a populated `{ user_id, key_id, scopes, grants }` object; auth failures throw `AuthError`; transport failures throw `HubError`
+  3. `resolveCredentials(opts)` returns `{ apiKey, hubUrl, orgId, source }` honoring the precedence `opts.orgId` → `ARCANON_ORG_ID` → `~/.arcanon/config.json#default_org_id`; missing org id throws an `AuthError` whose message names all three sources and recommends `/arcanon:login --org-id <uuid>`
+  4. Re-running `storeCredentials(apiKey, {hubUrl, defaultOrgId})` on an existing config preserves any unrelated keys via spread-merge; mode-0600 file permission preserved
+  5. Setting `hub.org_id` in a per-repo `arcanon.config.json` causes that repo's scan upload to send the override even when `ARCANON_ORG_ID` is set globally — per-repo beats env beats machine default
+**Plans**: TBD (estimate 2 plans — Plan A: AUTH-03 + AUTH-01 + AUTH-05 coupled signature/contract, Plan B: AUTH-02 whoami client + AUTH-04 storage extension; ordering within phase is AUTH-03 first per C1)
+
+**Plan-phase pre-flight requirement (from predecessor audit):**
+
+- *(C1, AUTH-01)*: Plan must sequence AUTH-03 before AUTH-01: AUTH-03 expands `resolveCredentials` return shape with `orgId`; AUTH-01 then reads `creds.orgId` at the 2 `worker/hub-sync/index.js` call sites (lines 71, 146). Confirm zero callers destructure with `Object.keys` or otherwise depend on field-set parity. AUTH-01, AUTH-03, AUTH-05 are a coupled signature/contract block — none is buildable alone; they must land together in this phase.
+
+- *(C2, AUTH-03)*: Plan must spec how `hasCredentials()` (auth.js:120) handles missing-org-id. Two options: **(a)** keep `hasCredentials()` returning true when `api_key` resolves but `org_id` doesn't — defer the throw to upload time; **(b)** tighten `hasCredentials()` to require `org_id`, with a `manager.js:941` WARN when auto-sync gates off. Pick (a) or (b) explicitly and document the choice. The HUB-01 auto-sync gate (manager.js:941, 949) MUST surface why uploads are silently skipped — silent gating is a regression.
+
+- *(C3, AUTH-04)*: Plan must verify `storeCredentials`' existing spread-merge (`{...existing, api_key}` at auth.js:137) preserves `default_org_id` when only `api_key` is being rewritten. Add a unit test pinning: writing `api_key` on top of `{api_key, hub_url, default_org_id}` keeps all three. CHANGELOG `### BREAKING` entry must call out the upgrade path: existing v0.1.4 users will fail on next `/arcanon:sync` until they re-run `/arcanon:login` (or `/arcanon:login --org-id <uuid>`).
+
+- *(X1, AUTH-05)*: Plan must thread `orgId` through `manager.js:937` destructure and `manager.js:962` `syncFindings` call. Confirm the `_readHubConfig` return shape extension doesn't break `manager.test.js` fixtures. Phase ordering: AUTH-03 + AUTH-01 + AUTH-05 land together in this single phase; landing AUTH-05 alone won't compile.
+
+### Phase 125: Login & Status UX
+**Goal**: Users get a guided `/arcanon:login` flow that auto-resolves org id from `whoami`, see their resolved identity in `/arcanon:status`, and receive actionable error messages on every server-side auth failure
+**Depends on**: Phase 124 (`whoami` client + `resolveCredentials` shape required)
+**Requirements**: AUTH-06, AUTH-07, AUTH-08, AUTH-09
+**Success Criteria** (what must be TRUE):
+  1. Running `/arcanon:login arc_xxx` against a hub where the key has exactly one grant auto-selects that org, persists the triple, and announces the chosen org id; running it where the key has multiple grants prompts the user via AskUserQuestion; running it where the key has zero grants fails with an admin-action message
+  2. Running `/arcanon:login arc_xxx --org-id <uuid>` calls `whoami` for verification, warns-but-allows if the key isn't authorized for that org, and persists the triple either way
+  3. Running `/arcanon:status` displays an Identity block with: resolved org id + resolution source (env / repo config / machine default), a key preview (`arc_xxxx…1234`), the key's scopes, and the list of orgs the key is authorized for; shows `(missing)` when no org id resolves
+  4. When `uploadScan` receives a server response with code `missing_x_org_id` / `invalid_x_org_id` / `insufficient_scope` / `key_not_authorized_for_org` / `not_a_member` / `forbidden_scan` / `invalid_key`, the user sees a code-specific actionable message — never the opaque `401 Unauthorized` fallback
+  5. `commands/login.md`, `arcanon.config.json.example`, `docs/hub-integration.md`, `docs/getting-started.md`, and `docs/configuration.md` document the new `default_org_id` config field, the `ARCANON_ORG_ID` env var, the login-flow grant-resolution behavior, and the resolution precedence
+**Plans**: TBD (estimate 2 plans — Plan A: AUTH-06 login flow + AUTH-08 error-code parser, Plan B: AUTH-07 status block + AUTH-09 docs)
+
+**Plan-phase pre-flight requirement (from predecessor audit):**
+
+- *(C4, AUTH-08)*: Plan must coordinate with arcanon-hub THE-1030 to lock the error response JSON shape — likely `{type, title, status, detail, code}` per RFC 7807 with a custom `code` field. Test M-AUTH-08 must enumerate all 7 codes (`missing_x_org_id`, `invalid_x_org_id`, `insufficient_scope`, `key_not_authorized_for_org`, `not_a_member`, `forbidden_scan`, `invalid_key`). Existing `body.title` fallback (client.js:164) MUST remain for forward-compat with codes the plugin doesn't recognize. The `HubError` object should gain `.code` (string|null) without breaking existing `.status`, `.retriable`, `.body`, `.attempts` fields.
+
+- *(C5, AUTH-06)*: Plan must spec offline / hub-unreachable login behavior. Recommended: when `whoami` fails network or returns 5xx, store the credential anyway (with the user-supplied `--org-id` if given, else fail), emit a WARN that grants couldn't be verified. NEVER silently store an unvalidated credential without an org id. THE-1030 hard dependency means this phase ships AFTER the hub deploy.
+
+- *(L1, AUTH-07)*: Plan should emit Identity as a nested `identity: {…}` object in `--json` mode (not flat top-level fields), to insulate existing JSON consumers from field-set churn. Human mode adds new lines; JSON mode adds one new key.
+
+### Phase 126: Auth Test Suite
+**Goal**: The cross-module auth contract — header landing, missing-orgId fail-fast, error-code-to-message mapping, login flow branches, and resolution-order precedence — is pinned by an executable test suite that fails closed on any regression
+**Depends on**: Phase 125 (all auth surfaces in place; tests exercise them end-to-end)
+**Requirements**: AUTH-10
+**Success Criteria** (what must be TRUE):
+  1. `worker/hub-sync/client.test.js` asserts: `X-Org-Id` header lands on the upload request; missing `orgId` throws before any `fetch` is issued; each of the 7 server error codes produces its own user-message-bearing `HubError`; success returns `scan_upload_id`
+  2. `worker/hub-sync/whoami.test.js` (new file) asserts: `getKeyInfo` returns parsed `{ user_id, key_id, scopes, grants }`; auth-class HTTP errors throw `AuthError`; transport errors throw `HubError`
+  3. `worker/hub-sync/integration.test.js` asserts: `/arcanon:login --org-id <uuid>` round-trips through `storeCredentials` → `resolveCredentials`; `/arcanon:login` without `--org-id` calls `whoami`; precedence test: per-repo `hub.org_id` beats `ARCANON_ORG_ID` beats `default_org_id`
+  4. `npm test` exits 0 on a clean tree with the new tests included; no pre-existing-mock carryforwards introduced
+**Plans**: TBD (estimate 1 plan — test suite is well-scoped after phases 124-125 set the contract; could be folded into 124+125 if compact, plan-phase decides)
+
+### Phase 127: Verification & Release Gate
+**Goal**: v0.1.5 is shippable: all manifests pinned at `0.1.5`, CHANGELOG entry written, full test suite green, and an end-to-end verification confirms the auth + PII paths against a real hub honoring THE-1030
+**Depends on**: Phase 126 (all REQ phases verified individually before release gate)
+**Requirements**: VER-01, VER-02, VER-03, VER-04
+**Success Criteria** (what must be TRUE):
+  1. `package.json`, `plugins/arcanon/package.json`, `plugins/arcanon/.claude-plugin/plugin.json`, and the repo-root `.claude-plugin/marketplace.json` all contain `"version": "0.1.5"`; `package-lock.json` is regenerated and committed
+  2. `CHANGELOG.md` has a pinned `[0.1.5]` section with categorized entries (Added / Changed / Fixed / BREAKING as applicable) and explicitly notes the hub-side dependency on THE-1030 under BREAKING
+  3. The full bats suite is green and the full node test suite is green; no new pre-existing-mock carryforwards relative to the v0.1.4 baseline
+  4. End-to-end manual verification confirms: `/arcanon:login` round-trips against a real hub honoring THE-1030; `/arcanon:status` shows the expected Identity block; an MCP tool call's response is inspected and asserted to contain zero `/Users/` strings; a real `/arcanon:sync` upload succeeds with the `X-Org-Id` header landing server-side
+**Plans**: TBD (estimate 1 plan — manifest bumps + CHANGELOG + e2e verification)
+
+---
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -721,19 +825,10 @@ Plans:
 | 92-96 | v5.8.0 | 16/16 | Complete | 2026-04-19 |
 | 97-100 | v0.1.1 | 12/12 | Complete | 2026-04-21 |
 | 101-105 | v0.1.2 | 9/9 | Complete | 2026-04-23 |
-| 107 | v0.1.3 | 3/3 | Complete | 2026-04-25 |
-| 108 | v0.1.3 | 2/2 | Complete | 2026-04-25 |
-| 109 | v0.1.3 | 2/2 | Complete | 2026-04-25 |
-| 110 | v0.1.3 | 1/1 | Complete | 2026-04-25 |
-| 111 | v0.1.3 | 3/3 | Complete | 2026-04-25 |
-| 112 | v0.1.3 | 2/2 | Complete | 2026-04-25 |
-| 113 | v0.1.3 | 1/1 | Complete | 2026-04-25 |
-| 114 | v0.1.4 | 0/? | Pending | — |
-| 115 | v0.1.4 | 0/? | Pending | — |
-| 116 | v0.1.4 | 0/? | Pending | — |
-| 117 | v0.1.4 | 0/? | Pending (discuss-phase) | — |
-| 118 | v0.1.4 | 0/? | Pending | — |
-| 119 | v0.1.4 | 0/? | Pending | — |
-| 120 | v0.1.4 | 0/? | Pending | — |
-| 121 | v0.1.4 | 2/3 | In Progress | 2026-04-25 |
-| 122 | v0.1.4 | 0/? | Pending | — |
+| 107-113 | v0.1.3 | 14/14 | Complete | 2026-04-25 |
+| 114-122 | v0.1.4 | 21/21 | Complete | 2026-04-27 |
+| 123 | v0.1.5 | 0/3 | Pending | — |
+| 124 | v0.1.5 | 0/2 | Pending | — |
+| 125 | v0.1.5 | 0/2 | Pending | — |
+| 126 | v0.1.5 | 0/1 | Pending | — |
+| 127 | v0.1.5 | 0/1 | Pending | — |

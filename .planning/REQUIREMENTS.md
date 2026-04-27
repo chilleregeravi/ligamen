@@ -54,7 +54,7 @@ Mask `$HOME` at every serialization seam where a path could leave the worker pro
 
 - [ ] **PII-02**: `worker/mcp/server.js` — every MCP tool response payload that references `repo.path`, `path`, `source_file`, `target_file`, or `root_path` runs through `maskHomeDeep` before returning to the client. **Highest priority** — only egress to a third party (Anthropic).
 
-- [ ] **PII-03**: `worker/server/http.js` — `/api/scan-freshness`, `/api/repos`, and `/graph` responses run through `maskHomeDeep` before serialization. The `repo_path` column from `query-engine.js:1591` is masked.
+- [ ] **PII-03**: `worker/server/http.js` — `/api/scan-freshness`, `/projects`, and `/graph` responses run through `maskHomeDeep` before serialization. The `repo_path` column from `query-engine.js:1591` is masked. (Note: prior REQ wording referenced `/api/repos`; that route does not exist — the actual surface is `GET /projects` plus `repos[].path` arrays nested inside `/api/scan-freshness` and `/graph` response bodies.)
 
 - [ ] **PII-04**: `worker/lib/logger.js` — `extra` fields and stack-trace strings are masked before write to `~/.arcanon/logs/worker.log`. Console output (TTY mode) uses the same mask path.
 
@@ -99,13 +99,33 @@ Explicit non-goals for v0.1.5.
 
 ## Traceability
 
-Filled by `/gsd-roadmapper` after roadmap approval.
+Filled by `/gsd-roadmapper` after roadmap approval (2026-04-27).
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| AUTH-01..10 | (pending) | not started |
-| PII-01..07 | (pending) | not started |
-| VER-01..04 | (pending) | not started |
+| AUTH-01 | Phase 124 | not started |
+| AUTH-02 | Phase 124 | not started |
+| AUTH-03 | Phase 124 | not started |
+| AUTH-04 | Phase 124 | not started |
+| AUTH-05 | Phase 124 | not started |
+| AUTH-06 | Phase 125 | not started |
+| AUTH-07 | Phase 125 | not started |
+| AUTH-08 | Phase 125 | not started |
+| AUTH-09 | Phase 125 | not started |
+| AUTH-10 | Phase 126 | not started |
+| PII-01 | Phase 123 | not started |
+| PII-02 | Phase 123 | not started |
+| PII-03 | Phase 123 | not started |
+| PII-04 | Phase 123 | not started |
+| PII-05 | Phase 123 | not started |
+| PII-06 | Phase 123 | not started |
+| PII-07 | Phase 123 | not started |
+| VER-01 | Phase 127 | not started |
+| VER-02 | Phase 127 | not started |
+| VER-03 | Phase 127 | not started |
+| VER-04 | Phase 127 | not started |
+
+**Coverage: 21/21 v1 REQs mapped to exactly one phase. No orphans, no duplicates.**
 
 ---
 
