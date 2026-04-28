@@ -229,7 +229,7 @@ Full details: `.planning/milestones/v0.1.4-ROADMAP.md`
 <details open>
 <summary>🚧 v0.1.5 Identity & Privacy (Phases 123-127) — IN PROGRESS</summary>
 
-- [ ] **Phase 123: PII Path Masking** — `worker/lib/path-mask.js` + apply at MCP / HTTP / logger / export egress seams + agent contract assertion + tests (PII-01..07). INDEPENDENT of hub-side THE-1030 — ships first to give the milestone shippable scope even if the hub PR slips.
+- [x] **Phase 123: PII Path Masking** — `worker/lib/path-mask.js` + apply at MCP / HTTP / logger / export egress seams + agent contract assertion + tests (PII-01..07). ✓ shipped 2026-04-28.
 - [ ] **Phase 124: Hub Auth Core** — `uploadScan` `X-Org-Id` header + `whoami` client + `resolveCredentials` precedence chain + `~/.arcanon/config.json` `default_org_id` field + per-repo `hub.org_id` override (AUTH-01..05). Coupled signature/contract block — must land in one phase.
 - [ ] **Phase 125: Login & Status UX** — `/arcanon:login [--org-id]` whoami flow + `/arcanon:status` Identity block + structured server error-code parsing + docs (AUTH-06..09).
 - [ ] **Phase 126: Auth Test Suite** — `client.test.js`, `whoami.test.js`, `integration.test.js` covering header landing, missing-orgId fail-fast, error-code-to-message mapping, login flow, resolution-order precedence (AUTH-10).
@@ -829,7 +829,7 @@ Plans:
 | 101-105 | v0.1.2 | 9/9 | Complete | 2026-04-23 |
 | 107-113 | v0.1.3 | 14/14 | Complete | 2026-04-25 |
 | 114-122 | v0.1.4 | 21/21 | Complete | 2026-04-27 |
-| 123 | v0.1.5 | 0/3 | Pending | — |
+| 123 | v0.1.5 | 7/7 | Complete | 2026-04-28 |
 | 124 | v0.1.5 | 0/2 | Pending | — |
 | 125 | v0.1.5 | 0/2 | Pending | — |
 | 126 | v0.1.5 | 0/1 | Pending | — |

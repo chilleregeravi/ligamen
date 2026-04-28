@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1.5
 milestone_name: Identity & Privacy
-status: roadmap approved
-stopped_at: Awaiting Phase 123 plan (PII Path Masking — first phase, ships independently of hub-side THE-1030)
-last_updated: "2026-04-27T23:05:00.000Z"
-last_activity: 2026-04-27
+status: Phase 123 (PII Path Masking) complete — 7 PII REQs closed, 4 risk mitigations evidenced (S1, S2, M1, X2). Awaiting Phase 124 (hub auth core, gated on THE-1030 hub deploy).
+stopped_at: Phase 123 complete; advancing to Phase 124
+last_updated: "2026-04-28T18:30:00.000Z"
+last_activity: 2026-04-28
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 9
-  completed_plans: 0
-  percent: 0
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 123 (PII Path Masking) — not started
+Phase: 124 (Hub Auth Core) — not started
 Plan: —
-Status: Roadmap approved (5 phases, 21 REQs, ~9 plans estimated). Awaiting Phase 123 plan.
+Status: Phase 123 complete (8 commits, all PII-01..07 mitigations green). Advancing to Phase 124 (Hub Auth Core).
 Last activity: 2026-04-27 — v0.1.5 roadmap created (phases 123-127); 10 pre-flight notes attached for high/medium predecessor-audit risks (C1, C2, C3, C4, C5, S1, S2, M1, X1, L1, X2)
 
 ## Performance Metrics
@@ -66,7 +66,7 @@ Last activity: 2026-04-27 — v0.1.5 roadmap created (phases 123-127); 10 pre-fl
 
 ### Pending Todos
 
-None. Phase 123 plan is next.
+Phase 124 (Hub Auth Core) is next — gated on arcanon-hub THE-1030 deploy.
 
 ### Blockers/Concerns
 
