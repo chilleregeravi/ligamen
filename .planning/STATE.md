@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.1.5
 milestone_name: Identity & Privacy
-status: Phase 123 (PII Path Masking) complete — 7 PII REQs closed, 4 risk mitigations evidenced (S1, S2, M1, X2). Awaiting Phase 124 (hub auth core, gated on THE-1030 hub deploy).
-stopped_at: Phase 123 complete; advancing to Phase 124
-last_updated: "2026-04-28T18:30:00.000Z"
+status: Phases 123-124 complete (PII masking + hub auth core; 12 REQs closed; all 7 risk mitigations green). Doctor check 8 regression caught and fixed inline (orgIdRequired:false opt-out). Advancing to Phase 125 (login & status UX).
+stopped_at: Phase 124 complete; advancing to Phase 125
+last_updated: "2026-04-28T19:45:00.000Z"
 last_activity: 2026-04-28
 progress:
   total_phases: 5
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 124 (Hub Auth Core) — not started
+Phase: 125 (Login & Status UX) — not started
 Plan: —
-Status: Phase 123 complete (8 commits, all PII-01..07 mitigations green). Advancing to Phase 124 (Hub Auth Core).
-Last activity: 2026-04-27 — v0.1.5 roadmap created (phases 123-127); 10 pre-flight notes attached for high/medium predecessor-audit risks (C1, C2, C3, C4, C5, S1, S2, M1, X1, L1, X2)
+Status: Phases 123-124 complete (8 + 7 commits; PII-01..07 + AUTH-01..05 mitigations green; doctor check 8 regression fix `e107463`). Advancing to Phase 125 (login flow + status Identity block + error-code parser + docs).
+Last activity: 2026-04-28 — Phase 124 finalized inline after executor stalled; node 820/821, doctor.bats 12/12.
 
 ## Performance Metrics
 
