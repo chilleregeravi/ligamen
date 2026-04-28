@@ -28,13 +28,17 @@ export const BASE_BACKOFFS_MS = [1000, 2000, 4000];
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
 export class HubError extends Error {
-  constructor(message, { status, retriable, body, attempts } = {}) {
+  constructor(message, { status, retriable, body, attempts, code } = {}) {
     super(message);
     this.name = "HubError";
     this.status = status ?? null;
     this.retriable = Boolean(retriable);
     this.body = body ?? null;
     this.attempts = attempts ?? null;
+    // AUTH-01 / AUTH-08: structured error code (e.g. "missing_org_id"). Additive,
+    // default null. Phase 124 emits this from the client (fail-fast pre-fetch);
+    // Phase 125 AUTH-08 will parse server-side codes from RFC 7807 responses.
+    this.code = code ?? null;
   }
 }
 
@@ -83,6 +87,9 @@ async function readBodySafe(response) {
  * @param {object} opts
  * @param {string} opts.apiKey — Bearer token starting with arc_
  * @param {string} opts.hubUrl — e.g. "https://api.arcanon.dev"
+ * @param {string} opts.orgId — REQUIRED (THE-1029). Sent as `X-Org-Id` request header.
+ *   Missing orgId throws HubError(status=400, code='missing_org_id') BEFORE any
+ *   network attempt — no retry, no enqueue.
  * @param {number} [opts.attempts=3]
  * @param {number[]} [opts.backoffsMs] — override retry delays
  * @param {number} [opts.timeoutMs=30000]
@@ -95,6 +102,7 @@ export async function uploadScan(payload, opts) {
   const {
     apiKey,
     hubUrl,
+    orgId,
     attempts = RETRY_ATTEMPTS,
     backoffsMs = BASE_BACKOFFS_MS,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -107,6 +115,16 @@ export async function uploadScan(payload, opts) {
   }
   if (!apiKey) throw new HubError("apiKey is required");
   if (!hubUrl) throw new HubError("hubUrl is required");
+  // AUTH-01: fail fast BEFORE serializePayload + before the network loop. The
+  // hub (THE-1030) rejects uploads without X-Org-Id; emitting the same code
+  // client-side prevents wasted retries and surfaces a clear remediation.
+  if (!orgId) {
+    throw new HubError(
+      "Missing X-Org-Id header — orgId is required (THE-1029). " +
+        "Run /arcanon:login --org-id <uuid> or set ARCANON_ORG_ID, or add hub.org_id to arcanon.config.json.",
+      { status: 400, retriable: false, code: "missing_org_id" },
+    );
+  }
 
   const { body, bytes } = serializePayload(payload);
   if (bytes > MAX_PAYLOAD_BYTES) {
@@ -132,6 +150,8 @@ export async function uploadScan(payload, opts) {
           "Content-Type": "application/json",
           Accept: "application/json",
           "User-Agent": "arcanon-plugin-hub-sync",
+          // AUTH-01 / THE-1029: required by arcanon-hub THE-1030 enforcement.
+          "X-Org-Id": orgId,
         },
         body,
         signal: controller.signal,

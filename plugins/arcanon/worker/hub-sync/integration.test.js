@@ -55,10 +55,17 @@ test("syncFindings happy-path round-trips through mock hub", async () => {
     path.join(os.tmpdir(), "arcanon-it-data-"),
   );
   process.env.ARCANON_API_KEY = "arc_it";
+  process.env.ARCANON_ORG_ID = "org-it";
 
   let seen = null;
   const { server, url } = await startMockHub((req, res, body) => {
-    seen = { method: req.method, url: req.url, auth: req.headers.authorization, body };
+    seen = {
+      method: req.method,
+      url: req.url,
+      auth: req.headers.authorization,
+      orgId: req.headers["x-org-id"],
+      body,
+    };
     res.writeHead(202, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ scan_upload_id: "uuid-1", status: "processing", latest_payload_version: "1.0" }));
   });
@@ -78,6 +85,8 @@ test("syncFindings happy-path round-trips through mock hub", async () => {
     assert.equal(seen.method, "POST");
     assert.equal(seen.url, "/api/v1/scans/upload");
     assert.equal(seen.auth, "Bearer arc_it");
+    // AUTH-01 wire assertion: X-Org-Id from ARCANON_ORG_ID lands on the request.
+    assert.equal(seen.orgId, "org-it");
     const body = JSON.parse(seen.body);
     assert.equal(body.version, "1.0");
     assert.equal(body.metadata.tool, "claude-code");
@@ -86,6 +95,7 @@ test("syncFindings happy-path round-trips through mock hub", async () => {
   } finally {
     await stopServer(server);
     delete process.env.ARCANON_API_KEY;
+    delete process.env.ARCANON_ORG_ID;
     delete process.env.ARCANON_DATA_DIR;
   }
 });
@@ -96,6 +106,7 @@ test("syncFindings enqueues payload when hub returns 5xx", async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "arcanon-it-data-"));
   process.env.ARCANON_DATA_DIR = dataDir;
   process.env.ARCANON_API_KEY = "arc_it";
+  process.env.ARCANON_ORG_ID = "org-it";
 
   const { server, url } = await startMockHub((req, res) => {
     res.writeHead(503, { "Content-Type": "application/json" });
@@ -120,6 +131,7 @@ test("syncFindings enqueues payload when hub returns 5xx", async () => {
     await stopServer(server);
     _resetQueueDb();
     delete process.env.ARCANON_API_KEY;
+    delete process.env.ARCANON_ORG_ID;
     delete process.env.ARCANON_DATA_DIR;
   }
 });
@@ -130,6 +142,7 @@ test("syncFindings surfaces 422 without enqueueing", async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "arcanon-it-data-"));
   process.env.ARCANON_DATA_DIR = dataDir;
   process.env.ARCANON_API_KEY = "arc_it";
+  process.env.ARCANON_ORG_ID = "org-it";
 
   const { server, url } = await startMockHub((req, res) => {
     res.writeHead(422, { "Content-Type": "application/json" });
@@ -151,6 +164,7 @@ test("syncFindings surfaces 422 without enqueueing", async () => {
     await stopServer(server);
     _resetQueueDb();
     delete process.env.ARCANON_API_KEY;
+    delete process.env.ARCANON_ORG_ID;
     delete process.env.ARCANON_DATA_DIR;
   }
 });

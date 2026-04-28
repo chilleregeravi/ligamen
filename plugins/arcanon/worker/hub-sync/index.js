@@ -38,6 +38,8 @@ export { queueStats, listAllUploads, pruneDead } from "./queue.js";
  * @param {object} opts — fields forwarded to buildScanPayload, plus:
  * @param {string} [opts.apiKey] — explicit override; else resolveCredentials()
  * @param {string} [opts.hubUrl]
+ * @param {string} [opts.orgId] — per-repo override threaded by manager.js (AUTH-05).
+ *   Wins precedence over ARCANON_ORG_ID env and ~/.arcanon/config.json default_org_id.
  * @param {boolean} [opts.enqueueOnFailure=true]
  * @param {boolean} [opts.libraryDepsEnabled] — HUB-03 feature flag passthrough
  * @param {"full"|"hash-only"|"none"} [opts.evidenceMode] — INT-01 hub.evidence_mode passthrough
@@ -61,7 +63,11 @@ export async function syncFindings(opts = {}) {
 
   let creds;
   try {
-    creds = resolveCredentials({ apiKey: opts.apiKey, hubUrl: opts.hubUrl });
+    creds = resolveCredentials({
+      apiKey: opts.apiKey,
+      hubUrl: opts.hubUrl,
+      orgId: opts.orgId,
+    });
   } catch (err) {
     if (err instanceof AuthError) return { ok: false, error: err, warnings };
     throw err;
@@ -71,6 +77,7 @@ export async function syncFindings(opts = {}) {
     const result = await uploadScan(payload, {
       apiKey: creds.apiKey,
       hubUrl: creds.hubUrl,
+      orgId: creds.orgId,
       log,
     });
     return { ok: true, result, warnings };
@@ -103,6 +110,7 @@ export async function syncFindings(opts = {}) {
  * @param {object} [opts]
  * @param {string} [opts.apiKey]
  * @param {string} [opts.hubUrl]
+ * @param {string} [opts.orgId] — AUTH-05 per-repo override; threaded into uploadScan as X-Org-Id.
  * @param {number} [opts.limit=50]
  * @param {Function} [opts.log]
  * @returns {Promise<{ attempted: number, succeeded: number, failed: number, dead: number, stats: object }>}
@@ -111,7 +119,11 @@ export async function drainQueue(opts = {}) {
   const log = opts.log || (() => {});
   let creds;
   try {
-    creds = resolveCredentials({ apiKey: opts.apiKey, hubUrl: opts.hubUrl });
+    creds = resolveCredentials({
+      apiKey: opts.apiKey,
+      hubUrl: opts.hubUrl,
+      orgId: opts.orgId,
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       log("WARN", "drain skipped — no credentials", { error: err.message });
@@ -143,7 +155,12 @@ export async function drainQueue(opts = {}) {
       continue;
     }
     try {
-      await uploadScan(payload, { apiKey: creds.apiKey, hubUrl: creds.hubUrl, log });
+      await uploadScan(payload, {
+        apiKey: creds.apiKey,
+        hubUrl: creds.hubUrl,
+        orgId: creds.orgId,
+        log,
+      });
       deleteUpload(row.id);
       succeeded++;
     } catch (err) {
