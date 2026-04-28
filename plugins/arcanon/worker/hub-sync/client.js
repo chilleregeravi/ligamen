@@ -27,6 +27,52 @@ export const RETRY_ATTEMPTS = 3;
 export const BASE_BACKOFFS_MS = [1000, 2000, 4000];
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * AUTH-08 / D-125-01: Frozen map of server-side RFC 7807 `code` values to
+ * actionable user-facing messages. All 7 codes enumerated from the arcanon-hub
+ * THE-1030 error contract. Phase 126 test M-AUTH-08 will pin each entry.
+ *
+ * Unknown codes fall back to `body.title` (forward-compat; see messageForCode).
+ */
+export const HUB_ERROR_CODE_MESSAGES = Object.freeze({
+  missing_x_org_id:
+    "hub rejected upload: X-Org-Id header missing — re-run /arcanon:login or set ARCANON_ORG_ID",
+  invalid_x_org_id:
+    "hub rejected upload: X-Org-Id is not a valid uuid — fix arcanon.config.json hub.org_id, ARCANON_ORG_ID, or re-run /arcanon:login --org-id <uuid>",
+  insufficient_scope:
+    "hub rejected upload: API key is missing the required scope for this operation — generate a key with scan:write at https://app.arcanon.dev/settings/api-keys",
+  key_not_authorized_for_org:
+    "hub rejected upload: API key is not authorized for this org — run /arcanon:login --org-id <uuid> to switch, or ask your admin to grant the key",
+  not_a_member:
+    "hub rejected upload: you are not a member of this org — ask an org admin to invite your user (the API key owner)",
+  forbidden_scan:
+    "hub rejected upload: this scan is forbidden by org policy — contact your org admin",
+  invalid_key:
+    "hub rejected upload: API key is invalid or revoked — generate a new key at https://app.arcanon.dev/settings/api-keys, then /arcanon:login arc_…",
+});
+
+/**
+ * AUTH-08 / D-125-01: Derive user-facing message from an RFC 7807 response body.
+ *
+ * Resolution order:
+ *   1. body.code is a known key in HUB_ERROR_CODE_MESSAGES → return that message.
+ *   2. body.title is present → return "hub returned <status>: <title>" (forward-compat
+ *      for future codes the plugin doesn't yet recognize — preserves pre-phase behaviour).
+ *   3. Else → return "hub returned <status>" (last-resort fallback).
+ *
+ * @param {unknown} body — parsed response body (may be null, string, or object)
+ * @param {number} status — HTTP status code
+ * @returns {string}
+ */
+function messageForCode(body, status) {
+  if (body && typeof body === "object" && typeof body.code === "string") {
+    const known = HUB_ERROR_CODE_MESSAGES[body.code];
+    if (known) return known;
+  }
+  if (body?.title) return `hub returned ${status}: ${body.title}`;
+  return `hub returned ${status}`;
+}
+
 export class HubError extends Error {
   constructor(message, { status, retriable, body, attempts, code } = {}) {
     super(message);
@@ -180,9 +226,10 @@ export async function uploadScan(payload, opts) {
       return { scan_upload_id: null, status: "accepted" };
     }
 
+    const errCode = (responseBody && typeof responseBody === "object") ? (responseBody.code ?? null) : null;
     lastErr = new HubError(
-      `hub returned ${response.status}${responseBody?.title ? `: ${responseBody.title}` : ""}`,
-      { status: response.status, retriable, body: responseBody, attempts: attempt },
+      messageForCode(responseBody, response.status),
+      { status: response.status, retriable, body: responseBody, attempts: attempt, code: errCode },
     );
     log(retriable ? "WARN" : "ERROR", "hub upload non-success", {
       status: response.status,
