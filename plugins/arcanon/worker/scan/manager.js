@@ -79,7 +79,13 @@ function _readHubAutoSync(hubBlock) {
 
 /**
  * Read hub config from arcanon.config.json.
- * @returns {{ hubAutoSync: boolean, hubUrl: string|undefined, projectSlug: string|undefined }}
+ * @returns {{
+ *   hubAutoSync: boolean,
+ *   hubUrl: string|undefined,
+ *   projectSlug: string|undefined,
+ *   libraryDepsEnabled: boolean,
+ *   orgId: string|undefined,
+ * }}
  */
 function _readHubConfig() {
   try {
@@ -90,9 +96,18 @@ function _readHubConfig() {
       hubUrl: cfg?.hub?.url,
       projectSlug: cfg?.hub?.["project-slug"] || cfg?.["project-name"],
       libraryDepsEnabled: Boolean(cfg?.hub?.beta_features?.library_deps),
+      // AUTH-05 / THE-1029: per-repo org_id override. Threaded into syncFindings
+      // and ultimately resolveCredentials({orgId}) where it beats env + default.
+      orgId: cfg?.hub?.org_id,
     };
   } catch {
-    return { hubAutoSync: false, hubUrl: undefined, projectSlug: undefined, libraryDepsEnabled: false };
+    return {
+      hubAutoSync: false,
+      hubUrl: undefined,
+      projectSlug: undefined,
+      libraryDepsEnabled: false,
+      orgId: undefined,
+    };
   }
 }
 
@@ -934,7 +949,7 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
     slog('INFO', 'hub auto-sync skipped — caller requested skipHubSync (shadow scan)');
   } else {
   try {
-    const { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled } = _readHubConfig();
+    const { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled, orgId } = _readHubConfig();
     // Credential check spans env vars AND ~/.arcanon/config.json so that
     // users who ran /arcanon:login (without exporting an env var) still
     // get auto-sync.
@@ -965,6 +980,14 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
             repoPath: r.repoPath,
             projectSlug,
             hubUrl,
+            // AUTH-05 / THE-1029: per-repo override into AUTH-03 precedence chain
+            // (opts.orgId beats ARCANON_ORG_ID env beats ~/.arcanon/config.json
+            // default_org_id). When undefined here, the resolver falls through
+            // to env / home-config; if all three are missing, resolveCredentials
+            // throws AuthError and the outcome.error.message lands in the WARN
+            // log below — surfacing the actionable remediation to the user
+            // (C2 option-a).
+            orgId,
             scanMode: r.mode,
             libraryDepsEnabled,   // HUB-03 feature flag — gates v1.1 emission
             log: (level, msg, data) => slog(level, `hub-sync: ${msg}`, data),
@@ -1011,4 +1034,4 @@ export async function scanRepos(repoPaths, options = {}, queryEngine) {
 }
 
 // Exported for test access only (_-prefixed = internal helper, not public surface).
-export { _readHubAutoSync };
+export { _readHubAutoSync, _readHubConfig };
