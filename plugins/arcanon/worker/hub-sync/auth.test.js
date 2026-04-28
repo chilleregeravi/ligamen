@@ -26,6 +26,7 @@ function clearEnv() {
   delete process.env.ARCANON_API_KEY;
   delete process.env.ARCANON_API_TOKEN;
   delete process.env.ARCANON_HUB_URL;
+  delete process.env.ARCANON_ORG_ID;
 }
 
 test("resolveCredentials throws when nothing is configured", () => {
@@ -38,10 +39,15 @@ test("resolveCredentials throws when nothing is configured", () => {
 test("resolveCredentials honors explicit apiKey", () => {
   withTempHome(() => {
     clearEnv();
-    const { apiKey, hubUrl, source } = resolveCredentials({ apiKey: "arc_explicit" });
+    // Provide an orgId source so the AUTH-03 org_id resolver succeeds.
+    const { apiKey, hubUrl, source, orgId } = resolveCredentials({
+      apiKey: "arc_explicit",
+      orgId: "org-explicit",
+    });
     assert.equal(apiKey, "arc_explicit");
     assert.equal(source, "explicit");
     assert.equal(hubUrl, DEFAULT_HUB_URL);
+    assert.equal(orgId, "org-explicit");
   });
 });
 
@@ -49,6 +55,7 @@ test("resolveCredentials reads ARCANON_API_KEY env var", () => {
   withTempHome(() => {
     clearEnv();
     process.env.ARCANON_API_KEY = "arc_env";
+    process.env.ARCANON_ORG_ID = "org-env-aux";
     const { apiKey, source } = resolveCredentials();
     assert.equal(apiKey, "arc_env");
     assert.equal(source, "env");
@@ -60,7 +67,10 @@ test("resolveCredentials falls back to ~/.arcanon/config.json", () => {
     clearEnv();
     const dir = path.join(home, ".arcanon");
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "config.json"), JSON.stringify({ api_key: "arc_home" }));
+    fs.writeFileSync(
+      path.join(dir, "config.json"),
+      JSON.stringify({ api_key: "arc_home", default_org_id: "org-home" }),
+    );
     const { apiKey, source } = resolveCredentials();
     assert.equal(apiKey, "arc_home");
     assert.equal(source, "home-config");
@@ -71,8 +81,138 @@ test("resolveCredentials rejects keys without arc_ prefix", () => {
   withTempHome(() => {
     clearEnv();
     assert.throws(
-      () => resolveCredentials({ apiKey: "ey.not.a.jwt.but.wrong.prefix" }),
+      () => resolveCredentials({ apiKey: "ey.not.a.jwt.but.wrong.prefix", orgId: "org-x" }),
       /must start with "arc_"/,
+    );
+  });
+});
+
+// AUTH-03 Test A1 — explicit opts.orgId beats everything
+test("AUTH-03 A1: resolveCredentials returns explicit opts.orgId verbatim", () => {
+  withTempHome(() => {
+    clearEnv();
+    const { apiKey, hubUrl, orgId, source } = resolveCredentials({
+      apiKey: "arc_x",
+      hubUrl: "https://h",
+      orgId: "org-explicit",
+    });
+    assert.equal(apiKey, "arc_x");
+    assert.equal(hubUrl, "https://h");
+    assert.equal(orgId, "org-explicit");
+    assert.equal(source, "explicit");
+  });
+});
+
+// AUTH-03 Test A2 — ARCANON_ORG_ID env var
+test("AUTH-03 A2: resolveCredentials reads ARCANON_ORG_ID env var", () => {
+  withTempHome(() => {
+    clearEnv();
+    process.env.ARCANON_ORG_ID = "org-env";
+    const { apiKey, orgId } = resolveCredentials({ apiKey: "arc_x" });
+    assert.equal(apiKey, "arc_x");
+    assert.equal(orgId, "org-env");
+  });
+});
+
+// AUTH-03 Test A3 — ~/.arcanon/config.json default_org_id
+test("AUTH-03 A3: resolveCredentials reads default_org_id from ~/.arcanon/config.json", () => {
+  withTempHome((home) => {
+    clearEnv();
+    const dir = path.join(home, ".arcanon");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "config.json"),
+      JSON.stringify({ api_key: "arc_x", default_org_id: "org-cfg" }),
+    );
+    const { apiKey, orgId } = resolveCredentials();
+    assert.equal(apiKey, "arc_x");
+    assert.equal(orgId, "org-cfg");
+  });
+});
+
+// AUTH-03 Test A4 — precedence: opts.orgId > ARCANON_ORG_ID > default_org_id
+test("AUTH-03 A4: orgId precedence — opts beats env beats config", () => {
+  withTempHome((home) => {
+    clearEnv();
+    const dir = path.join(home, ".arcanon");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "config.json"),
+      JSON.stringify({ api_key: "arc_x", default_org_id: "org-cfg" }),
+    );
+    process.env.ARCANON_ORG_ID = "org-env";
+
+    // All three present: opts wins
+    const a = resolveCredentials({ apiKey: "arc_x", orgId: "org-opts" });
+    assert.equal(a.orgId, "org-opts");
+
+    // Env + config present (no opts): env wins
+    const b = resolveCredentials({ apiKey: "arc_x" });
+    assert.equal(b.orgId, "org-env");
+
+    // Config only (no opts, no env): config wins
+    delete process.env.ARCANON_ORG_ID;
+    const c = resolveCredentials({ apiKey: "arc_x" });
+    assert.equal(c.orgId, "org-cfg");
+  });
+});
+
+// AUTH-03 Test A5 — missing orgId throws AuthError naming all 3 sources + remediation
+test("AUTH-03 A5: missing orgId throws AuthError naming all three sources and /arcanon:login --org-id", () => {
+  withTempHome(() => {
+    clearEnv();
+    let caught = null;
+    try {
+      resolveCredentials({ apiKey: "arc_x" });
+    } catch (err) {
+      caught = err;
+    }
+    assert.ok(caught instanceof AuthError, "expected AuthError");
+    const msg = caught.message;
+    assert.ok(msg.includes("opts.orgId"), `message must include "opts.orgId" — got: ${msg}`);
+    assert.ok(
+      msg.includes("ARCANON_ORG_ID"),
+      `message must include "ARCANON_ORG_ID" — got: ${msg}`,
+    );
+    assert.ok(
+      msg.includes("default_org_id"),
+      `message must include "default_org_id" — got: ${msg}`,
+    );
+    assert.ok(
+      msg.includes("/arcanon:login --org-id"),
+      `message must include "/arcanon:login --org-id" — got: ${msg}`,
+    );
+  });
+});
+
+// AUTH-03 Test A6 — existing api-key-error message must not change
+test("AUTH-03 A6: missing apiKey still throws original 'No Arcanon Hub API key found' AuthError", () => {
+  withTempHome(() => {
+    clearEnv();
+    let caught = null;
+    try {
+      resolveCredentials();
+    } catch (err) {
+      caught = err;
+    }
+    assert.ok(caught instanceof AuthError);
+    assert.ok(
+      caught.message.includes("No Arcanon Hub API key found"),
+      `expected api-key error message; got: ${caught.message}`,
+    );
+  });
+});
+
+// AUTH-03 Test A7 — option-a guard: hasCredentials() returns true when api_key resolves but org_id does NOT.
+test("AUTH-03 A7 (option-a): hasCredentials returns true on api-key-only configs (no org_id)", () => {
+  withTempHome(() => {
+    clearEnv();
+    process.env.ARCANON_API_KEY = "arc_x";
+    // No ARCANON_ORG_ID, no ~/.arcanon/config.json default_org_id, no opts.
+    assert.equal(
+      hasCredentials(),
+      true,
+      "hasCredentials must stay org_id-tolerant per C2 option-a",
     );
   });
 });
@@ -91,6 +231,8 @@ test("storeCredentials writes an 0600 config file and round-trips", () => {
     assert.equal(content.api_key, "arc_stored");
     assert.equal(content.hub_url, "https://api.arcanon.test");
 
+    // Provide an orgId source so the AUTH-03 org_id resolver succeeds.
+    process.env.ARCANON_ORG_ID = "org-roundtrip";
     const { apiKey, hubUrl } = resolveCredentials();
     assert.equal(apiKey, "arc_stored");
     assert.equal(hubUrl, "https://api.arcanon.test");
