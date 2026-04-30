@@ -27,14 +27,64 @@ export const RETRY_ATTEMPTS = 3;
 export const BASE_BACKOFFS_MS = [1000, 2000, 4000];
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * AUTH-08 / D-125-01: Frozen map of server-side RFC 7807 `code` values to
+ * actionable user-facing messages. All 7 codes enumerated from the arcanon-hub
+ * THE-1030 error contract. Phase 126 test M-AUTH-08 will pin each entry.
+ *
+ * Unknown codes fall back to `body.title` (forward-compat; see messageForCode).
+ */
+export const HUB_ERROR_CODE_MESSAGES = Object.freeze({
+  missing_x_org_id:
+    "hub rejected upload: X-Org-Id header missing — re-run /arcanon:login or set ARCANON_ORG_ID",
+  invalid_x_org_id:
+    "hub rejected upload: X-Org-Id is not a valid uuid — fix arcanon.config.json hub.org_id, ARCANON_ORG_ID, or re-run /arcanon:login --org-id <uuid>",
+  insufficient_scope:
+    "hub rejected upload: API key is missing the required scope for this operation — generate a key with scan:write at https://app.arcanon.dev/settings/api-keys",
+  key_not_authorized_for_org:
+    "hub rejected upload: API key is not authorized for this org — run /arcanon:login --org-id <uuid> to switch, or ask your admin to grant the key",
+  not_a_member:
+    "hub rejected upload: you are not a member of this org — ask an org admin to invite your user (the API key owner)",
+  forbidden_scan:
+    "hub rejected upload: this scan is forbidden by org policy — contact your org admin",
+  invalid_key:
+    "hub rejected upload: API key is invalid or revoked — generate a new key at https://app.arcanon.dev/settings/api-keys, then /arcanon:login arc_…",
+});
+
+/**
+ * AUTH-08 / D-125-01: Derive user-facing message from an RFC 7807 response body.
+ *
+ * Resolution order:
+ *   1. body.code is a known key in HUB_ERROR_CODE_MESSAGES → return that message.
+ *   2. body.title is present → return "hub returned <status>: <title>" (forward-compat
+ *      for future codes the plugin doesn't yet recognize — preserves pre-phase behaviour).
+ *   3. Else → return "hub returned <status>" (last-resort fallback).
+ *
+ * @param {unknown} body — parsed response body (may be null, string, or object)
+ * @param {number} status — HTTP status code
+ * @returns {string}
+ */
+function messageForCode(body, status) {
+  if (body && typeof body === "object" && typeof body.code === "string") {
+    const known = HUB_ERROR_CODE_MESSAGES[body.code];
+    if (known) return known;
+  }
+  if (body?.title) return `hub returned ${status}: ${body.title}`;
+  return `hub returned ${status}`;
+}
+
 export class HubError extends Error {
-  constructor(message, { status, retriable, body, attempts } = {}) {
+  constructor(message, { status, retriable, body, attempts, code } = {}) {
     super(message);
     this.name = "HubError";
     this.status = status ?? null;
     this.retriable = Boolean(retriable);
     this.body = body ?? null;
     this.attempts = attempts ?? null;
+    // AUTH-01 / AUTH-08: structured error code (e.g. "missing_org_id"). Additive,
+    // default null. Phase 124 emits this from the client (fail-fast pre-fetch);
+    // Phase 125 AUTH-08 will parse server-side codes from RFC 7807 responses.
+    this.code = code ?? null;
   }
 }
 
@@ -83,6 +133,9 @@ async function readBodySafe(response) {
  * @param {object} opts
  * @param {string} opts.apiKey — Bearer token starting with arc_
  * @param {string} opts.hubUrl — e.g. "https://api.arcanon.dev"
+ * @param {string} opts.orgId — REQUIRED (THE-1029). Sent as `X-Org-Id` request header.
+ *   Missing orgId throws HubError(status=400, code='missing_org_id') BEFORE any
+ *   network attempt — no retry, no enqueue.
  * @param {number} [opts.attempts=3]
  * @param {number[]} [opts.backoffsMs] — override retry delays
  * @param {number} [opts.timeoutMs=30000]
@@ -95,6 +148,7 @@ export async function uploadScan(payload, opts) {
   const {
     apiKey,
     hubUrl,
+    orgId,
     attempts = RETRY_ATTEMPTS,
     backoffsMs = BASE_BACKOFFS_MS,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -107,6 +161,16 @@ export async function uploadScan(payload, opts) {
   }
   if (!apiKey) throw new HubError("apiKey is required");
   if (!hubUrl) throw new HubError("hubUrl is required");
+  // AUTH-01: fail fast BEFORE serializePayload + before the network loop. The
+  // hub (THE-1030) rejects uploads without X-Org-Id; emitting the same code
+  // client-side prevents wasted retries and surfaces a clear remediation.
+  if (!orgId) {
+    throw new HubError(
+      "Missing X-Org-Id header — orgId is required (THE-1029). " +
+        "Run /arcanon:login --org-id <uuid> or set ARCANON_ORG_ID, or add hub.org_id to arcanon.config.json.",
+      { status: 400, retriable: false, code: "missing_org_id" },
+    );
+  }
 
   const { body, bytes } = serializePayload(payload);
   if (bytes > MAX_PAYLOAD_BYTES) {
@@ -132,6 +196,8 @@ export async function uploadScan(payload, opts) {
           "Content-Type": "application/json",
           Accept: "application/json",
           "User-Agent": "arcanon-plugin-hub-sync",
+          // AUTH-01 / THE-1029: required by arcanon-hub THE-1030 enforcement.
+          "X-Org-Id": orgId,
         },
         body,
         signal: controller.signal,
@@ -160,9 +226,10 @@ export async function uploadScan(payload, opts) {
       return { scan_upload_id: null, status: "accepted" };
     }
 
+    const errCode = (responseBody && typeof responseBody === "object") ? (responseBody.code ?? null) : null;
     lastErr = new HubError(
-      `hub returned ${response.status}${responseBody?.title ? `: ${responseBody.title}` : ""}`,
-      { status: response.status, retriable, body: responseBody, attempts: attempt },
+      messageForCode(responseBody, response.status),
+      { status: response.status, retriable, body: responseBody, attempts: attempt, code: errCode },
     );
     log(retriable ? "WARN" : "ERROR", "hub upload non-success", {
       status: response.status,

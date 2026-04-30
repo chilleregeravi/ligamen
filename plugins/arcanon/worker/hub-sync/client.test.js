@@ -34,6 +34,7 @@ test("uploadScan sends Bearer auth and JSON body to /api/v1/scans/upload", async
   const res = await uploadScan(mkPayload(), {
     apiKey: "arc_test",
     hubUrl: BASE_URL,
+    orgId: "org-test",
     fetchImpl,
   });
   assert.equal(res.scan_upload_id, "abc");
@@ -49,6 +50,7 @@ test("uploadScan treats 409 as a successful idempotent hit", async () => {
   const res = await uploadScan(mkPayload(), {
     apiKey: "arc_test",
     hubUrl: BASE_URL,
+    orgId: "org-test",
     fetchImpl,
   });
   assert.equal(res.scan_upload_id, "existing");
@@ -65,6 +67,7 @@ test("uploadScan retries on 503 and eventually succeeds", async () => {
   const res = await uploadScan(mkPayload(), {
     apiKey: "arc_test",
     hubUrl: BASE_URL,
+    orgId: "org-test",
     fetchImpl,
     backoffsMs: [0, 0, 0],
   });
@@ -84,6 +87,7 @@ test("uploadScan honors Retry-After on 429", async () => {
   const res = await uploadScan(mkPayload(), {
     apiKey: "arc_test",
     hubUrl: BASE_URL,
+    orgId: "org-test",
     fetchImpl,
     backoffsMs: [0, 0, 0],
   });
@@ -103,6 +107,7 @@ test("uploadScan fails fast on 4xx (non-429)", async () => {
       uploadScan(mkPayload(), {
         apiKey: "arc_test",
         hubUrl: BASE_URL,
+        orgId: "org-test",
         fetchImpl,
         backoffsMs: [0, 0, 0],
       }),
@@ -127,6 +132,7 @@ test("uploadScan treats network errors as retriable", async () => {
       uploadScan(mkPayload(), {
         apiKey: "arc_test",
         hubUrl: BASE_URL,
+        orgId: "org-test",
         fetchImpl,
         backoffsMs: [0, 0, 0],
       }),
@@ -149,4 +155,129 @@ test("uploadScan validates apiKey and hubUrl are present", async () => {
     () => uploadScan(mkPayload(), { apiKey: "arc_x", fetchImpl }),
     /hubUrl is required/,
   );
+});
+
+// AUTH-01 Test C1 — X-Org-Id header is sent on every upload
+test("AUTH-01 C1: uploadScan sends X-Org-Id header when orgId is provided", async () => {
+  let captured = null;
+  const fetchImpl = async (url, init) => {
+    captured = { url, init };
+    return jsonResponse(202, { scan_upload_id: "abc", status: "processing" });
+  };
+  await uploadScan(mkPayload(), {
+    apiKey: "arc_test",
+    hubUrl: BASE_URL,
+    orgId: "org-1",
+    fetchImpl,
+  });
+  assert.equal(captured.init.headers["X-Org-Id"], "org-1");
+});
+
+// AUTH-01 Test C2 — missing orgId throws HubError BEFORE any fetch invocation
+test("AUTH-01 C2: missing orgId throws HubError(status=400, code='missing_org_id') before fetch", async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls++;
+    return jsonResponse(202, {});
+  };
+  await assert.rejects(
+    () =>
+      uploadScan(mkPayload(), {
+        apiKey: "arc_test",
+        hubUrl: BASE_URL,
+        // no orgId
+        fetchImpl,
+      }),
+    (err) => {
+      assert.ok(err instanceof HubError, "expected HubError");
+      assert.equal(err.status, 400);
+      assert.equal(err.code, "missing_org_id");
+      assert.equal(err.retriable, false);
+      return true;
+    },
+  );
+  // Critical: throw must happen BEFORE the network attempt.
+  assert.equal(calls, 0, "fakeFetch must NOT be called when orgId is missing");
+});
+
+// AUTH-01 Test C3 — HubError gains a .code field (additive, default null)
+test("AUTH-01 C3: HubError.code defaults to null when no code is passed", () => {
+  const err = new HubError("some message", { status: 500 });
+  assert.equal(err.code, null);
+  // Existing fields unchanged.
+  assert.equal(err.status, 500);
+  assert.equal(err.retriable, false);
+  assert.equal(err.body, null);
+  assert.equal(err.attempts, null);
+});
+
+// AUTH-01 Test C4 — body.title fallback preserved (forward-compat with codes the plugin doesn't recognize)
+test("AUTH-01 C4: 4xx response with body.title still surfaces title in error message", async () => {
+  const fetchImpl = async () =>
+    jsonResponse(422, { title: "validation failed", detail: "bad field", code: "future_unknown_code" });
+  await assert.rejects(
+    () =>
+      uploadScan(mkPayload(), {
+        apiKey: "arc_test",
+        hubUrl: BASE_URL,
+        orgId: "org-1",
+        fetchImpl,
+        backoffsMs: [0, 0, 0],
+      }),
+    (err) => {
+      assert.ok(err instanceof HubError);
+      assert.equal(err.status, 422);
+      assert.ok(
+        err.message.includes("validation failed"),
+        `expected body.title in error message; got: ${err.message}`,
+      );
+      return true;
+    },
+  );
+});
+
+// AUTH-08 / AUTH-10: Each of the 7 RFC 7807 server error codes must surface as
+// its own HubError with .code populated and a recognisable user message.
+// Substring matching (NOT exact equality) so Phase 125 copy edits don't fail
+// the regression suite. This is the auth-test-suite gate (REQ AUTH-10).
+test("AUTH-10 M-AUTH-08: 7 server error codes each surface a distinct HubError with .code populated", async () => {
+  const CASES = [
+    { code: "missing_x_org_id", status: 400, expectedSubstring: "x-org-id" },
+    { code: "invalid_x_org_id", status: 400, expectedSubstring: "uuid" },
+    { code: "insufficient_scope", status: 403, expectedSubstring: "scope" },
+    { code: "key_not_authorized_for_org", status: 403, expectedSubstring: "not authorized" },
+    { code: "not_a_member", status: 403, expectedSubstring: "member" },
+    { code: "forbidden_scan", status: 403, expectedSubstring: "forbidden" },
+    { code: "invalid_key", status: 401, expectedSubstring: "invalid" },
+  ];
+  for (const { code, status, expectedSubstring } of CASES) {
+    const fetchImpl = async () =>
+      jsonResponse(status, {
+        type: "https://errors.arcanon.dev/" + code,
+        title: "auth error",
+        status,
+        detail: "test",
+        code,
+      });
+    await assert.rejects(
+      () =>
+        uploadScan(mkPayload(), {
+          apiKey: "arc_test",
+          hubUrl: BASE_URL,
+          orgId: "org-1",
+          fetchImpl,
+          backoffsMs: [0, 0, 0],
+        }),
+      (err) => {
+        assert.ok(err instanceof HubError, `code=${code}: expected HubError`);
+        assert.equal(err.status, status, `code=${code}: status mismatch`);
+        assert.equal(err.code, code, `code=${code}: HubError.code must be populated`);
+        assert.ok(
+          err.message.toLowerCase().includes(expectedSubstring.toLowerCase()),
+          `code=${code}: expected message to include "${expectedSubstring}"; got: ${err.message}`,
+        );
+        return true;
+      },
+    );
+  }
 });

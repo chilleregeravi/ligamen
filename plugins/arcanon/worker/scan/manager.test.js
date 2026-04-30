@@ -1827,3 +1827,120 @@ test("CLN-07: neither key set disables sync without warning", async () => {
     capture.restore();
   }
 });
+
+// ---------------------------------------------------------------------------
+// AUTH-05 (THE-1029): per-repo cfg.hub.org_id flow into _readHubConfig
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: run `fn` with process.cwd() pointed at a temp dir containing the
+ * given arcanon.config.json contents.
+ */
+function withTempCwdConfig(cfgJson, fn) {
+  const tmp = mkdtempSync(join(tmpdir(), "arcanon-mgr-cfg-"));
+  if (cfgJson !== null) {
+    writeFileSync(join(tmp, "arcanon.config.json"), JSON.stringify(cfgJson));
+  }
+  const originalCwd = process.cwd();
+  process.chdir(tmp);
+  try {
+    return fn(tmp);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// AUTH-05 Test M1 — _readHubConfig returns orgId when cfg.hub.org_id is set
+test("AUTH-05 M1: _readHubConfig returns orgId from cfg.hub.org_id", async () => {
+  const mod = await loadManagerModuleFresh();
+  withTempCwdConfig(
+    {
+      hub: {
+        "auto-sync": true,
+        "project-slug": "p",
+        url: "https://h",
+        org_id: "org-repo",
+      },
+    },
+    () => {
+      const cfg = mod._readHubConfig();
+      assert.equal(cfg.orgId, "org-repo");
+      assert.equal(cfg.hubAutoSync, true);
+      assert.equal(cfg.projectSlug, "p");
+      assert.equal(cfg.hubUrl, "https://h");
+    },
+  );
+});
+
+// AUTH-05 Test M2 — _readHubConfig returns orgId: undefined when no hub.org_id
+test("AUTH-05 M2: _readHubConfig returns orgId=undefined when hub.org_id is not set", async () => {
+  const mod = await loadManagerModuleFresh();
+  withTempCwdConfig(
+    {
+      hub: { "auto-sync": true, "project-slug": "p" },
+    },
+    () => {
+      const cfg = mod._readHubConfig();
+      assert.equal(cfg.orgId, undefined);
+    },
+  );
+  // Also: missing config file — should also return orgId: undefined.
+  withTempCwdConfig(null, () => {
+    const cfg = mod._readHubConfig();
+    assert.equal(cfg.orgId, undefined);
+    assert.equal(cfg.hubAutoSync, false);
+  });
+});
+
+// AUTH-05 Test M3 — precedence wire: per-repo hub.org_id is read by
+// _readHubConfig and is the value that would be threaded into syncFindings
+// (resolveCredentials precedence opts > env > default is verified by Task 1
+// auth.test.js A4; this case pins that the manager actually surfaces the
+// per-repo value as opts.orgId).
+test("AUTH-05 M3: per-repo hub.org_id surfaces as orgId out of _readHubConfig", async () => {
+  const mod = await loadManagerModuleFresh();
+  withTempCwdConfig(
+    {
+      hub: {
+        "auto-sync": true,
+        "project-slug": "p",
+        org_id: "org-repo-precedence",
+      },
+    },
+    () => {
+      const cfg = mod._readHubConfig();
+      assert.equal(
+        cfg.orgId,
+        "org-repo-precedence",
+        "per-repo hub.org_id must surface as orgId — this is the value " +
+          "manager.js threads into syncFindings as opts.orgId, which then " +
+          "wins precedence in resolveCredentials over ARCANON_ORG_ID env " +
+          "and ~/.arcanon/config.json default_org_id.",
+      );
+    },
+  );
+});
+
+// AUTH-05 Test M4 — existing fixture compatibility: _readHubConfig return
+// shape extension is purely additive; pre-existing 4-key destructure callers
+// see no regression because the new orgId field defaults to undefined.
+test("AUTH-05 M4: _readHubConfig return shape extension does not break 4-key destructures", async () => {
+  const mod = await loadManagerModuleFresh();
+  withTempCwdConfig(
+    {
+      hub: { "auto-sync": true, "project-slug": "p", url: "https://h" },
+    },
+    () => {
+      const cfg = mod._readHubConfig();
+      // Old destructure: { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled }
+      const { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled } = cfg;
+      assert.equal(hubAutoSync, true);
+      assert.equal(hubUrl, "https://h");
+      assert.equal(projectSlug, "p");
+      assert.equal(libraryDepsEnabled, false);
+      // The new orgId key exists but defaults to undefined when not configured.
+      assert.equal(cfg.orgId, undefined);
+    },
+  );
+});

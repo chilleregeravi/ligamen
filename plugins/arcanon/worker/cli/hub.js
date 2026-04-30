@@ -35,6 +35,9 @@ import {
   pruneDead,
   resolveCredentials,
   storeCredentials,
+  getKeyInfo,
+  AuthError,
+  HubError,
 } from "../hub-sync/index.js";
 import { resolveConfigPath } from "../lib/config-path.js";
 import { resolveDataDir } from "../lib/data-dir.js";
@@ -154,18 +157,198 @@ async function cmdVersion(flags) {
   emit({ version: readPackageVersion() }, flags, `arcanon plugin v${readPackageVersion()}`);
 }
 
-async function cmdLogin(flags) {
-  const apiKey = flags["api-key"] || process.env.ARCANON_API_KEY;
+/**
+ * AUTH-06 / D-125-02: Whoami-driven login flow.
+ *
+ * Calls GET /api/v1/auth/whoami to discover org grants for the supplied key,
+ * then applies the 4×2 branch table (whoami outcome × --org-id provided/not).
+ *
+ * Exit codes:
+ *   0 — success (or warn-and-store when hub unavailable + --org-id supplied)
+ *   2 — failure (no key, bad key format, invalid uuid, 0 grants, AuthError,
+ *               hub unavailable without --org-id)
+ *   7 — multi-grant prompt: stdout emits __ARCANON_GRANT_PROMPT__ sentinel +
+ *       JSON grants array for the slash-command markdown layer to handle via
+ *       AskUserQuestion + re-invocation with --org-id <chosen>.
+ *
+ * Security: the api key is NEVER echoed to stdout or stderr.
+ */
+async function cmdLogin(flags, positional) {
+  // Resolve api key: positional arg first (from slash command), then --api-key flag, then env.
+  const apiKey = positional?.[0] || flags["api-key"] || process.env.ARCANON_API_KEY;
   if (!apiKey) {
-    console.error("error: pass --api-key arc_... or set ARCANON_API_KEY");
+    process.stderr.write("error: pass --api-key arc_... or set ARCANON_API_KEY\n");
     process.exit(2);
   }
-  const file = storeCredentials(apiKey, { hubUrl: flags["hub-url"] });
-  emit(
-    { ok: true, stored_at: file, hub_url: flags["hub-url"] || null },
-    flags,
-    `✓ saved credentials to ${file}${flags["hub-url"] ? ` (hub_url=${flags["hub-url"]})` : ""}`,
-  );
+  if (!apiKey.startsWith("arc_")) {
+    process.stderr.write("error: api key must start with arc_\n");
+    process.exit(2);
+  }
+
+  // Resolve optional --org-id with uuid v4 validation.
+  const orgId = flags["org-id"] || null;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (orgId && !UUID_RE.test(orgId)) {
+    process.stderr.write(`error: --org-id must be a uuid (got ${orgId})\n`);
+    process.exit(2);
+  }
+
+  // Resolve hub URL for whoami: flag → env → home config → default.
+  // Use resolveCredentials with orgIdRequired:false to get hubUrl without requiring org.
+  let hubUrlForWhoami;
+  try {
+    const creds = resolveCredentials({
+      apiKey,
+      hubUrl: flags["hub-url"] || undefined,
+      orgIdRequired: false,
+    });
+    hubUrlForWhoami = creds.hubUrl;
+  } catch {
+    // resolveCredentials throws AuthError if key is bad format — but we already
+    // validated startsWith("arc_"), so this path is unlikely. Fallback to default.
+    const { DEFAULT_HUB_URL } = await import("../hub-sync/auth.js");
+    hubUrlForWhoami = flags["hub-url"] || process.env.ARCANON_HUB_URL || DEFAULT_HUB_URL;
+  }
+
+  // Call whoami — never echoes the full key.
+  let keyInfo = null;
+  let whoamiErr = null;
+  let whoamiErrKind = null; // "auth" | "hub5xx" | "network"
+
+  try {
+    keyInfo = await getKeyInfo(apiKey, hubUrlForWhoami);
+  } catch (err) {
+    whoamiErr = err;
+    if (err instanceof AuthError) {
+      whoamiErrKind = "auth";
+    } else if (err instanceof HubError) {
+      // Distinguish network error (status===null, retriable) from hub 5xx.
+      whoamiErrKind = (err.status === null && err.retriable) ? "network" : "hub5xx";
+    } else {
+      // Unexpected error — re-throw.
+      throw err;
+    }
+  }
+
+  // ---- Branch table (D-125-02) ----
+
+  // Case: AuthError (401/403) — key invalid or revoked. NEVER store.
+  if (whoamiErrKind === "auth") {
+    const msg = "error: hub rejected the API key during whoami — generate a new key at https://app.arcanon.dev/settings/api-keys";
+    if (flags.json) {
+      process.stdout.write(JSON.stringify({ ok: false, error: msg }) + "\n");
+    } else {
+      process.stderr.write(msg + "\n");
+    }
+    process.exit(2);
+  }
+
+  // Case: HubError 5xx or network error.
+  if (whoamiErrKind === "hub5xx" || whoamiErrKind === "network") {
+    if (orgId) {
+      // Store with warning — user explicitly supplied org id.
+      const file = storeCredentials(apiKey, { hubUrl: flags["hub-url"], defaultOrgId: orgId });
+      const warnMsg = whoamiErrKind === "network"
+        ? "⚠ hub unreachable; grants could not be verified — credential stored, retry /arcanon:login when online"
+        : `⚠ hub whoami returned ${whoamiErr.status}; grants could not be verified — credential stored, retry /arcanon:login later to verify`;
+      process.stderr.write(warnMsg + "\n");
+      if (flags.json) {
+        process.stdout.write(JSON.stringify({
+          ok: true, stored_at: file, hub_url: flags["hub-url"] || null,
+          org_id: orgId, warning: warnMsg,
+        }) + "\n");
+      } else {
+        process.stdout.write(`✓ credential stored to ${file}\n`);
+      }
+      process.exit(0);
+    } else {
+      // No org id — refuse to store.
+      const msg = whoamiErrKind === "network"
+        ? "error: hub unreachable and no --org-id provided — connect to the network and retry, or run /arcanon:login arc_… --org-id <uuid>"
+        : `error: hub whoami unavailable (${whoamiErr.status}) and no --org-id provided — retry later, or run /arcanon:login arc_… --org-id <uuid> if you know the org id`;
+      if (flags.json) {
+        process.stdout.write(JSON.stringify({ ok: false, error: msg }) + "\n");
+      } else {
+        process.stderr.write(msg + "\n");
+      }
+      process.exit(2);
+    }
+  }
+
+  // Case: whoami success — keyInfo is populated.
+  const grants = Array.isArray(keyInfo?.grants) ? keyInfo.grants : [];
+
+  if (orgId) {
+    // With --org-id: verify the supplied org appears in grants.
+    const matchingGrant = grants.find((g) => g.org_id === orgId);
+    const file = storeCredentials(apiKey, { hubUrl: flags["hub-url"], defaultOrgId: orgId });
+
+    if (matchingGrant) {
+      const slug = matchingGrant.org_name || matchingGrant.slug || orgId;
+      const successMsg = `✓ verified: signed in to org ${slug} (${orgId}) as ${keyInfo.user_id}`;
+      if (flags.json) {
+        process.stdout.write(JSON.stringify({
+          ok: true, stored_at: file, hub_url: flags["hub-url"] || null,
+          org_id: orgId, org_slug: slug, source_branch: "verified",
+        }) + "\n");
+      } else {
+        process.stdout.write(successMsg + "\n");
+      }
+    } else {
+      // Mismatch — store anyway but warn loudly.
+      const grantList = grants.map((g) => `${g.org_name || g.slug || g.org_id} (${g.org_id})`).join(", ");
+      const warnMsg = `⚠ key is not authorized for org ${orgId} — server will reject uploads. Run /arcanon:login --org-id <uuid> with one of: ${grantList || "(no grants found)"}  to switch.`;
+      process.stderr.write(warnMsg + "\n");
+      if (flags.json) {
+        process.stdout.write(JSON.stringify({
+          ok: true, stored_at: file, hub_url: flags["hub-url"] || null,
+          org_id: orgId, org_slug: null, source_branch: "mismatch", warning: warnMsg,
+        }) + "\n");
+      } else {
+        process.stdout.write(`✓ credential stored to ${file}\n`);
+      }
+    }
+    process.exit(0);
+  }
+
+  // Without --org-id: apply grant-count resolution.
+  if (grants.length === 0) {
+    const msg = "error: key has no org grants — ask your admin to grant the key access at https://app.arcanon.dev/settings/api-keys";
+    if (flags.json) {
+      process.stdout.write(JSON.stringify({ ok: false, error: msg }) + "\n");
+    } else {
+      process.stderr.write(msg + "\n");
+    }
+    process.exit(2);
+  }
+
+  if (grants.length === 1) {
+    const grant = grants[0];
+    const chosenOrgId = grant.org_id;
+    const slug = grant.org_name || grant.slug || chosenOrgId;
+    const file = storeCredentials(apiKey, { hubUrl: flags["hub-url"], defaultOrgId: chosenOrgId });
+    const successMsg = `✓ auto-selected org ${slug} (${chosenOrgId})`;
+    if (flags.json) {
+      process.stdout.write(JSON.stringify({
+        ok: true, stored_at: file, hub_url: flags["hub-url"] || null,
+        org_id: chosenOrgId, org_slug: slug, source_branch: "auto-selected",
+      }) + "\n");
+    } else {
+      process.stdout.write(successMsg + "\n");
+    }
+    process.exit(0);
+  }
+
+  // N > 1 grants: emit sentinel for the markdown layer to handle via AskUserQuestion.
+  // The slash-command markdown parses this sentinel, prompts the user, then re-invokes
+  // cmdLogin with --org-id <chosen_uuid>.
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ action: "prompt_grants", grants }) + "\n");
+  } else {
+    process.stdout.write("__ARCANON_GRANT_PROMPT__\n");
+    process.stdout.write(JSON.stringify(grants) + "\n");
+  }
+  process.exit(7);
 }
 
 async function cmdStatus(flags) {
@@ -193,6 +376,9 @@ async function cmdStatus(flags) {
   // is no longer consumed by /arcanon:status.
   const freshness = await _fetchScanFreshness(process.cwd());
 
+  // AUTH-07 / D-125-03: Identity block.
+  const identity = await _buildIdentityBlock(cfg);
+
   const report = {
     plugin_version: readPackageVersion(),
     data_dir: resolveDataDir(),
@@ -202,6 +388,7 @@ async function cmdStatus(flags) {
     credentials: hasCreds ? "present" : "missing",
     queue: stats,
     scan_freshness: freshness?.report ?? null,
+    identity,
   };
 
   if (flags.json) {
@@ -216,6 +403,23 @@ async function cmdStatus(flags) {
     `  queue:        ${stats.pending} pending, ${stats.dead} dead${stats.oldestPending ? `, oldest ${stats.oldestPending}` : ""}`,
     `  data dir:     ${report.data_dir}`,
   ];
+
+  // AUTH-07 / D-125-03: Identity block (4 indented lines under "Identity:" header).
+  // Rendered after data dir, before Latest scan freshness lines.
+  lines.push(`  Identity:`);
+  const idOrgId = identity.org_id || "(missing)";
+  const idSource = identity.org_id_source || "—";
+  lines.push(`    org id:        ${idOrgId}  (source: ${idSource})`);
+  lines.push(`    key:           ${identity.key_preview || "(missing)"}`);
+  if (identity.whoami_status === "ok") {
+    lines.push(`    scopes:        ${identity.scopes.length > 0 ? identity.scopes.join(", ") : "(none)"}`);
+    const slugs = identity.authorized_orgs.map((o) => o.slug || o.id).join(", ");
+    lines.push(`    authorized:    ${slugs || "(none)"}`);
+  } else {
+    lines.push(`    scopes:        (unavailable: ${identity.whoami_status})`);
+    lines.push(`    authorized:    (unavailable)`);
+  }
+
   if (freshness?.qualityLine) {
     lines.push(`  ${freshness.qualityLine}`);
   }
@@ -223,6 +427,101 @@ async function cmdStatus(flags) {
     lines.push(`  ${line}`);
   }
   emit(report, flags, lines.join("\n"));
+}
+
+/**
+ * AUTH-07 / D-125-03: Build the Identity block surfaced in /arcanon:status.
+ *
+ * Resolution:
+ *   1. Try resolveCredentials({orgIdRequired:false}) — gives apiKey + hubUrl + best-effort orgId.
+ *      If no creds at all → return all-null with whoami_status: "skipped".
+ *   2. Build key_preview as `${apiKey.slice(0,8)}…${apiKey.slice(-4)}` (e.g. arc_xxxx…1234).
+ *   3. Determine org_id_source by inspecting opts/env/repo-config/home-config in precedence order.
+ *   4. If apiKey + hubUrl resolve, call getKeyInfo(apiKey, hubUrl) with a 4 s timeout.
+ *      - On success → populate scopes, authorized_orgs, whoami_status:"ok".
+ *      - On AuthError → whoami_status:"auth_error".
+ *      - On HubError 5xx → whoami_status:"hub_error".
+ *      - On HubError network (status:null + retriable) → whoami_status:"network_error".
+ *
+ * @param {object} cfg - Already-loaded project config (from readProjectConfig()).
+ * @returns {Promise<{
+ *   org_id: string|null,
+ *   org_id_source: string|null,
+ *   key_preview: string|null,
+ *   scopes: string[],
+ *   authorized_orgs: Array<{id: string, slug: string}>,
+ *   whoami_status: "ok"|"auth_error"|"hub_error"|"network_error"|"skipped",
+ * }>}
+ */
+async function _buildIdentityBlock(cfg) {
+  const empty = {
+    org_id: null,
+    org_id_source: null,
+    key_preview: null,
+    scopes: [],
+    authorized_orgs: [],
+    whoami_status: "skipped",
+  };
+
+  // Determine org_id_source by inspecting precedence chain explicitly.
+  // Order: per-repo hub.org_id → ARCANON_ORG_ID env → home-config default_org_id.
+  const repoOrgId = cfg?.hub?.org_id || null;
+  const envOrgId = process.env.ARCANON_ORG_ID || null;
+
+  let creds;
+  try {
+    creds = resolveCredentials({
+      orgId: repoOrgId || undefined,
+      orgIdRequired: false,
+    });
+  } catch {
+    return empty;
+  }
+
+  const { apiKey, hubUrl, orgId } = creds;
+  const keyPreview = apiKey && apiKey.length >= 12
+    ? `${apiKey.slice(0, 8)}…${apiKey.slice(-4)}`
+    : (apiKey ? "arc_***" : null);
+
+  // Compute org_id_source: which precedence tier produced the resolved orgId?
+  let orgIdSource = null;
+  if (orgId) {
+    if (repoOrgId && orgId === repoOrgId) orgIdSource = "repo_config";
+    else if (envOrgId && orgId === envOrgId) orgIdSource = "env";
+    else orgIdSource = "config_default";
+  }
+
+  // Best-effort whoami call with 4-second timeout cap so /arcanon:status never hangs.
+  let scopes = [];
+  let authorizedOrgs = [];
+  let whoamiStatus = "ok";
+  try {
+    const info = await getKeyInfo(apiKey, hubUrl, { timeoutMs: 4000 });
+    scopes = Array.isArray(info?.scopes) ? info.scopes : [];
+    const grants = Array.isArray(info?.grants) ? info.grants : [];
+    authorizedOrgs = grants.map((g) => ({
+      id: g.org_id,
+      slug: g.org_name || g.slug || g.org_id,
+    }));
+  } catch (err) {
+    if (err instanceof AuthError) {
+      whoamiStatus = "auth_error";
+    } else if (err instanceof HubError) {
+      whoamiStatus = (err.status === null && err.retriable) ? "network_error" : "hub_error";
+    } else {
+      // Unexpected — treat as hub_error so /arcanon:status still renders cleanly.
+      whoamiStatus = "hub_error";
+    }
+  }
+
+  return {
+    org_id: orgId || null,
+    org_id_source: orgIdSource,
+    key_preview: keyPreview,
+    scopes,
+    authorized_orgs: authorizedOrgs,
+    whoami_status: whoamiStatus,
+  };
 }
 
 /**
@@ -1279,7 +1578,11 @@ async function cmdDoctor(flags) {
     await runCheck(8, "hub_credentials", "non-critical", async () => {
       let creds;
       try {
-        creds = resolveCredentials();
+        // Check 8 only needs apiKey + hubUrl for the GET /api/version probe;
+        // org_id is not part of that round-trip. Opt out of the AUTH-03 org-id
+        // requirement so a "creds present but no org_id" config doesn't get
+        // mis-classified as SKIP. (See doctor.bats NAV-03 tests 9-10.)
+        creds = resolveCredentials({ orgIdRequired: false });
       } catch {
         return { status: "SKIP", detail: "no credentials configured" };
       }

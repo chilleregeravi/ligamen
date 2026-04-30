@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveDataDir } from "../lib/data-dir.js";
 import { getQueryEngine } from "../db/pool.js";
+import { maskHomeDeep } from "../lib/path-mask.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -237,7 +238,11 @@ async function main() {
     flags.out || path.join(".arcanon", "reports", new Date().toISOString().replace(/[:.]/g, "-")),
   );
 
-  const graph = loadGraph(repoPath);
+  // PII-05: mask absolute repo paths in services[].root_path /
+  // services[].repo_path before any of the four downstream emitters
+  // (toMermaid, toDot, toHtml, JSON) sees the data. Single edit covers all
+  // four formats; html escaping leaves '~' untouched.
+  const graph = maskHomeDeep(loadGraph(repoPath));
 
   fs.mkdirSync(outDir, { recursive: true });
   const written = [];

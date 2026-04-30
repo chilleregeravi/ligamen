@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { maskHomeDeep } from "./path-mask.js";
 
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 const MAX_LOG_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -58,7 +59,13 @@ export function createLogger({ dataDir, port, logLevel = "INFO", component }) {
     // Merge any extra fields last so they don't override core fields accidentally
     Object.assign(lineObj, extra);
 
-    const line = JSON.stringify(lineObj);
+    // PII-04 (M1 mitigation): single-seam $HOME masking. Walks the merged
+    // line object once, masks every string value (including unkeyed stack
+    // frames inside extra.stack). Do NOT replicate this at the ~30 logger
+    // call sites — the seam is intentionally one place.
+    const masked = maskHomeDeep(lineObj);
+
+    const line = JSON.stringify(masked);
     const logPath = path.join(dataDir, "logs", "worker.log");
     rotateIfNeeded(logPath);
     fs.appendFileSync(logPath, line + "\n");
