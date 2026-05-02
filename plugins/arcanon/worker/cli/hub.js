@@ -51,7 +51,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * Bounded fetch with timeout. Returns a normalized result object regardless
  * of success/failure so callers don't need try/catch boilerplate.
  *
- * Used by cmdDoctor checks 1, 2, and 8 . The contract
+ * Used by cmdDoctor checks 1, 2, and 8. The contract
  * documented here is the surface the doctor checks rely on — do NOT change
  * field names without updating cmdDoctor.
  *
@@ -203,7 +203,7 @@ async function cmdLogin(flags, positional) {
     }
   }
 
-  // Branch table  ----
+  // ---- Branch table ----
 
   // Case: AuthError (401/403) — key invalid or revoked. NEVER store.
   if (whoamiErrKind === "auth") {
@@ -339,7 +339,7 @@ async function cmdStatus(flags) {
     }
   })();
 
-  // 02 : best-effort latest-scan freshness via the new
+  // Best-effort latest-scan freshness via the
   // /api/scan-freshness endpoint. Surfaces both the quality line ("Latest scan:
   // YYYY-MM-DD (NN% high-confidence)") and the per-repo drift line ("N repo(s)
   // have new commits since last scan: <name> (M new), ..."). The drift line is
@@ -498,7 +498,7 @@ async function _buildIdentityBlock(cfg) {
 }
 
 /**
- * Fetches scan freshness data from the worker (/04). Returns formatted
+ * Fetches scan freshness data from the worker. Returns formatted
  * status output lines plus the raw report for --json mode. Best-effort:
  * returns null on any failure (worker offline, no scan data, network error,
  * old worker without the endpoint). Callers MUST tolerate a null return —
@@ -737,8 +737,8 @@ async function cmdSync(flags) {
 }
 
 /**
- * cmdVerify — Re-read cited source files and report per-connection verdicts
- * . Read-only; never writes to the scan database.
+ * cmdVerify — Re-read cited source files and report per-connection verdicts.
+ * Read-only; never writes to the scan database.
  *
  * Verdicts (exhaustive): ok | moved | missing | method_mismatch
  *

@@ -139,7 +139,7 @@ test("syncFindings enqueues payload when hub returns 5xx", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// ..05 e2e: per-repo hub.org_id beats ARCANON_ORG_ID beats default_org_id;
+// e2e: per-repo hub.org_id beats ARCANON_ORG_ID beats default_org_id;
 // X-Org-Id header lands on the request. Pinning the precedence wire end-to-end.
 // ---------------------------------------------------------------------------
 

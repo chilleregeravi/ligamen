@@ -91,9 +91,9 @@ function computeVerdict(conn, projectRoot) {
   }
 
   // 5/6. Delegate hash + line-range derivation to the shared helper
-  //      (single source of truth for evidence-line semantics — 
-  //      ). The helper does its own file-read; we accept the small
-  //      redundancy (one extra readFileSync per verify call) in exchange for
+  //      — single source of truth for evidence-line semantics. The helper
+  //      does its own file-read; we accept the small redundancy (one extra
+  //      readFileSync per verify call) in exchange for
   //      keeping the moved-vs-missing distinction the verify command needs:
   //      the helper conflates "file unreadable" and "snippet not in file"
   //      as evidence_present=false, so we keep the existsSync/readFileSync

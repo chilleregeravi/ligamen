@@ -1732,14 +1732,26 @@ describe("scanRepos — scan lifecycle logging (SCAN-01, SCAN-02)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Two-read pattern tests for _readHubAutoSync
+// Two-read pattern tests for readHubAutoSync (shared helper)
+//
+// Imports the helper directly from worker/lib/hub-config.js — the same
+// module that worker/cli/hub.js and worker/scan/manager.js both use. The
+// `_resetAutoUploadDeprecationWarnedForTests` reset hook lets us isolate
+// the once-per-process deprecation warning between tests without resorting
+// to the ESM cache-busting trick the previous version used.
 // ---------------------------------------------------------------------------
+
+import {
+  readHubAutoSync,
+  _resetAutoUploadDeprecationWarnedForTests,
+} from "../lib/hub-config.js";
+import { _readHubConfig } from "./manager.js";
 
 // Test helper: stub process.stderr.write and return a capture array.
 function captureStderr() {
   const originalWrite = process.stderr.write.bind(process.stderr);
   const captured = [];
-  process.stderr.write = (chunk, ...rest) => {
+  process.stderr.write = (chunk) => {
     captured.push(String(chunk));
     return true;
   };
@@ -1749,24 +1761,11 @@ function captureStderr() {
   };
 }
 
-// Dynamic re-import to reset the module-level `_autoUploadDeprecationWarned`
-// guard between tests. The ESM import cache returns the same instance, so
-// we reset by cache-busting via a query-string on the import specifier.
-// Note: registerEnricher calls at module load are idempotent by key, so
-// re-importing manager.js multiple times is safe.
-async function loadManagerModuleFresh() {
-  const specifier = new URL(
-    `./manager.js?fresh=${Date.now()}-${Math.random()}`,
-    import.meta.url,
-  ).href;
-  return import(specifier);
-}
-
-test("auto-sync=true activates sync without deprecation warning", async () => {
+test("auto-sync=true activates sync without deprecation warning", () => {
+  _resetAutoUploadDeprecationWarnedForTests();
   const capture = captureStderr();
   try {
-    const mod = await loadManagerModuleFresh();
-    const result = mod._readHubAutoSync({ "auto-sync": true });
+    const result = readHubAutoSync({ "auto-sync": true });
     assert.equal(result, true);
     assert.equal(
       capture.captured.filter(s => s.includes("deprecated")).length,
@@ -1778,14 +1777,14 @@ test("auto-sync=true activates sync without deprecation warning", async () => {
   }
 });
 
-test("auto-upload-only triggers sync AND writes one deprecation warning", async () => {
+test("auto-upload-only triggers sync AND writes one deprecation warning", () => {
+  _resetAutoUploadDeprecationWarnedForTests();
   const capture = captureStderr();
   try {
-    const mod = await loadManagerModuleFresh();
     // First read: warning fires
-    const first = mod._readHubAutoSync({ "auto-upload": true });
+    const first = readHubAutoSync({ "auto-upload": true });
     // Second read: warning must NOT fire again (once-per-process guard)
-    const second = mod._readHubAutoSync({ "auto-upload": true });
+    const second = readHubAutoSync({ "auto-upload": true });
     assert.equal(first, true);
     assert.equal(second, true);
     const warnings = capture.captured.filter(s => s.includes("auto-upload"));
@@ -1797,11 +1796,11 @@ test("auto-upload-only triggers sync AND writes one deprecation warning", async 
   }
 });
 
-test("auto-sync=false beats auto-upload=true (new key wins)", async () => {
+test("auto-sync=false beats auto-upload=true (new key wins)", () => {
+  _resetAutoUploadDeprecationWarnedForTests();
   const capture = captureStderr();
   try {
-    const mod = await loadManagerModuleFresh();
-    const result = mod._readHubAutoSync({ "auto-sync": false, "auto-upload": true });
+    const result = readHubAutoSync({ "auto-sync": false, "auto-upload": true });
     assert.equal(result, false, "explicit false on new key disables, ignores legacy true");
     assert.equal(
       capture.captured.filter(s => s.includes("deprecated")).length,
@@ -1813,11 +1812,11 @@ test("auto-sync=false beats auto-upload=true (new key wins)", async () => {
   }
 });
 
-test("neither key set disables sync without warning", async () => {
+test("neither key set disables sync without warning", () => {
+  _resetAutoUploadDeprecationWarnedForTests();
   const capture = captureStderr();
   try {
-    const mod = await loadManagerModuleFresh();
-    const result = mod._readHubAutoSync({});
+    const result = readHubAutoSync({});
     assert.equal(result, false);
     assert.equal(
       capture.captured.filter(s => s.includes("deprecated")).length,
@@ -1852,8 +1851,7 @@ function withTempCwdConfig(cfgJson, fn) {
 }
 
 // Test M1 — _readHubConfig returns orgId when cfg.hub.org_id is set
-test("_readHubConfig returns orgId from cfg.hub.org_id", async () => {
-  const mod = await loadManagerModuleFresh();
+test("_readHubConfig returns orgId from cfg.hub.org_id", () => {
   withTempCwdConfig(
     {
       hub: {
@@ -1864,7 +1862,7 @@ test("_readHubConfig returns orgId from cfg.hub.org_id", async () => {
       },
     },
     () => {
-      const cfg = mod._readHubConfig();
+      const cfg = _readHubConfig();
       assert.equal(cfg.orgId, "org-repo");
       assert.equal(cfg.hubAutoSync, true);
       assert.equal(cfg.projectSlug, "p");
@@ -1874,20 +1872,19 @@ test("_readHubConfig returns orgId from cfg.hub.org_id", async () => {
 });
 
 // Test M2 — _readHubConfig returns orgId: undefined when no hub.org_id
-test("_readHubConfig returns orgId=undefined when hub.org_id is not set", async () => {
-  const mod = await loadManagerModuleFresh();
+test("_readHubConfig returns orgId=undefined when hub.org_id is not set", () => {
   withTempCwdConfig(
     {
       hub: { "auto-sync": true, "project-slug": "p" },
     },
     () => {
-      const cfg = mod._readHubConfig();
+      const cfg = _readHubConfig();
       assert.equal(cfg.orgId, undefined);
     },
   );
   // Also: missing config file — should also return orgId: undefined.
   withTempCwdConfig(null, () => {
-    const cfg = mod._readHubConfig();
+    const cfg = _readHubConfig();
     assert.equal(cfg.orgId, undefined);
     assert.equal(cfg.hubAutoSync, false);
   });
@@ -1898,8 +1895,7 @@ test("_readHubConfig returns orgId=undefined when hub.org_id is not set", async 
 // (resolveCredentials precedence opts > env > default is verified by Task 1
 // auth.test.js A4; this case pins that the manager actually surfaces the
 // per-repo value as opts.orgId).
-test("per-repo hub.org_id surfaces as orgId out of _readHubConfig", async () => {
-  const mod = await loadManagerModuleFresh();
+test("per-repo hub.org_id surfaces as orgId out of _readHubConfig", () => {
   withTempCwdConfig(
     {
       hub: {
@@ -1909,7 +1905,7 @@ test("per-repo hub.org_id surfaces as orgId out of _readHubConfig", async () => 
       },
     },
     () => {
-      const cfg = mod._readHubConfig();
+      const cfg = _readHubConfig();
       assert.equal(
         cfg.orgId,
         "org-repo-precedence",
@@ -1925,14 +1921,13 @@ test("per-repo hub.org_id surfaces as orgId out of _readHubConfig", async () => 
 // Test M4 — existing fixture compatibility: _readHubConfig return
 // shape extension is purely additive; pre-existing 4-key destructure callers
 // see no regression because the new orgId field defaults to undefined.
-test("_readHubConfig return shape extension does not break 4-key destructures", async () => {
-  const mod = await loadManagerModuleFresh();
+test("_readHubConfig return shape extension does not break 4-key destructures", () => {
   withTempCwdConfig(
     {
       hub: { "auto-sync": true, "project-slug": "p", url: "https://h" },
     },
     () => {
-      const cfg = mod._readHubConfig();
+      const cfg = _readHubConfig();
       // Old destructure: { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled }
       const { hubAutoSync, hubUrl, projectSlug, libraryDepsEnabled } = cfg;
       assert.equal(hubAutoSync, true);

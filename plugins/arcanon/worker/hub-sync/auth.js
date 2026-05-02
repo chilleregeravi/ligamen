@@ -60,7 +60,7 @@ function readHomeConfig() {
 /**
  * Internal: resolve only the api_key + hub_url + source. Used by both
  * `resolveCredentials` and `hasCredentials` so the latter never trips
- * on missing org_id .
+ * on missing org_id.
  *
  * @param {{ apiKey?: string, hubUrl?: string }} [opts]
  * @param {object} [homeCfg] — pre-read ~/.arcanon/config.json (avoid double-reading)
@@ -139,7 +139,7 @@ function _resolveOrgId(opts = {}, homeCfg = null) {
  * existing destructures at hub.js:179, 777, 1282 depend on this shape).
  *
  * Throws AuthError when no apiKey can be found, or when no orgId can be
- * resolved (per  /  — every upload requires an X-Org-Id).
+ * resolved — every upload requires an X-Org-Id header.
  *
  * Pass `{ orgIdRequired: false }` to disable the org-id requirement for
  * callers that only need apiKey + hubUrl (e.g. doctor check 8 round-trips
