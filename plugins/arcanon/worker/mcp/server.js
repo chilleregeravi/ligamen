@@ -1197,7 +1197,11 @@ export async function queryDriftOpenapi(db, { severity = "WARN" } = {}) {
  */
 export async function queryScan({ repo, full = false } = {}) {
   try {
-    const portFilePath = path.join(dataDir, "worker.port");
+    // Resolve dataDir lazily so tests can isolate via ARCANON_DATA_DIR; the
+    // module-level `dataDir` constant is frozen at import time and would
+    // otherwise leak the developer's real ~/.arcanon/worker.port into the
+    // test's "no worker" scenario.
+    const portFilePath = path.join(resolveDataDir(), "worker.port");
     let port;
     try {
       port = fs.readFileSync(portFilePath, "utf8").trim();
