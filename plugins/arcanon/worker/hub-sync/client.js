@@ -166,7 +166,7 @@ export async function uploadScan(payload, opts) {
   // client-side prevents wasted retries and surfaces a clear remediation.
   if (!orgId) {
     throw new HubError(
-      "Missing X-Org-Id header — orgId is required (THE-1029). " +
+      "Missing X-Org-Id header — orgId is required. " +
         "Run /arcanon:login --org-id <uuid> or set ARCANON_ORG_ID, or add hub.org_id to arcanon.config.json.",
       { status: 400, retriable: false, code: "missing_org_id" },
     );

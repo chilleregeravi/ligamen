@@ -41,6 +41,7 @@ import {
 } from "../hub-sync/index.js";
 import { resolveConfigPath } from "../lib/config-path.js";
 import { resolveDataDir } from "../lib/data-dir.js";
+import { maskHome } from "../lib/path-mask.js";
 import { projectHashDir, evictLiveQueryEngine } from "../db/pool.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -381,8 +382,8 @@ async function cmdStatus(flags) {
 
   const report = {
     plugin_version: readPackageVersion(),
-    data_dir: resolveDataDir(),
-    config_file: resolveConfigPath(process.cwd()),
+    data_dir: maskHome(resolveDataDir()),
+    config_file: maskHome(resolveConfigPath(process.cwd())),
     project_slug: projectSlug,
     hub_auto_sync: hubAutoSync,
     credentials: hasCreds ? "present" : "missing",

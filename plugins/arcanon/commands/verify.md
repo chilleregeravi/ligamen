@@ -4,8 +4,6 @@ argument-hint: "[--connection <id> | --source <path>] [--all] [--json]"
 allowed-tools: Bash, mcp__plugin_arcanon_arcanon__*
 ---
 
-<!-- Linear THE-1022 reviewer item #1 — TRUST-01 (v0.1.3) -->
-
 # Arcanon Verify
 
 Re-read the cited source file and confirm the recorded evidence is still where

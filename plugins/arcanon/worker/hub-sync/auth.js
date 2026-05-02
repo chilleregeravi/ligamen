@@ -90,8 +90,7 @@ function _resolveApiKey(opts = {}, homeCfg = null) {
     throw new AuthError(
       "No Arcanon Hub API key found.\n" +
         "  1. Create a key: https://app.arcanon.dev/settings/api-keys\n" +
-        "     (if you're not signed in you'll be redirected to login first;\n" +
-        "      navigate to Settings → API keys after sign-in. Tracked: THE-1016.)\n" +
+        "     (sign in first, then navigate to Settings → API keys.)\n" +
         "  2. Run /arcanon:login arc_…  OR  set ARCANON_API_KEY in your environment.\n" +
         "     /arcanon:status will then report 'credentials: present'.",
     );
@@ -164,18 +163,10 @@ export function resolveCredentials(opts = {}) {
 }
 
 /**
- * Persist the api_key to ~/.arcanon/config.json with 0600 perms.
- * Creates the directory if missing.
- *
- * @param {string} apiKey — must start with arc_
- * @param {{ hubUrl?: string }} [opts]
- * @returns {string} path to the config file written
- */
-/**
  * Non-throwing credential presence check.
- * True iff an api_key resolves right now — does NOT require org_id (C2 option-a).
+ * True iff an api_key resolves right now — does NOT require org_id.
  *
- * Used by the scan manager's auto-upload gate so that users who ran
+ * Used by the scan manager's auto-sync gate so that users who ran
  * /arcanon:login but never set ARCANON_API_KEY still get auto-uploads.
  * Missing org_id is surfaced as an AuthError at upload time (resolveCredentials
  * throws), which lands in the scan-end WARN log via the existing

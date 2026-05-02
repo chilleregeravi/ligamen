@@ -22,9 +22,7 @@ Parse `$ARGUMENTS`:
 
 > "Paste your Arcanon Hub API key (starts with `arc_`).
 > Don't have one yet? Sign in at https://app.arcanon.dev, then open
-> Settings → API keys to create one. Heads-up: opening
-> `/settings/api-keys` directly while signed out lands you on `/home`
-> after login (THE-1016) — navigate to it manually for now."
+> Settings → API keys to create one."
 
 Do **not** print the key back to the user at any point.
 
