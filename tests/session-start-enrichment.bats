@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 # tests/session-start-enrichment.bats
 # Bats test suite for ARCANON_ENRICHMENT block in scripts/session-start.sh
-# Covers SSE-01 (fresh map), SSE-02 (plain banner when fresh), SSE-03 (stale prefix),
-#         SSE-04 (hub failure / corrupt DB fallback), SSE-05 (non-Arcanon dir),
-#         SSE-06 (< 200ms budget), SSE-07 (silent no-op on all failures)
+# Covers  (fresh map),  (plain banner when fresh),  (stale prefix),
+#         (hub failure / corrupt DB fallback),  (non-Arcanon dir),
+#         (< 200ms budget),  (silent no-op on all failures)
 
 PROJECT_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 
@@ -109,10 +109,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-01: fresh map (<48h) injects full enrichment suffix
+# fresh map (<48h) injects full enrichment suffix
 # ---------------------------------------------------------------------------
 
-@test "SSE-01: fresh map (<48h) injects full enrichment suffix" {
+@test "fresh map (<48h) injects full enrichment suffix" {
   # Build fixture: 1h old, 5 services, 3 load-bearing files
   build_enrichment_fixture "$FIXTURE_CWD" "$FIXTURE_DATA_DIR" 1 5 3
 
@@ -136,10 +136,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-03: stale map (48h < age < 7d) prepends stale prefix
+# stale map (48h < age < 7d) prepends stale prefix
 # ---------------------------------------------------------------------------
 
-@test "SSE-03: stale map (48h < age < 7d) prepends stale prefix" {
+@test "stale map (48h < age < 7d) prepends stale prefix" {
   # Build fixture: 72h old (3 days), 5 services, 3 load-bearing files
   build_enrichment_fixture "$FIXTURE_CWD" "$FIXTURE_DATA_DIR" 72 5 3
 
@@ -161,10 +161,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-01: map > 7d old produces no enrichment
+# map > 7d old produces no enrichment
 # ---------------------------------------------------------------------------
 
-@test "SSE-01: map > 7d old produces no enrichment" {
+@test "map > 7d old produces no enrichment" {
   # Build fixture: 200h old (> 7 days), 5 services, 3 load-bearing files
   build_enrichment_fixture "$FIXTURE_CWD" "$FIXTURE_DATA_DIR" 200 5 3
 
@@ -182,10 +182,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-05: non-Arcanon directory (no impact-map.db) produces no enrichment
+# non-Arcanon directory (no impact-map.db) produces no enrichment
 # ---------------------------------------------------------------------------
 
-@test "SSE-05: non-Arcanon directory (no impact-map.db) produces no enrichment and no 'inactive' text" {
+@test "non-Arcanon directory (no impact-map.db) produces no enrichment and no 'inactive' text" {
   # No fixture built — FIXTURE_CWD has no impact-map.db in FIXTURE_DATA_DIR
 
   run_hook "bats-sse-05"
@@ -203,10 +203,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-04: hub.sh status failure degrades gracefully
+# hub.sh status failure degrades gracefully
 # ---------------------------------------------------------------------------
 
-@test "SSE-04: hub.sh status failure degrades gracefully to Hub: unknown" {
+@test "hub.sh status failure degrades gracefully to Hub: unknown" {
   # Build a fresh valid fixture
   build_enrichment_fixture "$FIXTURE_CWD" "$FIXTURE_DATA_DIR" 1 5 3
 
@@ -225,10 +225,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-04: corrupt DB file falls back silently
+# corrupt DB file falls back silently
 # ---------------------------------------------------------------------------
 
-@test "SSE-04: corrupt DB file falls back silently" {
+@test "corrupt DB file falls back silently" {
   # Compute the expected DB path and write garbage there
   local hash
   hash="$(_compute_project_hash "$FIXTURE_CWD")"
@@ -254,10 +254,10 @@ print(d['hookSpecificOutput']['additionalContext'])
 }
 
 # ---------------------------------------------------------------------------
-# SSE-06: total overhead < 200ms budget on warm cache
+# total overhead < 200ms budget on warm cache
 # ---------------------------------------------------------------------------
 
-@test "SSE-06: total overhead < 200ms budget on warm cache" {
+@test "total overhead < 200ms budget on warm cache" {
   # Build a fresh valid fixture
   build_enrichment_fixture "$FIXTURE_CWD" "$FIXTURE_DATA_DIR" 1 5 3
 

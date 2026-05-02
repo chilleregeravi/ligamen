@@ -1,21 +1,21 @@
 /**
- * Scan-version selector resolver — Phase 115, Plan 115-01, Task 1 (NAV-04).
+ * Scan-version selector resolver —, , Task 1 .
  *
  * Translates an operator-supplied scan-version selector (one of four shapes:
  * integer ID, HEAD/HEAD~N, ISO 8601 date or timestamp, or branch name) into
  * a concrete `scan_versions.id` number.
  *
- * Engine-shape contract (load-bearing for Phase 119 shadow-DB reuse):
+ * Engine-shape contract (load-bearing for  shadow-DB reuse):
  *
  *   - Takes a raw `better-sqlite3` Database handle (NOT a projectRoot, NOT a
  *     pool key). The caller owns DB lifecycle. This module never opens,
  *     closes, attaches, or mutates the handle it receives.
  *
  *   - Pool-agnostic: imports nothing from `worker/db/pool.js` or
- *     `worker/db/database.js`. Phase 119 (`/arcanon:diff --shadow`) opens a
+ *     `worker/db/database.js`.  (`/arcanon:diff --shadow`) opens a
  *     shadow DB itself and passes the handle here without going through the
  *     pool. Adding any pool import would break that contract — see
- *     115-RESEARCH.md §8 for the full Phase 119 dependency promise.
+ *     115-RESEARCH.md §8 for the full  dependency promise.
  *
  *   - Read-only: only SELECT statements. No INSERT / UPDATE / DELETE
  *     anywhere in this module.

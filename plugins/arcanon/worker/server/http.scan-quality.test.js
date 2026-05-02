@@ -1,5 +1,5 @@
 /**
- * worker/server/http.scan-quality.test.js — Phase 111 Plan 02 (TRUST-05, D-05)
+ * worker/server/http.scan-quality.test.js —   
  *
  * Verifies the GET /api/scan-quality endpoint:
  *   - 200 + breakdown shape on a populated DB
@@ -8,7 +8,7 @@
  *   - 404 on a project that cannot be resolved (resolveQueryEngine → null)
  *   - Honors ?project= param via the existing resolveQueryEngine path
  *
- * The endpoint contract is locked in CONTEXT.md D-05:
+ * The endpoint contract is locked in CONTEXT.md :
  *   {
  *     scan_version_id, completed_at, quality_score, total_connections,
  *     high_confidence, low_confidence, null_confidence,

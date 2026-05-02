@@ -1,10 +1,10 @@
 /**
  * Test suite for migration 013 — connections.path_template column.
  *
- * Phase 109 (TRUST-03): adds a TEXT column on `connections` for storing
+ * adds a TEXT column on `connections` for storing
  * the original (un-canonicalized) path template(s). The canonical form
- * lives in the existing `path` column (D-02). No backfill — pre-migration
- * rows retain `path_template = NULL` (D-06).
+ * lives in the existing `path` column . No backfill — pre-migration
+ * rows retain `path_template = NULL` .
  *
  * Verifies:
  *   - version export === 13
@@ -88,6 +88,6 @@ describe('migration 013 — connections.path_template', () => {
     up013(db);
     const row = db.prepare('SELECT path, path_template FROM connections').get();
     assert.equal(row.path, '/runtime/streams/{stream_id}'); // path unchanged
-    assert.equal(row.path_template, null); // NOT backfilled — D-06
+    assert.equal(row.path_template, null); // NOT backfilled —
   });
 });

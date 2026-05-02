@@ -1,5 +1,5 @@
 /**
- * dep-collector.js — Library dependency enrichment module (v5.8.0 / THE-1019)
+ * dep-collector.js — Library dependency enrichment module (v5.8.0)
  *
  * Reads manifests for 7 ecosystems and returns normalized DependencyRow shapes
  * for the manager's Phase B loop to persist via queryEngine.upsertDependency.
@@ -7,10 +7,10 @@
  * Contract:
  *   - MUST NOT call beginScan/endScan — runs AFTER the bracket closes
  *   - MUST NOT access the database — it is a pure parser/shaper
- *   - Production deps only (DEP-07) — devDependencies are NEVER emitted
+ *   Production deps only  — devDependencies are NEVER emitted
  *   - Emits logger.log('WARN', ...) via injected logger for unsupported manifests
  *     and parser errors — partial coverage > total failure
- *   - Returns ecosystems_scanned array so coverage gaps are visible in logs (DEP-06)
+ *   Returns ecosystems_scanned array so coverage gaps are visible in logs 
  *
  * Supported: npm, pypi, go, cargo, maven, nuget, rubygems.
  * Unsupported (v5.8.0): swift, composer, mix, sbt, pub — logged as WARN.
@@ -65,7 +65,7 @@ export async function collectDependencies({ repoPath, rootPath, logger = null })
   tryParser('nuget',    () => parseNuget(rootPath));
   tryParser('rubygems', () => parseRubygems(rootPath));
 
-  // Shallow scan for unrecognized manifests — warn so gaps are visible (DEP-06)
+  // Shallow scan for unrecognized manifests — warn so gaps are visible 
   scanUnsupportedTopLevel(rootPath, warn);
 
   return { rows, ecosystems_scanned };
@@ -80,7 +80,7 @@ function parseNpm(rootPath) {
   if (!existsSync(manifestPath)) return null; // ecosystem absent
 
   const pkg = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  // PRODUCTION ONLY (DEP-07) — devDependencies, peerDependencies, optionalDependencies excluded
+  // PRODUCTION ONLY  — devDependencies, peerDependencies, optionalDependencies excluded
   const deps = pkg.dependencies || {};
 
   // Build resolved_version lookup from package-lock.json when present (npm v7+ format)
@@ -354,7 +354,7 @@ function parseMaven(rootPath) {
     const vRaw = dep[1].match(/<version>([^<]+)<\/version>/)?.[1]?.trim();
     const scope = dep[1].match(/<scope>([^<]+)<\/scope>/)?.[1]?.trim();
 
-    // DEP-07: exclude test-scoped deps
+    // exclude test-scoped deps
     if (scope === 'test') continue;
     if (!g || !a) continue;
 

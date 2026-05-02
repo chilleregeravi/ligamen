@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/doctor.bats — Phase 114-03 (NAV-03).
+# tests/doctor.bats —  .
 #
 # End-to-end coverage of /arcanon:doctor. Drives the real shell wrapper, the
 # real worker HTTP endpoint, and the real cmdDoctor handler against a seeded
@@ -94,7 +94,7 @@ teardown() {
 # when no creds present. Healthy worker + healthy DB + writable data dir
 # satisfy the critical checks.)
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor all-pass scenario emits 8 check lines and exits 0" {
+@test "doctor all-pass scenario emits 8 check lines and exits 0" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -119,7 +119,7 @@ teardown() {
 # ---------------------------------------------------------------------------
 # Test 2 — --json all-pass: structured JSON object with summary.exit_code=0.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor --json emits structured object with 8 checks" {
+@test "doctor --json emits structured object with 8 checks" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -147,7 +147,7 @@ teardown() {
 # Test 3 — silent contract: in a non-Arcanon dir, exit 0 with empty stdout.
 # Worker is intentionally NOT started.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor silent in non-Arcanon directory" {
+@test "doctor silent in non-Arcanon directory" {
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" doctor
   [ "$status" -eq 0 ]
@@ -158,7 +158,7 @@ teardown() {
 # Test 4 — critical FAIL → exit 1: chmod -w the data dir to break check 5.
 # Worker still healthy, DB still healthy; only check 5 fails.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor exits 1 when critical check 5 (data dir) FAILs" {
+@test "doctor exits 1 when critical check 5 (data dir) FAILs" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -188,7 +188,7 @@ teardown() {
 # Test 5 — hub creds SKIP: no ~/.arcanon/config.json file at all → check 8
 # reports SKIP (not WARN, not FAIL); overall exit code 0.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports SKIP for check 8 when no credentials" {
+@test "doctor reports SKIP for check 8 when no credentials" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -213,7 +213,7 @@ teardown() {
 # would auto-start). Check 1 must FAIL with detail starting `worker
 # unreachable:` and exit code 1.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports check 1 FAIL + exit 1 when worker unreachable" {
+@test "doctor reports check 1 FAIL + exit 1 when worker unreachable" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -231,11 +231,11 @@ teardown() {
 
 # ---------------------------------------------------------------------------
 # Test 6 — surface: doctor.md exists with correct frontmatter. (The
-# commands-surface.bats NAV-03 block already asserts this; we duplicate the
+# commands-surface.bats  block already asserts this; we duplicate the
 # check here so a developer running just `bats tests/doctor.bats` catches
 # missing-file issues without needing the surface suite.)
 # ---------------------------------------------------------------------------
-@test "NAV-03: commands/doctor.md exists with frontmatter" {
+@test "commands/doctor.md exists with frontmatter" {
   [ -f "${REPO_ROOT}/plugins/arcanon/commands/doctor.md" ]
   grep -E '^description:' "${REPO_ROOT}/plugins/arcanon/commands/doctor.md"
   grep -E '^allowed-tools:' "${REPO_ROOT}/plugins/arcanon/commands/doctor.md"
@@ -247,7 +247,7 @@ teardown() {
 # schema_versions to 14. Check 3 must report WARN with the "db schema 14 <
 # migration head 16" detail; overall exit 0 (non-critical).
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports WARN for check 3 when DB schema lags migration head" {
+@test "doctor reports WARN for check 3 when DB schema lags migration head" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -268,7 +268,7 @@ teardown() {
 # probe PASSes when the server stays alive past the 1s deadline (= reached
 # the stdio-read loop without crashing on import).
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports check 7 PASS for MCP liveness probe" {
+@test "doctor reports check 7 PASS for MCP liveness probe" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -287,7 +287,7 @@ teardown() {
 # Spawn the mock hub on $MOCK_HUB_PORT, write creds + hub_url under HOME,
 # run doctor, assert check 8 PASS.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports check 8 PASS when hub round-trip succeeds" {
+@test "doctor reports check 8 PASS when hub round-trip succeeds" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -322,7 +322,7 @@ EOF
 # (port 1 connects-and-RSTs / refuses on most systems). Check 8 must report
 # WARN (NOT FAIL — non-critical); overall exit 0.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports check 8 WARN when hub unreachable" {
+@test "doctor reports check 8 WARN when hub unreachable" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -345,7 +345,7 @@ EOF
 # Test 11 — config 4 linked-repos with one missing dir: WARN with detail
 # naming the missing path; overall exit 0.
 # ---------------------------------------------------------------------------
-@test "NAV-03: doctor reports check 4 WARN when a linked-repo dir is missing" {
+@test "doctor reports check 4 WARN when a linked-repo dir is missing" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"

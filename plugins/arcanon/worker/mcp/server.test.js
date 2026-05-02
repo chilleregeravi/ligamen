@@ -443,7 +443,7 @@ test("resolveDb path traversal: valid 12-char hex hash does not false-positive",
 });
 
 // ─────────────────────────────────────────────────────────────
-// impact_query depth limit (REL-02)
+// impact_query depth limit 
 // ─────────────────────────────────────────────────────────────
 
 /**

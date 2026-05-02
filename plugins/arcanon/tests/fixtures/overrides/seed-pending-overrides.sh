@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # plugins/arcanon/tests/fixtures/overrides/seed-pending-overrides.sh
-# Phase 117-02 (CORRECT-03).
+# .
 #
 # Thin wrapper around seed-pending-overrides.js. Invoked from
 # tests/scan-overrides-apply.bats setup() to populate a fresh SQLite DB at

@@ -3,7 +3,7 @@
 # Tests for the PreToolUse sensitive file guard hook.
 # Covers TEST-03 (hard blocks and soft warnings) and TEST-08 (exit 2 + permissionDecision deny JSON).
 #
-# These tests are in RED state until Phase 4 implements scripts/file-guard.sh.
+# These tests are in RED state until  implements scripts/file-guard.sh.
 # Run: tests/bats/bin/bats tests/file-guard.bats
 #
 # CRITICAL: Hard-block tests use assert_failure 2 (not bare assert_failure).

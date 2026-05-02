@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/worker-lifecycle.bats — Worker lifecycle (Phase 15: WRKR-01 through WRKR-07)
+# tests/worker-lifecycle.bats — Worker lifecycle (: WRKR-01 through WRKR-07)
 # Covers all 7 WRKR acceptance criteria using ARCANON_DATA_DIR temp-dir isolation.
 
 load 'test_helper/bats-support/load'

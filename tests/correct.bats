@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# tests/correct.bats — Phase 118-01 (CORRECT-02 / CORRECT-04 / CORRECT-06).
+# tests/correct.bats —  ( /).
 #
 # End-to-end coverage of /arcanon:correct driving the real shell wrapper.
-# cmdCorrect opens the DB directly via better-sqlite3 + uses Phase 117-01's
+# cmdCorrect opens the DB directly via better-sqlite3 + uses 's
 # QueryEngine.upsertOverride helper — no worker spawn needed.
 #
-# Each case asserts the override row goes IN. The apply path is Phase 117-02's
+# Each case asserts the override row goes IN. The apply path is 's
 # territory (covered by tests/scan-overrides-apply.bats).
 #
 # Tests:
@@ -44,7 +44,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 1 — silent in non-Arcanon directory.
 # ---------------------------------------------------------------------------
-@test "CORRECT-02: correct silent in non-Arcanon directory" {
+@test "correct silent in non-Arcanon directory" {
   cd "$PROJECT_ROOT"
   # No DB created — cmdCorrect should exit 0 silently.
   run bash "$HUB_SH" correct connection --action delete --connection 1
@@ -55,7 +55,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 2 — connection|delete happy path.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct connection --action delete inserts row" {
+@test "correct connection --action delete inserts row" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct connection --action delete --connection 1
@@ -68,14 +68,14 @@ setup() {
   [[ "$output" == *"kind = connection"* ]]
   [[ "$output" == *"target_id = 1"* ]]
   [[ "$output" == *"action = delete"* ]]
-  # Plan 117-01's helper defaults payload to '{}' when caller passes null/undefined.
+  # 's helper defaults payload to '{}' when caller passes null/undefined.
   [[ "$output" == *"payload = {}"* ]]
 }
 
 # ---------------------------------------------------------------------------
 # Test 3 — connection|update happy path with --source/--target payload.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct connection --action update inserts row with source/target payload" {
+@test "correct connection --action update inserts row with source/target payload" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct connection --action update --connection 1 --source svc-a --target svc-b
@@ -98,7 +98,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 4 — service|rename happy path; service name resolved to integer ID.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct service --action rename inserts row with resolved target_id" {
+@test "correct service --action rename inserts row with resolved target_id" {
   SEED_OUT="$(bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH")"
   # seed.js prints {"repoId":..,"svcAId":..} — capture svc-a's ID.
   SVC_A_ID="$(echo "$SEED_OUT" | sed -nE 's/.*"svcAId":([0-9]+).*/\1/p')"
@@ -119,7 +119,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 5 — service|set-base-path happy path.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct service --action set-base-path inserts row" {
+@test "correct service --action set-base-path inserts row" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct service --action set-base-path --service svc-a --base-path src/api
@@ -134,7 +134,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 6 — invalid kind exits 2 with friendly error.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct with invalid kind exits 2" {
+@test "correct with invalid kind exits 2" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct foo --action delete --connection 1
@@ -145,7 +145,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 7 — kind/action mismatch (connection|rename) exits 2.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct with kind/action mismatch exits 2" {
+@test "correct with kind/action mismatch exits 2" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct connection --action rename --connection 1
@@ -157,7 +157,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 8 — non-existent connection ID exits 2.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct with non-existent connection exits 2" {
+@test "correct with non-existent connection exits 2" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct connection --action delete --connection 999999
@@ -168,7 +168,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 9 — service name not found exits 2.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct with unknown service name exits 2" {
+@test "correct with unknown service name exits 2" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct service --action rename --service nonexistent --new-name x
@@ -180,7 +180,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 10 — --json emits structured object.
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct --json emits structured object" {
+@test "correct --json emits structured object" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct connection --action delete --connection 1 --json
@@ -198,7 +198,7 @@ setup() {
 # Test 11 — created_by column is 'cli'. Distinguishes operator-staged
 # overrides (this command) from system-generated rows (default 'system').
 # ---------------------------------------------------------------------------
-@test "CORRECT-06: correct stamps created_by='cli'" {
+@test "correct stamps created_by='cli'" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" correct connection --action delete --connection 1

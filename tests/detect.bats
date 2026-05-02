@@ -5,7 +5,7 @@
 #
 # These tests source lib/detect.sh directly (Pattern 4 from RESEARCH.md).
 # Tests are in RED state until lib/detect.sh is implemented.
-# Note: lib/detect.sh exists at Phase 13 time — tests should pass GREEN.
+# Note: lib/detect.sh exists at  time — tests should pass GREEN.
 
 setup() {
   load 'test_helper/bats-support/load'
@@ -121,7 +121,7 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# detect_language — new java/csharp/ruby branches (LANG-01)
+# detect_language — new java/csharp/ruby branches 
 # ---------------------------------------------------------------------------
 
 @test "detect.sh - detect_language: .java returns java" {
@@ -146,7 +146,7 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# detect_project_type — java/dotnet/ruby manifest detection (LANG-02)
+# detect_project_type — java/dotnet/ruby manifest detection 
 # ---------------------------------------------------------------------------
 
 @test "detect.sh - detects Java from pom.xml" {

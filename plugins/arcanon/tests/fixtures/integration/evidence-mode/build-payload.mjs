@@ -2,7 +2,7 @@
 /**
  * tests/fixtures/integration/evidence-mode/build-payload.mjs
  *
- * Phase 120-01 INT-01 — bats E2E driver. Spawned by tests/hub-evidence-mode.bats
+ * bats E2E driver. Spawned by tests/hub-evidence-mode.bats
  * once per fixture config; prints a single-line JSON object that the bats
  * @test blocks pattern-match against.
  *

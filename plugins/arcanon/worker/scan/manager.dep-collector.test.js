@@ -1,7 +1,7 @@
 /**
  * manager.dep-collector.test.js — Integration tests for dep-collector wiring in Phase B loop
  *
- * Tests: DEP-09 (collector invoked per service), DEP-10 (cascade cleanup), DEP-11 (ecosystems logged)
+ * Tests:  (collector invoked per service),  (cascade cleanup),  (ecosystems logged)
  *
  * Uses node:test + node:assert/strict. No external test framework.
  */

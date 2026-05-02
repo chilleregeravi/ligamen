@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# update-check.bats — UPD-04/05/06: /arcanon:update --check decouples
+# update-check.bats — /05/06: /arcanon:update --check decouples
 # offline-decision from claude-plugin-marketplace-update refresh-process
 # outcome. The mirror file is the source of truth.
 #
-# Refs: THE-1027, plan 108-01.
+# Refs:, plan 108-01.
 #
-# Strategy (per CONTEXT D-02):
+# Strategy (per CONTEXT ):
 #   - Stub `claude` binary in a per-test PATH prefix so the background refresh
 #     either sleeps (slow) or exits fast (offline regression case).
 #   - Override HOME to a temp dir so the marketplace mirror file path is
@@ -26,7 +26,7 @@ setup() {
 }
 
 # Helper: stub the `claude` binary to sleep N seconds then exit 0.
-# Used by UPD-04 and UPD-06 to simulate a slow `claude plugin marketplace update`
+# Used by  and  to simulate a slow `claude plugin marketplace update`
 # that exceeds the 5s timer in update.sh.
 stub_slow_claude() {
   local sleep_secs="$1"
@@ -39,7 +39,7 @@ EOF
 }
 
 # Helper: stub the `claude` binary to return immediately.
-# Used by UPD-05 to keep the test fast — the refresh outcome is irrelevant
+# Used by  to keep the test fast — the refresh outcome is irrelevant
 # for the missing-mirror regression case.
 stub_fast_claude() {
   cat >"$STUB_DIR/claude" <<'EOF'
@@ -62,11 +62,11 @@ installed_version() {
   jq -r '.version' "$PLUGIN_ROOT/.claude-plugin/plugin.json"
 }
 
-# ─── UPD-04 ──────────────────────────────────────────────────────────────────
+# ───  ──────────────────────────────────────────────────────────────────
 # Slow `claude plugin marketplace update` (10s sleep, hits the 5s timer) +
 # mirror file present with a strictly-newer version → status MUST be "newer",
-# NOT "offline". This is the THE-1027 bug-fix case.
-@test "UPD-04: slow marketplace refresh with mirror ahead returns status:newer not offline" {
+# NOT "offline". This is the  bug-fix case.
+@test "slow marketplace refresh with mirror ahead returns status:newer not offline" {
   stub_slow_claude 10
 
   CUR=$(installed_version)
@@ -81,11 +81,11 @@ installed_version() {
   [ "$(echo "$output" | jq -r '.update_available')" = "true" ]
 }
 
-# ─── UPD-05 ──────────────────────────────────────────────────────────────────
+# ───  ──────────────────────────────────────────────────────────────────
 # Genuinely-offline regression guard: HOME has no .claude/plugins tree at all,
 # so the mirror file is absent → status MUST be "offline" with remote=null.
 # Stub claude exits fast so the test completes in well under 1s.
-@test "UPD-05: missing marketplace mirror dir returns status:offline" {
+@test "missing marketplace mirror dir returns status:offline" {
   stub_fast_claude
   # Sanity check: confirm the mirror really is missing.
   [ ! -e "$TEST_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon/.claude-plugin/marketplace.json" ]
@@ -97,12 +97,12 @@ installed_version() {
   [ "$(echo "$output" | jq -r '.update_available')" = "false" ]
 }
 
-# ─── UPD-06 ──────────────────────────────────────────────────────────────────
+# ───  ──────────────────────────────────────────────────────────────────
 # Slow `claude plugin marketplace update` (10s sleep, hits the 5s timer) +
 # mirror file present with the SAME version as installed → status MUST be
 # "equal" regardless of the refresh-process outcome. Confirms the equal-version
 # path is independent of the refresh timer.
-@test "UPD-06: slow marketplace refresh with mirror at same version returns status:equal" {
+@test "slow marketplace refresh with mirror at same version returns status:equal" {
   stub_slow_claude 10
 
   CUR=$(installed_version)

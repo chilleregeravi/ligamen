@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # tests/worker-restart.bats — lib/worker-restart.sh
-# Covers: DSP-05 (API surface), DSP-06/07 (behavior parity with old inline code)
+# Covers:  (API surface), /07 (behavior parity with old inline code)
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'

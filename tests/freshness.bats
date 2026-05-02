@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/freshness.bats — Phase 116-02 (FRESH-01..05).
+# tests/freshness.bats —  (..05).
 #
 # End-to-end coverage of /arcanon:status freshness extension. Drives the real
 # shell wrapper, the real worker on a temp port, and a real on-disk fixture
@@ -86,9 +86,9 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# FRESH-03: endpoint shape — 200 with documented JSON; 3 new commits in repo-a.
+# endpoint shape — 200 with documented JSON; 3 new commits in repo-a.
 # ---------------------------------------------------------------------------
-@test "FRESH-03: GET /api/scan-freshness returns documented shape with new_commits=3" {
+@test "GET /api/scan-freshness returns documented shape with new_commits=3" {
   cd "$PROJECT_ROOT"
   PORT="$WORKER_PORT"
   run curl -sf "http://127.0.0.1:${PORT}/api/scan-freshness?project=${PROJECT_ROOT}"
@@ -101,9 +101,9 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# FRESH-01: status output contains the "Latest scan:" date + percent line.
+# status output contains the "Latest scan:" date + percent line.
 # ---------------------------------------------------------------------------
-@test "FRESH-01: /arcanon:status output contains 'Latest scan:' line with date + percentage" {
+@test "/arcanon:status output contains 'Latest scan:' line with date + percentage" {
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" status
   [ "$status" -eq 0 ]
@@ -112,10 +112,10 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# FRESH-02: status output reports 1 repo has 3 new commits in repo-a.
+# status output reports 1 repo has 3 new commits in repo-a.
 # Asserts the singular grammar ("1 repo has", not "1 repos have").
 # ---------------------------------------------------------------------------
-@test "FRESH-02: /arcanon:status output reports 1 repo has 3 new commits in repo-a" {
+@test "/arcanon:status output reports 1 repo has 3 new commits in repo-a" {
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" status
   [ "$status" -eq 0 ]
@@ -124,10 +124,10 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# FRESH-02: when no repo has drift, the freshness line is suppressed entirely.
+# when no repo has drift, the freshness line is suppressed entirely.
 # Proves the `drifted.length > 0` filter in _fetchScanFreshness works.
 # ---------------------------------------------------------------------------
-@test "FRESH-02: when no new commits exist, the freshness line is suppressed" {
+@test "when no new commits exist, the freshness line is suppressed" {
   cd "$PROJECT_ROOT"
   CURRENT_HEAD=$(git -C "$PROJECT_ROOT/repo-a" rev-parse HEAD)
   sqlite3 "$PROJECT_DB" "UPDATE repo_state SET last_scanned_commit='$CURRENT_HEAD'"
@@ -138,9 +138,9 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# FRESH-04 back-compat: /api/scan-quality endpoint still works untouched.
+# back-compat: /api/scan-quality endpoint still works untouched.
 # ---------------------------------------------------------------------------
-@test "FRESH-04: /api/scan-quality endpoint still works (back-compat)" {
+@test "/api/scan-quality endpoint still works (back-compat)" {
   PORT="$WORKER_PORT"
   run curl -sf "http://127.0.0.1:${PORT}/api/scan-quality?project=${PROJECT_ROOT}"
   [ "$status" -eq 0 ]

@@ -1,10 +1,10 @@
 /**
- * worker/db/query-engine.enrichment-log.test.js — Phase 111 Plan 03 (TRUST-06, TRUST-14)
+ * worker/db/query-engine.enrichment-log.test.js —   
  *
- * Verifies the QueryEngine enrichment-log API landed by Plan 111-03:
+ * Verifies the QueryEngine enrichment-log API landed by :
  *   - logEnrichment(scanVersionId, enricher, targetKind, targetId, field,
  *     fromValue, toValue, reason) writes a row to enrichment_log and returns
- *     the lastInsertRowid (TRUST-06).
+ *     the lastInsertRowid .
  *   - getEnrichmentLog(scanVersionId, opts?) reads rows for a scan_version,
  *     supports `enricher` filter, and returns [] (not null/error) for an
  *     unknown scan_version_id.
@@ -12,7 +12,7 @@
  *   - Pre-015 graceful no-op: pre-migration-016 db (table absent) → logEnrichment
  *     returns null without throwing; getEnrichmentLog returns [].
  *   - SQL CHECK constraint on target_kind fires (no JS pre-validation per
- *     CONTEXT D-04).
+ *     CONTEXT ).
  *   - FK to scan_versions(id) ON DELETE CASCADE works through the JS API.
  *
  * Run: node --test plugins/arcanon/worker/db/query-engine.enrichment-log.test.js

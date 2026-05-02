@@ -1,5 +1,5 @@
 /**
- * worker/scan/overrides.test.js — Phase 117 Plan 02 (CORRECT-03).
+ * worker/scan/overrides.test.js —   .
  *
  * Verifies the apply-hook (`applyPendingOverrides`) shipped in
  * `worker/scan/overrides.js`:
@@ -7,9 +7,9 @@
  *   - Dispatch matrix routes each (kind, action) to the correct mutator.
  *   - Per-override try/catch: a SqliteError on row N does NOT prevent rows
  *     N+1..M from processing.
- *   - Per-override stamp granularity (D-03): markOverrideApplied is invoked
+ *   Per-override stamp granularity : markOverrideApplied is invoked
  *     after each successful mutation, NOT batched at the end.
- *   - Dangling target (D-04): UPDATE/DELETE that hits 0 rows logs WARN AND
+ *   Dangling target : UPDATE/DELETE that hits 0 rows logs WARN AND
  *     stamps the row (avoids WARN-loop on every future scan).
  *   - Matrix violation: invalid (kind, action) is logged WARN, NOT applied,
  *     NOT stamped — the operator can fix and retry.
@@ -240,7 +240,7 @@ describe('applyPendingOverrides — dispatch matrix happy path', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dangling-target / log+skip+stamp (D-04)
+// Dangling-target / log+skip+stamp 
 // ---------------------------------------------------------------------------
 
 describe('applyPendingOverrides — dangling target paths (D-04)', () => {

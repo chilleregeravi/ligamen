@@ -1,5 +1,5 @@
 // plugins/arcanon/worker/cli/hub.test.js
-// Unit tests for the _readHubAutoSync two-read pattern in hub.js (CLN-07, CLN-08).
+// Unit tests for the _readHubAutoSync two-read pattern in hub.js .
 //
 // hub.js calls main() only when executed directly (import.meta.url === process.argv[1]),
 // so importing it here is safe — no CLI side effects occur.
@@ -14,7 +14,7 @@ function captureStderr() {
   return { captured, restore: () => { process.stderr.write = originalWrite; } };
 }
 
-test("CLN-07: hub.js _readHubAutoSync mirrors manager.js precedence rules", () => {
+test("hub.js _readHubAutoSync mirrors manager.js precedence rules", () => {
   const capture = captureStderr();
   try {
     // new key true → enabled, no warning

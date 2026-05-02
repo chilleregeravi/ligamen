@@ -1,11 +1,11 @@
 /**
  * Migration 010 — service_dependencies table with full schema for v5.8.0 Library Drift.
  *
- * DEP-01: service_dependencies table with dep_kind discriminant
- * DEP-02: 4-column UNIQUE(service_id, ecosystem, package_name, manifest_file) — handles same
+ * service_dependencies table with dep_kind discriminant
+ * 4-column UNIQUE(service_id, ecosystem, package_name, manifest_file) — handles same
  *         package in multiple manifests (e.g., root pom.xml + child build.gradle)
- * DEP-03: indexes on package_name (cross-repo drift) and scan_version_id (stale cleanup)
- * DEP-04: dep_kind IN ('direct','transient') — v5.8.0 writes 'direct' only; 'transient' is a
+ * indexes on package_name (cross-repo drift) and scan_version_id (stale cleanup)
+ * dep_kind IN ('direct','transient') — v5.8.0 writes 'direct' only; 'transient' is a
  *         reserved future value per research decision (transient scanning deferred to v5.9)
  *
  * ON DELETE CASCADE from services(id) means endScan() stale-service cleanup automatically

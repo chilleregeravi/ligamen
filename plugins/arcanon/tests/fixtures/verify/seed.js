@@ -1,5 +1,5 @@
 /**
- * tests/fixtures/verify/seed.js — Phase 112-02 fixture seeder (TRUST-07/08/09).
+ * tests/fixtures/verify/seed.js —  fixture seeder (/08/09).
  *
  * Builds a tiny SQLite DB shaped exactly like a post-/arcanon:map state:
  *   - 1 repo row (path = projectRoot)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/diff-shadow.bats — Phase 119-02 (SHADOW-02).
+# tests/diff-shadow.bats —  .
 #
 # End-to-end coverage of /arcanon:diff --shadow. The handler reuses Phase
 # 115's diffScanVersions(dbA, dbB, scanIdA, scanIdB) engine — passing the
@@ -8,7 +8,7 @@
 # Hard contracts from PLAN 119-02:
 #   - Reuses 115's diff engine (NOT a duplicate inline implementation).
 #   - Exits 2 with friendly error if either DB is missing.
-#   - Silent in non-Arcanon dir (mirrors NAV-01 / NAV-04).
+#   Silent in non-Arcanon dir (mirrors).
 #   - --json shape matches the engine's full result.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
@@ -72,7 +72,7 @@ _introduce_shadow_drift() {
 
   run _run_diff_shadow
   [ "$status" -eq 0 ]
-  # Section headers from Phase 115's formatter.
+  # Section headers from 's formatter.
   [[ "$output" == *"Services"* ]]
   [[ "$output" == *"Connections"* ]]
   # shadow-only-svc → added on shadow side
@@ -110,7 +110,7 @@ _introduce_shadow_drift() {
 }
 
 # ---------------------------------------------------------------------------
-# Test 15 — --json output shape matches Phase 115's engine result.
+# Test 15 — --json output shape matches 's engine result.
 # ---------------------------------------------------------------------------
 @test "Task 2 — Test 15: --json emits {services, connections, summary, ...}" {
   bash "$SHADOW_SEED_SH" "$PROJECT_ROOT" "$LIVE_DB" >/dev/null

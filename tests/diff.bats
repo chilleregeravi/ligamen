@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/diff.bats — Phase 115-02 (NAV-04).
+# tests/diff.bats —  .
 #
 # End-to-end coverage of /arcanon:diff driving the real shell wrapper.
 # cmdDiff opens the DB directly via better-sqlite3 — no worker needed.
@@ -39,7 +39,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 1 — silent in non-Arcanon directory.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff silent in non-Arcanon directory" {
+@test "diff silent in non-Arcanon directory" {
   cd "$PROJECT_ROOT"
   # No DB created — cmdDiff should exit 0 silently.
   run bash "$HUB_SH" diff 5 7
@@ -50,7 +50,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 2 — missing both positional args exits 2 with usage line.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff with no args exits 2 (usage)" {
+@test "diff with no args exits 2 (usage)" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" default >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff
@@ -61,7 +61,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 3 — only one positional arg exits 2.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff with only one arg exits 2 (usage)" {
+@test "diff with only one arg exits 2 (usage)" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" default >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 5
@@ -72,7 +72,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 4 — scan ID not found exits 2 with friendly error.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff with non-existent scan ID exits 2" {
+@test "diff with non-existent scan ID exits 2" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" default >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 99999 1
@@ -84,9 +84,9 @@ setup() {
 # Test 5 — integer ID happy path: full output assertions.
 # Note: production schema's UNIQUE constraints on services and connections
 # mean single-DB diff only detects added/removed (never modified). True
-# modify-detection requires the shadow-DB pattern (Phase 119).
+# modify-detection requires the shadow-DB pattern .
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff integer IDs prints sectioned report" {
+@test "diff integer IDs prints sectioned report" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" default >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 1 2
@@ -104,7 +104,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 6 — same-scan short-circuit.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff same scan ID prints identical short-circuit" {
+@test "diff same scan ID prints identical short-circuit" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" same >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 1 1
@@ -115,7 +115,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 7 — HEAD / HEAD~N happy path.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff HEAD HEAD~1 resolves to most recent two scans" {
+@test "diff HEAD HEAD~1 resolves to most recent two scans" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" head >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff HEAD HEAD~1
@@ -126,7 +126,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 8 — ISO date resolution.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff ISO dates resolves to scans ≤ each cutoff" {
+@test "diff ISO dates resolves to scans ≤ each cutoff" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" iso >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 2026-04-21 2026-04-25
@@ -139,7 +139,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 9 — branch heuristic with real tmp git repo.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff branch names resolves via repo_state.last_scanned_commit" {
+@test "diff branch names resolves via repo_state.last_scanned_commit" {
   GIT_REPO="$BATS_TEST_TMPDIR/gitrepo"
   mkdir -p "$GIT_REPO"
   pushd "$GIT_REPO" >/dev/null
@@ -163,7 +163,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 10 — --json parity.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff --json emits structured object" {
+@test "diff --json emits structured object" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" default >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 1 2 --json
@@ -181,7 +181,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 11 — HEAD~50 out of range.
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff HEAD~50 (out of range) exits 2" {
+@test "diff HEAD~50 (out of range) exits 2" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" head >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff HEAD~50 HEAD
@@ -192,10 +192,10 @@ setup() {
 # Test 12 — Modified rows skipped: production schema's UNIQUE(services.repo_id,
 # services.name) and UNIQUE(connections...) constraints mean a single DB
 # cannot have the same row tagged with two different scan_version_ids. True
-# "modified" diff is the shadow-DB pattern (Phase 119) — deferred there.
+# "modified" diff is the shadow-DB pattern  — deferred there.
 # Sanity: the Modified section header still prints (with count 0).
 # ---------------------------------------------------------------------------
-@test "NAV-04: diff prints Modified section header with count even when none" {
+@test "diff prints Modified section header with count even when none" {
   bash "$SEED_SH" "$PROJECT_ROOT" "$DB_PATH" default >/dev/null
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" diff 1 2
@@ -206,7 +206,7 @@ setup() {
 # ---------------------------------------------------------------------------
 # Test 13 — frontmatter regression on commands/diff.md.
 # ---------------------------------------------------------------------------
-@test "NAV-04: commands/diff.md has valid frontmatter" {
+@test "commands/diff.md has valid frontmatter" {
   local md="$REPO_ROOT/plugins/arcanon/commands/diff.md"
   [ -f "$md" ]
   grep -q "^description:" "$md"

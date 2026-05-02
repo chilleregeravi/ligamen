@@ -4,7 +4,7 @@
  *
  * Used by `/arcanon:rescan` (commands/rescan.md). Extracted into its own
  * pure module so the disambiguation logic is unit-testable without an HTTP
- * server. Originally written for Plan 118-02's POST /api/rescan endpoint
+ * server. Originally written for 's POST /api/rescan endpoint
  * (deleted; the markdown command now drives scanning directly).
  *
  * Resolution algorithm (see 118-RESEARCH.md §5):

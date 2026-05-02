@@ -23,7 +23,7 @@ const pool = new Map();
 /**
  * Compute the per-project data directory.
  *
- * Exported (NAV-01, plan 114-01) so that `cmdList` and other read-only CLI
+ * Exported (plan 114-01) so that `cmdList` and other read-only CLI
  * handlers can stat the resolved DB path without re-implementing the
  * sha256(project_root)[0:12] convention. Previously module-private — adding
  * `export` is purely additive and does not change call-site behaviour.
@@ -241,14 +241,14 @@ export function getQueryEngineByHash(hash) {
  * Why uncached (RESEARCH §1, Option B): bypasses openDb()'s process-singleton
  * problem entirely (live and shadow can never collide because they don't
  * share a code path), avoids the eviction-on-promote landmine that a cached
- * shadow QE would create (Plan 119-02 promote rename would orphan a stale
+ * shadow QE would create ( promote rename would orphan a stale
  * cached fd), and shadow ops are short-lived so caching offers near-zero
  * benefit. The inline pragma + runMigrations pattern mirrors getQueryEngineByHash.
  *
  * Atomic-promote constraint (RESEARCH §3): the shadow DB lives at
  * `${projectHashDir(root)}/impact-map-shadow.db` — sibling of the live
  * `impact-map.db`. Same parent dir → same filesystem → fs.rename is atomic
- * per POSIX. Plan 119-02's promote relies on this placement. Do NOT change
+ * per POSIX. 's promote relies on this placement. Do NOT change
  * the path without updating that plan.
  *
  * @param {string} projectRoot - Absolute path to the project root.
@@ -287,7 +287,7 @@ export function getShadowQueryEngine(projectRoot, opts = {}) {
  * to a renamed-out inode and subsequent live-DB operations write to the
  * wrong file (RESEARCH §3, threat T-119-02-01).
  *
- * Implementation note (Plan 119-02 deviation Rule 1 — see SUMMARY): the
+ * Implementation note ( deviation Rule 1 — see SUMMARY): the
  * pool's QueryEngine wraps the same Database instance that `openDb` cached
  * in its module-level `_db` slot (database.js:30). If we only delete the
  * pool entry and close the QE's handle, the next `getQueryEngine` call

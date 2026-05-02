@@ -1,10 +1,10 @@
 /**
  * Test suite for migration 015 — scan_versions.quality_score column.
  *
- * Phase 111 (TRUST-05): adds a REAL column on `scan_versions` for storing the
- * scan-level quality score (high + 0.5*low / total — see CONTEXT.md D-02). The
+ * adds a REAL column on `scan_versions` for storing the
+ * scan-level quality score (high + 0.5*low / total — see CONTEXT.md ). The
  * column is nullable; pre-migration rows pick up NULL and new scans populate
- * via endScan() in Plan 111-02.
+ * via endScan in .
  *
  * Verifies:
  *   - version export === 15

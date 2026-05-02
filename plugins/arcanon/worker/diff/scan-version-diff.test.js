@@ -1,5 +1,5 @@
 /**
- * Tests for the scan-version diff engine (Phase 115, Plan 115-01, Task 2).
+ * Tests for the scan-version diff engine (, Task 2).
  *
  * Run: node --test plugins/arcanon/worker/diff/scan-version-diff.test.js
  */
@@ -418,9 +418,9 @@ describe("diffScanVersions — same_scan short-circuit", () => {
   });
 
   test("test 13: cross-DB diff (Phase 119 readiness — load-bearing)", () => {
-    // RESEARCH §8: this is the contract Phase 119 (`/arcanon:diff --shadow`)
+    // RESEARCH §8: this is the contract  (`/arcanon:diff --shadow`)
     // depends on. Engine takes two open Database handles; can be the SAME
-    // handle (Phase 115 same-DB case) or DIFFERENT handles (Phase 119 shadow
+    // handle ( same-DB case) or DIFFERENT handles ( shadow
     // vs live). Engine never reaches for a global pool.
     const dbA = buildDb();
     const dbB = buildDb();

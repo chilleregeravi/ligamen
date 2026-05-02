@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/diff/seed.sh — Phase 115-02 (NAV-04).
+# plugins/arcanon/tests/fixtures/diff/seed.sh —  .
 #
 # Thin wrapper around seed.js. Invoked from tests/diff.bats setup() to
 # populate a fresh SQLite DB at the path the Arcanon worker computes for the

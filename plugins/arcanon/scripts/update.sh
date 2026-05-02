@@ -27,7 +27,7 @@ case "$MODE" in
     ;;
 esac
 
-# ─── --kill mode (REQ UPD-07, UPD-08) ────────────────────────────────────────
+# ─── --kill mode (REQ) ────────────────────────────────────────
 if [[ "$MODE" == "--kill" ]]; then
   # Resolve DATA_DIR via shared resolver — same pattern as worker-stop.sh:11-15.
   # shellcheck source=../lib/data-dir.sh
@@ -37,8 +37,8 @@ if [[ "$MODE" == "--kill" ]]; then
   PORT_FILE="${DATA_DIR}/worker.port"
   SCAN_LOCK="${DATA_DIR}/scan.lock"
 
-  # REQ UPD-07: scan-in-progress guard. scan.lock is written/removed by
-  # worker/scan/manager.js per Phase 80 SEC-03 and contains the scanning PID.
+  # REQ : scan-in-progress guard. scan.lock is written/removed by
+  # worker/scan/manager.js per  SEC-03 and contains the scanning PID.
   if [[ -f "$SCAN_LOCK" ]]; then
     _lock_pid=$(cat "$SCAN_LOCK" 2>/dev/null || true)
     if [[ -n "$_lock_pid" ]] && kill -0 "$_lock_pid" 2>/dev/null; then
@@ -50,7 +50,7 @@ if [[ "$MODE" == "--kill" ]]; then
     rm -f "$SCAN_LOCK"
   fi
 
-  # REQ UPD-08: kill-only semantics (no restart).
+  # REQ : kill-only semantics (no restart).
   if [[ ! -f "$PID_FILE" ]]; then
     printf '{"status":"killed","reason":"no_pid_file","message":"worker was not running"}\n'
     exit 0
@@ -86,7 +86,7 @@ if [[ "$MODE" == "--kill" ]]; then
   exit 0
 fi
 
-# ─── --prune-cache mode (REQ UPD-09 — Pitfall 17) ───────────────────────────
+# ─── --prune-cache mode (REQ  — Pitfall 17) ───────────────────────────
 if [[ "$MODE" == "--prune-cache" ]]; then
   CURRENT_VER=$(jq -r '.version // empty' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || true)
   if [[ -z "$CURRENT_VER" ]]; then
@@ -141,7 +141,7 @@ if [[ "$MODE" == "--prune-cache" ]]; then
   exit 0
 fi
 
-# ─── --verify mode (REQ UPD-10, UPD-12) ─────────────────────────────────────
+# ─── --verify mode (REQ) ─────────────────────────────────────
 if [[ "$MODE" == "--verify" ]]; then
   # shellcheck source=../lib/data-dir.sh
   source "${PLUGIN_ROOT}/lib/data-dir.sh"
@@ -160,7 +160,7 @@ if [[ "$MODE" == "--verify" ]]; then
 
   PORT_FILE="${DATA_DIR}/worker.port"
 
-  # Poll /api/version up to 10 times at 1s intervals (REQ UPD-10).
+  # Poll /api/version up to 10 times at 1s intervals (REQ ).
   # First iteration sleeps before checking — worker needs time to spawn.
   RUNNING_VER=""
   ELAPSED=0
@@ -202,10 +202,10 @@ if [[ -z "$INSTALLED_VER" ]]; then
 fi
 [[ -z "$INSTALLED_VER" ]] && INSTALLED_VER="unknown"
 
-# 2. Refresh marketplace with 5s cap (REQ UPD-11 — Pitfall 10)
+# 2. Refresh marketplace with 5s cap (REQ  — Pitfall 10)
 #    Uses background-subshell+timer because timeout(1) is not on macOS by default.
 #    The timer caps how long we wait for refresh; its outcome (timeout or success)
-#    is informational only and does NOT gate the offline branch below. (THE-1027)
+#    is informational only and does NOT gate the offline branch below. 
 MARKETPLACE_DIR="${HOME}/.claude/plugins/marketplaces/arcanon"
 {
   (claude plugin marketplace update arcanon >/dev/null 2>&1) &
@@ -219,7 +219,7 @@ MARKETPLACE_DIR="${HOME}/.claude/plugins/marketplaces/arcanon"
       sleep 0.1
       kill -KILL "$refresh_pid" 2>/dev/null || true
       # Timer fired: stop waiting for refresh. Do NOT flip an offline flag —
-      # the cached mirror file (if present) is still authoritative. (THE-1027)
+      # the cached mirror file (if present) is still authoritative. 
       break
     fi
   done
@@ -229,9 +229,9 @@ MARKETPLACE_DIR="${HOME}/.claude/plugins/marketplaces/arcanon"
 # Offline gate: mirror file existence is the single source of truth.
 # Refresh-process timeout is a staleness signal (we may have an old mirror)
 # but NOT an offline signal — if the mirror file is on disk, we still
-# compute newer/equal/ahead from it. (THE-1027, UPD-01..03)
+# compute newer/equal/ahead from it. (..03)
 if [[ ! -f "${MARKETPLACE_DIR}/plugins/arcanon/.claude-plugin/marketplace.json" ]]; then
-  # REQ UPD-11: exit 0 with offline status; commands/update.md formats the user-facing message
+  # REQ : exit 0 with offline status; commands/update.md formats the user-facing message
   printf '{"status":"offline","installed":"%s","remote":null,"update_available":false,"changelog_preview":""}\n' "$INSTALLED_VER"
   exit 0
 fi
@@ -241,7 +241,7 @@ REMOTE_VER=$(jq -r '.version // empty' \
   "${MARKETPLACE_DIR}/plugins/arcanon/.claude-plugin/marketplace.json" 2>/dev/null || true)
 [[ -z "$REMOTE_VER" ]] && REMOTE_VER="unknown"
 
-# 4. Semver comparison (REQ UPD-02 — Pitfall 1). Node + semver.
+# 4. Semver comparison (REQ  — Pitfall 1). Node + semver.
 #    Validates with semver.valid() before gt/lt to guard against injection (T-98-01, T-98-02).
 #    If semver is not resolvable, reports unknown rather than falling back to string compare.
 CMP_RESULT="unknown"
@@ -262,7 +262,7 @@ if [[ "$INSTALLED_VER" != "unknown" && "$REMOTE_VER" != "unknown" ]]; then
   esac
 fi
 
-# 5. Extract changelog preview (REQ UPD-04) if newer
+# 5. Extract changelog preview (REQ ) if newer
 CHANGELOG_PREVIEW=""
 if [[ "$CMP_RESULT" == "newer" ]]; then
   CHANGELOG_FILE="${MARKETPLACE_DIR}/plugins/arcanon/CHANGELOG.md"

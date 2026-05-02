@@ -1,10 +1,10 @@
 /**
  * dep-collector.test.js — node:test suite for the dep-collector enrichment module.
  *
- * Covers DEP-05, DEP-06, DEP-07:
+ * Covers, , :
  *   - All 7 ecosystems parse correctly against real fixture manifests
- *   - Unsupported manifests emit WARN (DEP-06)
- *   - devDependencies / test-scope / dev-scope never emitted (DEP-07)
+ *   Unsupported manifests emit WARN 
+ *   devDependencies / test-scope / dev-scope never emitted 
  *   - Parser errors are contained — no throw, partial coverage preserved
  */
 

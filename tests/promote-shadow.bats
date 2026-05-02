@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/promote-shadow.bats — Phase 119-02 (SHADOW-03).
+# tests/promote-shadow.bats —  .
 #
 # End-to-end coverage of /arcanon:promote-shadow and the supporting
 # evictLiveQueryEngine() pool helper. Mirrors the shadow-scan.bats pattern:
@@ -245,7 +245,7 @@ _run_promote() {
 }
 
 # ---------------------------------------------------------------------------
-# Test 8 — silent in non-Arcanon dir (mirrors NAV-01 / shadow-scan).
+# Test 8 — silent in non-Arcanon dir (mirrors  / shadow-scan).
 # ---------------------------------------------------------------------------
 @test "Task 1 — Test 8: silent in non-Arcanon directory (no live, no shadow)" {
   # Neither file exists.

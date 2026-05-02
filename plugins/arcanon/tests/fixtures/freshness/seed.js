@@ -1,5 +1,5 @@
 /**
- * tests/fixtures/freshness/seed.js — Phase 116-02 fixture seeder (FRESH-05).
+ * tests/fixtures/freshness/seed.js —  fixture seeder .
  *
  * Builds the on-disk state needed by tests/freshness.bats:
  *   1. A real git repo at <projectRoot>/repo-a/ with 4 commits (1 init + 3

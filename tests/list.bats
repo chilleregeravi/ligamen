@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/list.bats — Phase 114-01 (NAV-01).
+# tests/list.bats —  .
 #
 # End-to-end coverage of /arcanon:list driving the real shell wrapper, the
 # real worker HTTP endpoint (for happy path / json), and the real
@@ -128,10 +128,10 @@ teardown() {
 
 # ---------------------------------------------------------------------------
 # Test 4 — /arcanon:list silent in non-project dir (exit 0, no stdout).
-# Per the NAV-01 silent contract: no DB → no output, exit 0.
+# Per the  silent contract: no DB → no output, exit 0.
 # Worker is intentionally NOT started here.
 # ---------------------------------------------------------------------------
-@test "NAV-01: bash hub.sh list exits 0 silently when no impact-map.db" {
+@test "bash hub.sh list exits 0 silently when no impact-map.db" {
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" list
   [ "$status" -eq 0 ]
@@ -140,11 +140,11 @@ teardown() {
 
 # ---------------------------------------------------------------------------
 # Test 5 — /arcanon:list happy path with seeded DB + running worker.
-# Asserts the 5-line human overview matches NAV-01 spec.
+# Asserts the 5-line human overview matches  spec.
 # Per NIT 9: "Services: <ws> 8 mapped" via regex, plus three separate grep -q
 # assertions for the per-type counts.
 # ---------------------------------------------------------------------------
-@test "NAV-01: list happy path prints 5-line overview with correct counts" {
+@test "list happy path prints 5-line overview with correct counts" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -176,7 +176,7 @@ teardown() {
 # ---------------------------------------------------------------------------
 # Test 6 — --json parity: single JSON object with expected fields.
 # ---------------------------------------------------------------------------
-@test "NAV-01: list --json emits structured object" {
+@test "list --json emits structured object" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -205,7 +205,7 @@ teardown() {
 # Test 7 — scan_versions empty: no completed scan should NOT crash.
 # Header should print "scanned never" (or equivalent) and exit 0.
 # ---------------------------------------------------------------------------
-@test "NAV-01: list does not crash when scan_versions is empty" {
+@test "list does not crash when scan_versions is empty" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -219,14 +219,14 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# Phase 121 Plan 02 — INT-08: /arcanon:list renders actor labels inline.
+# arcanon:list renders actor labels inline.
 # Test 8: human mode shows labeled names in parentheses after the count.
 # Test 9: --json mode includes an `actors` array of {name,label} objects.
 # Test 10: human mode truncates at 5 labels with "+N more" suffix.
 # Test 11: zero actors -> bare "N external" (no parenthetical), JSON empty array.
 # ---------------------------------------------------------------------------
 
-@test "INT-08: list shows labeled actor names inline in human mode" {
+@test "list shows labeled actor names inline in human mode" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -249,7 +249,7 @@ teardown() {
   [[ "$output" =~ Actors:[[:space:]]+4\ external\ \( ]]
 }
 
-@test "INT-08: list --json includes actors array of {name,label}" {
+@test "list --json includes actors array of {name,label}" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -272,7 +272,7 @@ teardown() {
   echo "$output" | jq -e '[.actors[] | select(.label == null)] | length == 2' >/dev/null
 }
 
-@test "INT-08: list truncates at 5 labels with +N more suffix" {
+@test "list truncates at 5 labels with +N more suffix" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -288,7 +288,7 @@ teardown() {
   echo "$output" | grep -q "+3 more"
 }
 
-@test "INT-08: zero actors yields bare count with no parenthetical" {
+@test "zero actors yields bare count with no parenthetical" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"

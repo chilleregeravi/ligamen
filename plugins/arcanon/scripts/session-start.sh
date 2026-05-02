@@ -39,7 +39,7 @@ else
   [[ -f "$WORKER_CLIENT" ]] && WORKER_CLIENT_LIB="$WORKER_CLIENT"
 fi
 
-# DSP-06: restart logic extracted to lib/worker-restart.sh
+# restart logic extracted to lib/worker-restart.sh
 _worker_restarted=false
 _installed_version=""
 _running_version=""
@@ -80,10 +80,10 @@ if [[ -n "$WORKER_CLIENT_LIB" ]]; then
   fi
 fi
 
-# SSE-01..07: ARCANON_ENRICHMENT — impact-map stats suffix injected into session banner.
-# SSE-01/02: fresh map => full suffix. SSE-03: stale (48h<age<7d) => stale prefix.
-# SSE-04/07: any failure (missing DB, corrupt DB, query error, hub down) => ENRICHMENT=""
-# SSE-05: non-Arcanon dir (no DB) => silent no-op. SSE-06: total overhead < 200ms.
+# ..07: ARCANON_ENRICHMENT — impact-map stats suffix injected into session banner.
+# 02: fresh map => full suffix. : stale (48h<age<7d) => stale prefix.
+# 07: any failure (missing DB, corrupt DB, query error, hub down) => ENRICHMENT=""
+# non-Arcanon dir (no DB) => silent no-op. : total overhead < 200ms.
 # The entire block runs in a subshell so failures never leak to the outer script.
 ENRICHMENT=""
 ENRICHMENT="$(
@@ -116,10 +116,10 @@ ENRICHMENT="$(
   DB_PATH="${DATA_DIR}/projects/${PROJECT_HASH}/impact-map.db"
   [[ -f "$DB_PATH" ]] || exit 0  # SSE-05: non-Arcanon dir — silent no-op
 
-  # Validate DB integrity before any real query (SSE-04: corrupt DB => silent fallback)
+  # Validate DB integrity before any real query (: corrupt DB => silent fallback)
   sqlite3 "$DB_PATH" "PRAGMA quick_check;" 2>/dev/null | grep -q '^ok$' || exit 0
 
-  # Run the three stat queries (SSE-01/03)
+  # Run the three stat queries (/03)
   SVC_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM services;" 2>/dev/null)
   LB_COUNT=$(sqlite3 "$DB_PATH" \
     "SELECT COUNT(DISTINCT source_file) FROM connections WHERE source_file IS NOT NULL AND source_file != '';" 2>/dev/null)
@@ -136,12 +136,12 @@ ENRICHMENT="$(
   [[ -n "$SCAN_EPOCH" ]] || exit 0
 
   AGE_HOURS=$(( (NOW_EPOCH - SCAN_EPOCH) / 3600 ))
-  # SSE-01: map > 7 days old => no enrichment (silent)
+  # map > 7 days old => no enrichment (silent)
   (( AGE_HOURS >= 168 )) && exit 0
 
   SCAN_DATE="$(printf '%s' "$LAST_SCAN_ISO" | cut -c1-10)"
 
-  # Hub status (SSE-04: any failure => "unknown")
+  # Hub status (: any failure => "unknown")
   HUB_STATUS="unknown"
   HUB_SH=""
   if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]] && [[ -x "${CLAUDE_PLUGIN_ROOT}/scripts/hub.sh" ]]; then
@@ -164,10 +164,10 @@ ENRICHMENT="$(
     fi
   fi
 
-  # Assemble enrichment suffix (SSE-01)
+  # Assemble enrichment suffix 
   ENRICHMENT_VAL="${SVC_COUNT} services mapped. ${LB_COUNT:-0} load-bearing files. Last scan: ${SCAN_DATE}. Hub: ${HUB_STATUS}."
 
-  # SSE-03: stale map (48h <= age < 168h) => prepend stale prefix
+  # stale map (48h <= age < 168h) => prepend stale prefix
   if (( AGE_HOURS >= 48 )); then
     DAYS=$(( AGE_HOURS / 24 ))
     ENRICHMENT_VAL="[stale map — last scanned ${DAYS}d ago] ${ENRICHMENT_VAL}"

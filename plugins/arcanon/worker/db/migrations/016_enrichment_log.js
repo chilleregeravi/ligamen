@@ -1,10 +1,10 @@
 /**
- * Migration 016 — TRUST-06: creates `enrichment_log` table for post-scan
+ * Migration 016 — : creates `enrichment_log` table for post-scan
  * reconciliation audit trail.
  *
  * Each row records a field change applied AFTER the agent emitted findings
  * (e.g., crossing reclassified from 'external' to 'cross-service' because
- * the target name matches a known service). Plan 111-03 wires the writes
+ * the target name matches a known service).  wires the writes
  * via `QueryEngine.logEnrichment()`; this migration is schema-only.
  *
  * Indexed on `scan_version_id` (for the `impact_audit_log` MCP tool's
@@ -16,10 +16,10 @@
  *
  * `target_kind` is a discriminant (CHECK constrained to 'service' or
  * 'connection') so `target_id` can FK-by-convention into either the
- * `services` or `connections` table without a polymorphic FK. Phase 111
+ * `services` or `connections` table without a polymorphic FK. 
  * only writes 'connection' rows (reconciliation downgrades crossing on
  * connection rows); 'service' is reserved for future enrichers (codeowners,
- * auth-db) per CONTEXT.md decision D-04.
+ * auth-db) per CONTEXT.md decision .
  *
  * Idempotent natively via `CREATE TABLE IF NOT EXISTS` and
  * `CREATE INDEX IF NOT EXISTS` — no PRAGMA guard needed (mirrors migration 010).

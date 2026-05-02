@@ -1,7 +1,7 @@
 /**
  * Migration 013 — Add connections.path_template column + UNIQUE dedup index.
  *
- * Phase 109 (TRUST-03): connections whose only difference is a template variable
+ * connections whose only difference is a template variable
  * name (e.g. /runtime/streams/{stream_id} vs /runtime/streams/{name}) need to
  * collapse to a single canonical row. The canonical form ({_} placeholder) is
  * stored in the existing `path` column. The original template(s) — what the
@@ -19,14 +19,14 @@
  *      without this index. (Mirrors migration 004's pattern of "dedup
  *      duplicates first, then create UNIQUE index".)
  *
- * On collapse of multiple variants, persistFindings (Plan 109-02) stores
+ * On collapse of multiple variants, persistFindings  stores
  * templates comma-joined (e.g. "/runtime/streams/{stream_id},/runtime/streams/{name}").
  *
  * Idempotent via PRAGMA table_info / index_list checks — safe to re-run.
  *
  * Existing rows are NOT backfilled with canonicalized paths. They retain
  * `path_template = NULL` until a re-scan touches the row. See
- * .planning/phases/109-path-canonicalization-and-evidence/109-CONTEXT.md D-06
+ * .planning/phases/109-path-canonicalization-and-evidence/109-CONTEXT.md 
  * for the safety rationale (silent canonicalization of historic data could
  * incorrectly collapse legitimately-distinct rows).
  *
@@ -35,7 +35,7 @@
  * UNIQUE INDEX statement would fail. We keep MAX(id) per group (most recent
  * upsert wins) and reassign FK references via the schemas table.
  *
- * Migration numbering: this is `version: 13`. Phase 110 ships `version: 12`
+ * Migration numbering: this is `version: 13`.  ships `version: 12`
  * (services.base_path) later in the v0.1.3 train. The loader (database.js:41-68)
  * sorts by exported `version` integer, so 013 runs after 012 once 012 lands —
  * shipping 013 first is safe at runtime.

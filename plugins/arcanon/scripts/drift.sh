@@ -7,7 +7,7 @@
 # Each subcommand continues to source drift-common.sh itself — no coupling here.
 set -euo pipefail
 
-# DSP-04: Bash 4+ plugin floor. drift-types.sh uses declare -A which
+# Bash 4+ plugin floor. drift-types.sh uses declare -A which
 # silently produces wrong output on macOS system Bash 3.2. Guard at the top.
 if (( ${BASH_VERSINFO[0]:-0} < 4 )); then
   echo "arcanon drift requires Bash 4+. Install with: brew install bash" >&2
@@ -38,7 +38,7 @@ case "$SUBCOMMAND" in
     exit $_rc
     ;;
   licenses|security)
-    # DSP-01: reserved slots. Exit 2 distinguishes "reserved" from "unknown"=1.
+    # reserved slots. Exit 2 distinguishes "reserved" from "unknown"=1.
     echo "drift: subcommand '${SUBCOMMAND}' is not yet implemented" >&2
     exit 2
     ;;

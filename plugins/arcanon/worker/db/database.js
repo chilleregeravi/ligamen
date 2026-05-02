@@ -114,7 +114,7 @@ export function openDb(projectRoot = process.cwd()) {
 /**
  * Reset the module-level _db singleton.
  *
- * Required by Phase 119-02's `evictLiveQueryEngine` (pool.js) — the pool's
+ * Required by 's `evictLiveQueryEngine` (pool.js) — the pool's
  * cached QueryEngine wraps the same Database instance that `openDb` cached
  * in the module-level `_db` slot. If we close the QE's handle but leave
  * `_db` pointing at the now-closed instance, the next `openDb()` call
@@ -204,7 +204,7 @@ function getHistoryLimit() {
  * then syncFindings() is called as fire-and-forget via .catch().
  * A ChromaDB outage never prevents SQLite persistence.
  *
- * @param {{ services: Array, connections?: Array }} findings - Confirmed findings from Phase 19
+ * @param {{ services: Array, connections?: Array }} findings - Confirmed findings from 
  * @param {import('./query-engine.js').QueryEngine} queryEngine - QueryEngine instance
  * @param {number} repoId - ID of the repo row in the repos table
  * @returns {void}
@@ -249,7 +249,7 @@ export function writeScan(findings, queryEngine, repoId) {
   } catch { /* config absent or no boundaries key — boundaryMap stays empty */ }
 
   // Build actor map from DB (actors + actor_connections tables)
-  // Gracefully skip if tables don't exist yet (Phase 33 migration may not have run)
+  // Gracefully skip if tables don't exist yet ( migration may not have run)
   const actorMap = new Map();
   try {
     const rows = queryEngine._db.prepare(`

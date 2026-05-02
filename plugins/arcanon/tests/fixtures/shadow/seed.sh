@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/shadow/seed.sh — Phase 119-01 (SHADOW-01).
+# plugins/arcanon/tests/fixtures/shadow/seed.sh —  .
 #
 # Thin wrapper around seed.js. Invoked from tests/shadow-scan.bats setup() to:
 #   1. Create one real git repo under <project-root> (api) so manager.js's

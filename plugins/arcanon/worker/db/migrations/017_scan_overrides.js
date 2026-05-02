@@ -1,10 +1,10 @@
 /**
- * Migration 017 - CORRECT-01: creates `scan_overrides` table for staged
+ * Migration 017 - : creates `scan_overrides` table for staged
  * operator corrections that the next scan applies idempotently.
  *
- * Phase 117 schema. Each override row stages a single mutation against
+ * schema. Each override row stages a single mutation against
  * `connections` or `services`. The apply-hook (worker/scan/overrides.js,
- * Plan 117-02) reads pending rows BETWEEN persistFindings and endScan,
+ * ) reads pending rows BETWEEN persistFindings and endScan,
  * applies each via direct UPDATE/DELETE on the target table, and stamps
  * `applied_in_scan_version_id` so already-applied rows are skipped on
  * subsequent scans (idempotent re-application).
@@ -16,7 +16,7 @@
  *
  * Two indexes:
  *   - idx_scan_overrides_kind_target: future "is there an override for this
- *     row?" lookups (Phase 118 /arcanon:correct will use this).
+ *     row?" lookups ( /arcanon:correct will use this).
  *   - idx_scan_overrides_pending: speeds the `WHERE applied_in_scan_version_id
  *     IS NULL` filter that getPendingOverrides() runs on every scan.
  *

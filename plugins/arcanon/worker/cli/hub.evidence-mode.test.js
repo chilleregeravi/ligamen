@@ -1,5 +1,5 @@
 /**
- * worker/cli/hub.evidence-mode.test.js — Phase 120-01 INT-01 wiring tests.
+ * worker/cli/hub.evidence-mode.test.js —   wiring tests.
  *
  * Asserts the load-bearing wiring at the CLI to hub-sync boundary:
  *

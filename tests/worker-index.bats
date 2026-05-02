@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/worker-index.bats — TDD tests for worker/index.js (Task 1, Phase 15-02)
+# tests/worker-index.bats — TDD tests for worker/index.js (Task 1)
 # RED phase: these tests are written before the implementation exists.
 
 load 'test_helper/bats-support/load'

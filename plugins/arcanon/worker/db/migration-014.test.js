@@ -1,11 +1,11 @@
 /**
  * Test suite for migration 014 — services.base_path column.
  *
- * Phase 110 (TRUST-04, TRUST-12): adds a TEXT column on `services` for storing
+ * adds a TEXT column on `services` for storing
  * a service-level URL prefix (e.g. /api) that reverse proxies/ingress strip
  * before forwarding to the service. Connection resolution uses base_path to
  * strip the prefix from outbound paths before matching against exposed
- * endpoints (D-02 + D-03).
+ * endpoints ( + ).
  *
  * Verifies:
  *   - version export === 14
@@ -82,6 +82,6 @@ describe('migration 014 — services.base_path', () => {
       .get('pre-existing');
     assert.ok(row, 'pre-existing row still readable after migration');
     assert.equal(row.name, 'pre-existing');
-    assert.equal(row.base_path, null); // D-01: no backfill
+    assert.equal(row.base_path, null); // : no backfill
   });
 });

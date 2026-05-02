@@ -1,24 +1,24 @@
 /**
- * worker/server/http.verify.test.js — Phase 112-02 (TRUST-01, TRUST-07/08/09).
+ * worker/server/http.verify.test.js —  (/08/09).
  *
  * Drives the GET /api/verify endpoint and the exported computeVerdict helper
  * with an in-memory SQLite DB. Pairs with tests/verify.bats which exercises
  * the same code path end-to-end via the shell wrapper + spawned worker.
  *
  * Coverage map:
- *   1.  computeVerdict — ok happy path                        (TRUST-07)
- *   2.  computeVerdict — moved (file deleted)                 (TRUST-08)
- *   3.  computeVerdict — missing (snippet absent)             (TRUST-09)
- *   4.  computeVerdict — method_mismatch                      (D-01)
- *   5.  computeVerdict — ok with evidence=null                (D-01 degraded)
- *   6.  GET /api/verify — happy path returns 3 results        (TRUST-07)
- *   7.  GET /api/verify ?connection_id — single result        (D-06)
- *   8.  GET /api/verify ?source_file — exact match            (D-06)
- *   9.  GET /api/verify — missing project param → 400         (D-04)
- *   10. GET /api/verify ?connection_id=99999 → 404            (D-04 / 112-01)
- *   11. GET /api/verify ?source_file=src/nope → 200 empty     (D-06)
- *   12. GET /api/verify cap — 1001 connections truncated      (D-03)
- *   13. GET /api/verify is read-only                          (D-02)
+ *   1.  computeVerdict — ok happy path                        
+ *   2.  computeVerdict — moved (file deleted)                 
+ *   3.  computeVerdict — missing (snippet absent)             
+ *   4.  computeVerdict — method_mismatch                      
+ *   5.  computeVerdict — ok with evidence=null                ( degraded)
+ *   6.  GET /api/verify — happy path returns 3 results        
+ *   7.  GET /api/verify ?connection_id — single result        
+ *   8.  GET /api/verify ?source_file — exact match            
+ *   9.  GET /api/verify — missing project param → 400         
+ *   10. GET /api/verify ?connection_id=99999 → 404            (112-01)
+ *   11. GET /api/verify ?source_file=src/nope → 200 empty     
+ *   12. GET /api/verify cap — 1001 connections truncated      
+ *   13. GET /api/verify is read-only                          
  *
  * Run: node --test plugins/arcanon/worker/server/http.verify.test.js
  */
@@ -81,7 +81,7 @@ async function makeServer(qe) {
 /**
  * Compute a deterministic checksum of every column we care about on the
  * connections + scan_versions tables. Used by the read-only assertion
- * (test 13 / D-02).
+ * (test 13).
  */
 function checksumTables(db) {
   const conn = db.prepare(
@@ -104,7 +104,7 @@ function checksumTables(db) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. computeVerdict — ok happy path                                  TRUST-07
+// 1. computeVerdict — ok happy path                                  
 // ---------------------------------------------------------------------------
 
 test('computeVerdict — ok when file exists, evidence found, method matches (TRUST-07)', () => {
@@ -129,7 +129,7 @@ test('computeVerdict — ok when file exists, evidence found, method matches (TR
 });
 
 // ---------------------------------------------------------------------------
-// 2. computeVerdict — moved (file deleted)                           TRUST-08
+// 2. computeVerdict — moved (file deleted)                           
 // ---------------------------------------------------------------------------
 
 test('computeVerdict — moved when source_file does not exist (TRUST-08)', () => {
@@ -152,7 +152,7 @@ test('computeVerdict — moved when source_file does not exist (TRUST-08)', () =
 });
 
 // ---------------------------------------------------------------------------
-// 3. computeVerdict — missing (snippet absent)                       TRUST-09
+// 3. computeVerdict — missing (snippet absent)                       
 // ---------------------------------------------------------------------------
 
 test('computeVerdict — missing when file exists but evidence absent (TRUST-09)', () => {
@@ -174,7 +174,7 @@ test('computeVerdict — missing when file exists but evidence absent (TRUST-09)
 });
 
 // ---------------------------------------------------------------------------
-// 4. computeVerdict — method_mismatch                                D-01
+// 4. computeVerdict — method_mismatch                                
 // ---------------------------------------------------------------------------
 
 test('computeVerdict — method_mismatch when cited method absent in snippet (D-01)', () => {
@@ -197,7 +197,7 @@ test('computeVerdict — method_mismatch when cited method absent in snippet (D-
 });
 
 // ---------------------------------------------------------------------------
-// 5. computeVerdict — ok with no-evidence-recorded                   D-01
+// 5. computeVerdict — ok with no-evidence-recorded                   
 // ---------------------------------------------------------------------------
 
 test('computeVerdict — ok degraded when conn.evidence is null (pre-Phase-109)', () => {
@@ -219,7 +219,7 @@ test('computeVerdict — ok degraded when conn.evidence is null (pre-Phase-109)'
 });
 
 // ---------------------------------------------------------------------------
-// 6. GET /api/verify happy path — 3 ok results                       TRUST-07
+// 6. GET /api/verify happy path — 3 ok results                       
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify — happy path returns 3 ok verdicts (TRUST-07)', async () => {
@@ -252,7 +252,7 @@ test('GET /api/verify — happy path returns 3 ok verdicts (TRUST-07)', async ()
 });
 
 // ---------------------------------------------------------------------------
-// 7. GET /api/verify ?connection_id — single result                  D-06
+// 7. GET /api/verify ?connection_id — single result                  
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify ?connection_id=2 — returns exactly that connection', async () => {
@@ -281,7 +281,7 @@ test('GET /api/verify ?connection_id=2 — returns exactly that connection', asy
 });
 
 // ---------------------------------------------------------------------------
-// 8. GET /api/verify ?source_file — exact match                      D-06
+// 8. GET /api/verify ?source_file — exact match                      
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify ?source_file=...users.js — exact-path match returns one row', async () => {
@@ -312,7 +312,7 @@ test('GET /api/verify ?source_file=...users.js — exact-path match returns one 
 });
 
 // ---------------------------------------------------------------------------
-// 9. GET /api/verify — missing project param → 400                   D-04
+// 9. GET /api/verify — missing project param → 400                   
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify — missing project param returns 400', async () => {
@@ -333,7 +333,7 @@ test('GET /api/verify — missing project param returns 400', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// 10. GET /api/verify ?connection_id=99999 → 404                     D-04
+// 10. GET /api/verify ?connection_id=99999 → 404                     
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify ?connection_id=99999 — no row returns 404', async () => {
@@ -359,7 +359,7 @@ test('GET /api/verify ?connection_id=99999 — no row returns 404', async () => 
 });
 
 // ---------------------------------------------------------------------------
-// 11. GET /api/verify ?source_file=nope → 200 empty                  D-06
+// 11. GET /api/verify ?source_file=nope → 200 empty                  
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify ?source_file=nonexistent — 200 with empty results', async () => {
@@ -389,7 +389,7 @@ test('GET /api/verify ?source_file=nonexistent — 200 with empty results', asyn
 });
 
 // ---------------------------------------------------------------------------
-// 12. GET /api/verify cap — 1001 connections → truncated=true        D-03
+// 12. GET /api/verify cap — 1001 connections → truncated=true        
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify — 1001 connections triggers truncated=true (D-03)', async () => {
@@ -456,7 +456,7 @@ test('GET /api/verify — 1001 connections triggers truncated=true (D-03)', asyn
 });
 
 // ---------------------------------------------------------------------------
-// 13. GET /api/verify is read-only — D-02 byte-level checksum proof
+// 13. GET /api/verify is read-only —  byte-level checksum proof
 // ---------------------------------------------------------------------------
 
 test('GET /api/verify — read-only contract: connections + scan_versions byte-identical (D-02)', async () => {

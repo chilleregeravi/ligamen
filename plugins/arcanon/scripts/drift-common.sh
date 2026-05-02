@@ -75,7 +75,7 @@ else
 fi
 
 if [[ -z "${LINKED_REPOS:-}" ]]; then
-  # DSP-08: canonical short-form prefix so dispatcher/tests can grep this exact string.
+  # canonical short-form prefix so dispatcher/tests can grep this exact string.
   echo "drift: no linked repos configured" >&2
   echo "Configure linked-repos in arcanon.config.json or run from a directory with sibling git repos." >&2
   # Use return (not exit) since this file is always sourced; parent script handles control flow.

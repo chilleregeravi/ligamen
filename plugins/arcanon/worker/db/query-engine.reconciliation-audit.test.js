@@ -1,9 +1,9 @@
 /**
- * worker/db/query-engine.reconciliation-audit.test.js — Phase 111 Plan 03 (TRUST-06, TRUST-14)
+ * worker/db/query-engine.reconciliation-audit.test.js —   
  *
  * Integration test for the reconciliation → audit-log path wired in
  * commands/map.md Step 3 (capture _reconciliation field) and Step 5
- * (resolve connection_id and call qe.logEnrichment) under Plan 111-03.
+ * (resolve connection_id and call qe.logEnrichment) under .
  *
  * The slash-command flow itself (a Claude-driven JS snippet) is not directly
  * unit-testable, so this test reproduces the relevant slice of map.md inline:

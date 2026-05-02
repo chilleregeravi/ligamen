@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/shadow-scan.bats — Phase 119-01 (SHADOW-01).
+# tests/shadow-scan.bats —  .
 #
 # End-to-end coverage of /arcanon:shadow-scan and the underlying
 # getShadowQueryEngine() pool helper. Pairs with the rescan/verify pattern:
@@ -52,7 +52,7 @@ setup() {
 }
 
 # Latest migration version — derived from the migrations dir at runtime so the
-# assertion is future-proof. Migration 017 currently shipped (Phase 117-01).
+# assertion is future-proof. Migration 017 currently shipped .
 _latest_migration_version() {
   ls "${PLUGIN_ROOT}/worker/db/migrations/"*.js \
     | grep -v '\.test\.js$' \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# tests/update.bats — /arcanon:update command and scripts/update.sh (Phase 98, plan 98-01).
-# Covers UPD-01 (installed vs remote read), UPD-02/UPD-13 (semver matrix),
-# UPD-03 (latest release path), UPD-04 (changelog preview), UPD-11 (offline fallback).
+# tests/update.bats — /arcanon:update command and scripts/update.sh (plan 98-01).
+# Covers  (installed vs remote read), / (semver matrix),
+# (latest release path),  (changelog preview),  (offline fallback).
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
@@ -43,14 +43,14 @@ EOF
   export PATH="$TEST_FAKE_HOME/bin:$PATH"
 }
 
-# ─── UPD-02 / UPD-13: semver comparison matrix ──────────────────────────────
-@test "UPD-13: node+semver says 0.10.0 > 0.9.0 (not lexicographic)" {
+# ───  / : semver comparison matrix ──────────────────────────────
+@test "node+semver says 0.10.0 > 0.9.0 (not lexicographic)" {
   run env NODE_PATH="${PLUGIN_ROOT}/node_modules" node -e \
     "const s=require('semver'); process.exit(s.gt('0.10.0','0.9.0')?0:1)"
   assert_success
 }
 
-@test "UPD-13: node+semver says 0.10.0 is NOT less than 0.9.0 (anti-lex proof)" {
+@test "node+semver says 0.10.0 is NOT less than 0.9.0 (anti-lex proof)" {
   run env NODE_PATH="${PLUGIN_ROOT}/node_modules" node -e \
     "const s=require('semver'); process.exit(s.lt('0.10.0','0.9.0')?0:1)"
   # If lexical compare was used, "0.10.0" < "0.9.0" would be TRUE and exit 0.
@@ -58,20 +58,20 @@ EOF
   assert_failure
 }
 
-@test "UPD-13: node+semver says 0.1.1 > 0.1.0" {
+@test "node+semver says 0.1.1 > 0.1.0" {
   run env NODE_PATH="${PLUGIN_ROOT}/node_modules" node -e \
     "const s=require('semver'); process.exit(s.gt('0.1.1','0.1.0')?0:1)"
   assert_success
 }
 
-@test "UPD-13: node+semver says 1.0.0 == 1.0.0" {
+@test "node+semver says 1.0.0 == 1.0.0" {
   run env NODE_PATH="${PLUGIN_ROOT}/node_modules" node -e \
     "const s=require('semver'); process.exit(s.eq('1.0.0','1.0.0')?0:1)"
   assert_success
 }
 
-# ─── UPD-01 / UPD-03: update.sh --check, installed==remote path ──────────────
-@test "UPD-03: --check emits status=equal when installed matches remote" {
+# ───  / : update.sh --check, installed==remote path ──────────────
+@test "--check emits status=equal when installed matches remote" {
   shim_claude
   INSTALLED=$(jq -r '.version' "$PLUGIN_ROOT/.claude-plugin/plugin.json")
   write_remote_manifest "$INSTALLED"
@@ -80,8 +80,8 @@ EOF
   assert_output "equal"
 }
 
-# ─── UPD-04: changelog preview when newer ─────────────────────────────────────
-@test "UPD-04: --check emits non-empty changelog_preview when remote is newer" {
+# ─── : changelog preview when newer ─────────────────────────────────────
+@test "--check emits non-empty changelog_preview when remote is newer" {
   shim_claude
   write_remote_manifest "99.99.99" "$(cat <<'CHG'
 # Changelog
@@ -97,7 +97,7 @@ CHG
   [[ "$output" == *"Fix something critical"* ]] || { echo "preview missing expected bullet: $output"; return 1; }
 }
 
-@test "UPD-04: --check marks update_available=true when remote is newer" {
+@test "--check marks update_available=true when remote is newer" {
   shim_claude
   write_remote_manifest "99.99.99"
   run bash -c "bash '$PLUGIN_ROOT/scripts/update.sh' --check | jq -er '.update_available'"
@@ -105,8 +105,8 @@ CHG
   assert_output "true"
 }
 
-# ─── UPD-11: offline graceful fallback ────────────────────────────────────────
-@test "UPD-11: --check exits 0 with status=offline when marketplace manifest is absent" {
+# ─── : offline graceful fallback ────────────────────────────────────────
+@test "--check exits 0 with status=offline when marketplace manifest is absent" {
   shim_claude
   # Do NOT write the manifest — simulate "could not reach update server"
   rm -rf "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon"
@@ -123,10 +123,10 @@ CHG
   assert_success
 }
 
-# ─── UPD-07 / UPD-08: --kill mode tests (Phase 98, plan 98-02) ───────────────
+# ───  / : --kill mode tests (plan 98-02) ───────────────
 
-# UPD-07: scan-lock abort (live lock)
-@test "UPD-07: --kill emits scan_in_progress when scan.lock has a live PID" {
+# scan-lock abort (live lock)
+@test "--kill emits scan_in_progress when scan.lock has a live PID" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 
@@ -145,8 +145,8 @@ CHG
   rm -rf "$ARCANON_DATA_DIR"
 }
 
-# UPD-07: stale scan.lock is cleared and kill proceeds
-@test "UPD-07: --kill clears stale scan.lock (dead PID) and proceeds" {
+# stale scan.lock is cleared and kill proceeds
+@test "--kill clears stale scan.lock (dead PID) and proceeds" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 
@@ -163,8 +163,8 @@ CHG
   rm -rf "$ARCANON_DATA_DIR"
 }
 
-# UPD-08: sigterm path with live worker
-@test "UPD-08: --kill sends SIGTERM and removes worker.pid/worker.port on live worker" {
+# sigterm path with live worker
+@test "--kill sends SIGTERM and removes worker.pid/worker.port on live worker" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
   export ARCANON_WORKER_PORT="37999"
@@ -192,8 +192,8 @@ CHG
   rm -rf "$ARCANON_DATA_DIR"
 }
 
-# UPD-08: no-pid path
-@test "UPD-08: --kill emits reason=no_pid_file when worker not running" {
+# no-pid path
+@test "--kill emits reason=no_pid_file when worker not running" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 
@@ -204,15 +204,15 @@ CHG
   rm -rf "$ARCANON_DATA_DIR"
 }
 
-# UPD-08: update.sh never references restart_worker_if_stale or worker_start_background (Anti-Pattern 2 regression guard)
-@test "UPD-08: scripts/update.sh does not reference restart_worker_if_stale or worker_start_background" {
+# update.sh never references restart_worker_if_stale or worker_start_background (Anti-Pattern 2 regression guard)
+@test "scripts/update.sh does not reference restart_worker_if_stale or worker_start_background" {
   run grep -E 'restart_worker_if_stale|worker_start_background' "$PLUGIN_ROOT/scripts/update.sh"
   # grep exits 1 when no match — that's success for us
   assert_failure
 }
 
-# UPD-08: after --kill, no new Arcanon worker has been started
-@test "UPD-08: --kill does not spawn a new worker (kill-only semantics)" {
+# after --kill, no new Arcanon worker has been started
+@test "--kill does not spawn a new worker (kill-only semantics)" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
   export ARCANON_WORKER_PORT="37999"
@@ -233,10 +233,10 @@ CHG
   rm -rf "$ARCANON_DATA_DIR"
 }
 
-# ─── UPD-09 / UPD-10 / UPD-12: --prune-cache and --verify (Phase 98, plan 98-03) ───
+# ───  /  / : --prune-cache and --verify (plan 98-03) ───
 
-# UPD-09: current version is kept, not pruned
-@test "UPD-09: --prune-cache never prunes the current version dir" {
+# current version is kept, not pruned
+@test "--prune-cache never prunes the current version dir" {
   TEST_CACHE_HOME="$(mktemp -d)"
   export HOME="$TEST_CACHE_HOME"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
@@ -259,8 +259,8 @@ CHG
   rm -rf "$TEST_CACHE_HOME"
 }
 
-# UPD-09: old version is pruned
-@test "UPD-09: --prune-cache deletes non-current version dirs" {
+# old version is pruned
+@test "--prune-cache deletes non-current version dirs" {
   TEST_CACHE_HOME="$(mktemp -d)"
   export HOME="$TEST_CACHE_HOME"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
@@ -287,8 +287,8 @@ CHG
   rm -rf "$TEST_CACHE_HOME"
 }
 
-# UPD-09: lsof guard keeps dirs with active handles
-@test "UPD-09: --prune-cache skips dirs with active file handles (lsof guard)" {
+# lsof guard keeps dirs with active handles
+@test "--prune-cache skips dirs with active file handles (lsof guard)" {
   # Skip if lsof is unavailable (CI without lsof).
   command -v lsof >/dev/null 2>&1 || skip "lsof not available"
 
@@ -324,8 +324,8 @@ CHG
   rm -rf "$TEST_CACHE_HOME"
 }
 
-# UPD-10: --verify success path
-@test "UPD-10: --verify starts worker and reports status=verified when versions match" {
+# verify success path
+@test "--verify starts worker and reports status=verified when versions match" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
   export ARCANON_WORKER_PORT="37997"
@@ -340,10 +340,10 @@ CHG
   rm -rf "$ARCANON_DATA_DIR"
 }
 
-# UPD-10: --verify exits 0 even on failure (graceful fallback per Pitfall 11)
+# verify exits 0 even on failure (graceful fallback per Pitfall 11)
 # Sabotage: replace worker-start.sh with a no-op so no worker ever spawns.
 # The poll loop times out after 10 iterations and emits verify_failed.
-@test "UPD-10: --verify exits 0 on timeout (does not fail the caller)" {
+@test "--verify exits 0 on timeout (does not fail the caller)" {
   export ARCANON_DATA_DIR="$(mktemp -d)"
   export ARCANON_WORKER_PORT="37996"
 
@@ -371,8 +371,8 @@ CHG
   rm -rf "$ARCANON_DATA_DIR" "$FAKE_ROOT"
 }
 
-# UPD-12: final "Restart Claude Code" message is present in commands/update.md
-@test "UPD-12: commands/update.md contains 'Restart Claude Code to activate' in a success path" {
+# final "Restart Claude Code" message is present in commands/update.md
+@test "commands/update.md contains 'Restart Claude Code to activate' in a success path" {
   run grep -cE 'Restart Claude Code to activate' "$PLUGIN_ROOT/commands/update.md"
   assert_success
   [[ "$output" -ge 1 ]] || { echo "final message missing from commands/update.md"; return 1; }

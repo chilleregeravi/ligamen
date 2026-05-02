@@ -1,5 +1,5 @@
 /**
- * worker/scan/enrichment/actor-labeler.test.js — Phase 121 / INT-06.
+ * worker/scan/enrichment/actor-labeler.test.js —  / .
  *
  * Tests for runActorLabeling(repoId, db, logger, catalog) — the per-repo
  * actor enrichment pass that stamps actors.label using the catalog.

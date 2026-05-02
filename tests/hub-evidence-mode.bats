@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/hub-evidence-mode.bats — Phase 120-01 INT-01.
+# tests/hub-evidence-mode.bats —  .
 #
 # End-to-end coverage of the hub.evidence_mode config flag. For each of the
 # three valid values ("full", "hash-only", "none") spawns a node subprocess

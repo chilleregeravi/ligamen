@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/verify/seed.sh — Phase 112-02 (TRUST-07/08/09).
+# plugins/arcanon/tests/fixtures/verify/seed.sh —  (/08/09).
 #
 # Thin wrapper around seed.js. Invoked from tests/verify.bats setup() to
 # populate a fresh SQLite DB at the path the Arcanon worker computes for the

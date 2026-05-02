@@ -1,17 +1,17 @@
 #!/usr/bin/env bats
-# tests/pii-masking.bats — Phase 123 (PII-07-bats half).
+# tests/pii-masking.bats —  ( half).
 #
 # Cross-seam integration grep: asserts every Wave-2 egress seam emits zero
 # `/Users/` (or `/home/`) strings after a clean scan, plus a structural
 # regression guard against session-start.sh future-rendering `repos[].path`
-# without masking (S2 mitigation).
+# without masking .
 #
 # Layout:
 #   1.   Unit-gate — node tests for path-mask + findings.pii06 must pass.
 #   2-4. Three HTTP-route greps — /projects, /graph, /api/scan-freshness.
 #   5-7. Three export-format greps — mermaid, dot, html.
 #   8.   Log-file grep — ~/.arcanon/logs/worker.log after a clean scan.
-#   9.   PII-06 unit gate — re-runs findings.pii06.test.js.
+#   9.    unit gate — re-runs findings.pii06.test.js.
 #  10.   S2 structural guard — session-start.sh must not render repos[].path.
 #
 # Tests requiring a running worker or scanned fixture `skip` with a clear
@@ -227,7 +227,7 @@ teardown() {
 # 8 — Log-file grep: worker.log contains no /Users/ after a clean scan.
 #      We exercise the *current* logger seam by pointing the worker at a
 #      fresh data-dir (so its log file is isolated from the dev's actual
-#      ~/.arcanon/logs/worker.log, which may contain pre-PII-04 historical
+#      ~/.arcanon/logs/worker.log, which may contain pre- historical
 #      entries that pre-date this phase). After the worker has served at
 #      least one HTTP request, we assert the live log contains zero leaks.
 # ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# 9 — PII-06 unit-gate: findings.pii06.test.js exits 0.
+# 9 —  unit-gate: findings.pii06.test.js exits 0.
 # ---------------------------------------------------------------------------
 @test "PII-bats-09: parseAgentOutput rejects absolute source_file (PII-06 unit gate)" {
   cd "$PLUGIN_ROOT"

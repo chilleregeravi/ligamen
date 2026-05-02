@@ -1,9 +1,9 @@
 /**
- * worker/mcp/server.impact-audit-log.test.js — Phase 111 Plan 03 (TRUST-06, TRUST-14)
+ * worker/mcp/server.impact-audit-log.test.js —   
  *
- * Verifies the new MCP tool `impact_audit_log` exposed by Plan 111-03:
+ * Verifies the new MCP tool `impact_audit_log` exposed by :
  *   - The tool's handler `handleImpactAuditLog(params)` is exported from
- *     server.js (testability per Plan 111-03 Task 2 <action>).
+ *     server.js (testability per  Task 2 <action>).
  *   - With a populated DB, calling the handler with { scan_version_id: N }
  *     returns the rows wrapped in MCP envelope: { content:[{ type:'text', text }] }.
  *   - The `enricher` filter narrows results to a single enricher.

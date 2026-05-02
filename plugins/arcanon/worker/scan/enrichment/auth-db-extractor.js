@@ -150,38 +150,38 @@ const AUTH_SIGNALS = {
     { mechanism: 'actix-auth', regex: /(actix.web.httpauth|HttpAuthentication)/i },
   ],
   java: [
-    // ENR-02 — jjwt (io.jsonwebtoken) dominant JWT lib; spring-security-oauth2-jose is Boot 3+
+    // jjwt (io.jsonwebtoken) dominant JWT lib; spring-security-oauth2-jose is Boot 3+
     { mechanism: 'jwt',     regex: /(io\.jsonwebtoken|jjwt|JwtDecoder|JwtEncoder|BearerTokenAuthentication|spring-security.*oauth2.*jose)/i },
-    // ENR-02 — OAuth2 Authorization Server / OIDC login / resource server
+    // OAuth2 Authorization Server / OIDC login / resource server
     { mechanism: 'oauth2',  regex: /(OAuth2AuthorizationServer|OAuth2LoginConfigurer|OidcUserService|oauth2Login\(\)|\.oauth2ResourceServer\()/i },
-    // ENR-02 — Spring Security 5 (@EnableWebSecurity, @PreAuthorize) AND Spring Security 6 (SecurityFilterChain, formLogin, sessionManagement). Both patterns MUST ship per research PITFALL 10.
+    // Spring Security 5 (@EnableWebSecurity, @PreAuthorize) AND Spring Security 6 (SecurityFilterChain, formLogin, sessionManagement). Both patterns MUST ship per research PITFALL 10.
     { mechanism: 'session', regex: /(@EnableWebSecurity|@PreAuthorize|SecurityFilterChain|\.formLogin\(\)|\.sessionManagement\(\)|SecurityContextHolder|HttpSessionSecurityContextRepository)/i },
     // Custom API key filter
     { mechanism: 'api-key', regex: /(X-API-Key|ApiKeyAuthFilter|OncePerRequestFilter.*api.key|getHeader.*api)/i },
   ],
-  // ENR-03 — ASP.NET Core / ASP.NET Identity. NOTE: C# `partial class` is a Phase 92
-  // TYPE-03 drift-types concern, not an auth concern — this signal table works per-file
+  // ASP.NET Core / ASP.NET Identity. NOTE: C# `partial class` is a 
+  // drift-types concern, not an auth concern — this signal table works per-file
   // so fragment handling is not needed here.
   csharp: [
-    // ENR-03 — JWT: AddJwtBearer is the canonical minimal-API call. JwtBearerDefaults
+    // JWT: AddJwtBearer is the canonical minimal-API call. JwtBearerDefaults
     // is the enum. JwtSecurityToken is System.IdentityModel. Also cover the NuGet
     // package namespaces for robust match in using-less files.
     { mechanism: 'jwt',     regex: /(AddJwtBearer|JwtBearerDefaults|JwtSecurityToken|Microsoft\.AspNetCore\.Authentication\.JwtBearer|System\.IdentityModel\.Tokens\.Jwt)/i },
-    // ENR-03 — Session / ASP.NET Identity. Widened to include the [Authorize] attribute
-    // (MVC + minimal API common pattern) per ENR-03 requirement.
+    // Session / ASP.NET Identity. Widened to include the [Authorize] attribute
+    // (MVC + minimal API common pattern) per  requirement.
     { mechanism: 'session', regex: /(AddDefaultIdentity|AddIdentity|IdentityUser|SignInManager|UserManager|\.AddCookie\(|\[Authorize\b)/i },
-    // ENR-03 — OAuth2 / OIDC (Azure AD, Okta, Google)
+    // OAuth2 / OIDC (Azure AD, Okta, Google)
     { mechanism: 'oauth2',  regex: /(AddOpenIdConnect|AddMicrosoftIdentityWebApp|OAuthOptions|OpenIdConnectOptions)/i },
-    // ENR-03 — Custom API key middleware
+    // Custom API key middleware
     { mechanism: 'api-key', regex: /(ApiKeyMiddleware|IApiKeyValidator|X-API-Key|ApiKeyAttribute)/i },
   ],
-  // ENR-04 — Ruby / Rails. Devise is the dominant auth gem; HTTP basic is common in
+  // Ruby / Rails. Devise is the dominant auth gem; HTTP basic is common in
   // API-only Rails apps and admin tooling.
   ruby: [
-    // ENR-04 — Devise (session/cookie) — strongest signal. Cover `devise`, `devise_for`,
+    // Devise (session/cookie) — strongest signal. Cover `devise`, `devise_for`,
     // the `authenticate_user!` before_action, and Devise internal classes.
     { mechanism: 'session', regex: /(devise|devise_for|before_action :authenticate_user!|Devise::RegistrationsController|Devise::SessionsController)/i },
-    // ENR-04 — HTTP Basic auth (Rails controller helper — ENR-04 explicit requirement).
+    // HTTP Basic auth (Rails controller helper —  explicit requirement).
     { mechanism: 'http-basic', regex: /(authenticate_or_request_with_http_basic|authenticate_with_http_basic|ActionController::HttpAuthentication::Basic)/i },
     // JWT via the 'jwt' gem or Knock pattern
     { mechanism: 'jwt',     regex: /(require ['"]jwt['"]|JWT\.decode|JWT\.encode|JsonWebToken|knock)/i },
@@ -228,18 +228,18 @@ const DB_SOURCE_SIGNALS = {
     { backend: 'sqlite',     regex: /(rusqlite|sqlx.*sqlite)/i },
   ],
   java: [
-    // ENR-05 — PostgreSQL: driver class, datasource URL (jdbc:postgresql or spring.datasource.url=...postgres), r2dbc
+    // PostgreSQL: driver class, datasource URL (jdbc:postgresql or spring.datasource.url=...postgres), r2dbc
     { backend: 'postgresql', regex: /(org\.postgresql|jdbc:postgresql|spring\.datasource\.url.*postgres|r2dbc.*postgresql)/i },
-    // ENR-05 — MySQL
+    // MySQL
     { backend: 'mysql',      regex: /(com\.mysql|mysql\.jdbc|jdbc:mysql|spring\.datasource\.url.*mysql|r2dbc.*mysql)/i },
-    // ENR-05 — MongoDB (Spring Data MongoDB)
+    // MongoDB (Spring Data MongoDB)
     { backend: 'mongodb',    regex: /(org\.springframework\.data\.mongodb|MongoClient|MongoRepository|@Document)/i },
-    // ENR-05 — Redis
+    // Redis
     { backend: 'redis',      regex: /(spring\.data\.redis|LettuceConnectionFactory|RedisTemplate|JedisConnectionFactory)/i },
-    // ENR-05 — H2 in-memory
+    // H2 in-memory
     { backend: 'h2',         regex: /(com\.h2database|jdbc:h2:|spring\.datasource\.url.*h2:|H2ConsoleAutoConfiguration)/i },
   ],
-  // ENR-06 — EF Core with ASP.NET Core minimal API (PITFALL 11 GREEN path).
+  // EF Core with ASP.NET Core minimal API (PITFALL 11 GREEN path).
   // AddDbContext<T>(opt => opt.UseX(...)) — the Use-provider call is the discriminator.
   csharp: [
     { backend: 'postgresql', regex: /(Npgsql|NpgsqlConnection|\.UseNpgsql\(|Npgsql\.EntityFrameworkCore)/i },
@@ -249,7 +249,7 @@ const DB_SOURCE_SIGNALS = {
     { backend: 'mongodb',    regex: /(MongoDB\.Driver|MongoClient|IMongoDatabase)/i },
     { backend: 'cosmosdb',   regex: /(CosmosClient|\.UseCosmos\(|Microsoft\.EntityFrameworkCore\.Cosmos)/i },
   ],
-  // ENR-07 — Ruby / Rails. ActiveRecord is ubiquitous; the `pg` / `mysql2` / `sqlite3`
+  // Ruby / Rails. ActiveRecord is ubiquitous; the `pg` / `mysql2` / `sqlite3`
   // gems are the dominant drivers.
   ruby: [
     // Note: config/database.yml `adapter:` is handled separately in detectDbFromEnv();
@@ -466,7 +466,7 @@ function detectDbFromPrisma(repoPath) {
  * @returns {string|null}
  */
 function detectDbFromEnv(repoPath) {
-  // ENR-07 — config/database.yml added to the probed file list. It is the authoritative
+  // config/database.yml added to the probed file list. It is the authoritative
   // Rails DB signal; DATABASE_URL is not the Rails default. The file is scanned for an
   // `adapter:` key in addition to the existing DATABASE_URL match.
   const envFiles = [
@@ -491,7 +491,7 @@ function detectDbFromEnv(repoPath) {
         if (pattern.test(urlValue)) return backend;
       }
     }
-    // ENR-07 new path: Rails config/database.yml `adapter:` probe. Safe to run on all
+    // new path: Rails config/database.yml `adapter:` probe. Safe to run on all
     // env files — the regex won't match .env dotfiles. Adapter value is lowercased and
     // normalized to canonical backend names used throughout the extractor.
     const adapterMatch = content.match(/adapter:\s*(\S+)/);

@@ -1,9 +1,9 @@
 /**
- * worker/scan/findings-base-path.test.js — Phase 110 (TRUST-04, TRUST-12)
+ * worker/scan/findings-base-path.test.js —  
  *
  * Verifies the read path for services.base_path:
- *   - Validator accepts base_path as optional string field (D-01 backwards-compat)
- *   - Validator handles single-segment, multi-segment (D-03), and null values
+ *   Validator accepts base_path as optional string field ( backwards-compat)
+ *   Validator handles single-segment, multi-segment, and null values
  *   - Validator warns + skips on bad type (mirrors root_path / language pattern)
  *   - agent-prompt-service.md instructs base_path emission
  *   - agent-schema.json declares the field
@@ -49,7 +49,7 @@ test("validateFindings accepts base_path = '/api' and preserves it on the servic
 });
 
 // ---------------------------------------------------------------------------
-// Test B: backwards compat — missing base_path is fine (D-01)
+// Test B: backwards compat — missing base_path is fine 
 // ---------------------------------------------------------------------------
 test("validateFindings accepts services with NO base_path field (D-01 backwards-compat)", () => {
   const obj = minimalValid();
@@ -88,7 +88,7 @@ test("validateFindings warns + skips when base_path is not a string or null", ()
 });
 
 // ---------------------------------------------------------------------------
-// Test E: multi-segment base_path is accepted (D-03)
+// Test E: multi-segment base_path is accepted 
 // ---------------------------------------------------------------------------
 test("validateFindings accepts multi-segment base_path = '/api/v1' (D-03)", () => {
   const obj = minimalValid({ base_path: "/api/v1" });

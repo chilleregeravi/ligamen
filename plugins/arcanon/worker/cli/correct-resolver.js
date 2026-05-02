@@ -1,6 +1,6 @@
 /**
  * worker/cli/correct-resolver.js — service-name → service.id resolver for
- * /arcanon:correct (Phase 118-01, CORRECT-02).
+ * arcanon:correct .
  *
  * Pure helper. Extracted from cmdCorrect so the resolution logic — the
  * non-trivial branch of the handler — can be unit-tested with an in-memory

@@ -1,5 +1,5 @@
 /**
- * tests/fixtures/correct/seed.js — Phase 118-01 fixture seeder (CORRECT-02).
+ * tests/fixtures/correct/seed.js —  fixture seeder .
  *
  * Builds an impact-map.db shaped for tests/correct.bats. Two services
  * (svc-a, svc-b) and one connection (svc-a -> svc-b). Echoes the resolved

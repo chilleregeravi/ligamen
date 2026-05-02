@@ -181,7 +181,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92: Maven parent inheritance (MF-01)
+# Maven parent inheritance 
 # ---------------------------------------------------------------------------
 
 @test "extract_versions: resolves Maven parent dependencyManagement for version-less child dep" {
@@ -203,7 +203,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92: Gradle Kotlin DSL + version catalog (MF-02, MF-03)
+# Gradle Kotlin DSL + version catalog 
 # ---------------------------------------------------------------------------
 
 @test "extract_versions: Kotlin DSL double-quote implementation dependency is extracted" {
@@ -234,7 +234,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92: NuGet Central Package Management (MF-04)
+# NuGet Central Package Management 
 # ---------------------------------------------------------------------------
 
 @test "extract_versions: NuGet CPM resolves Version-less PackageReference via Directory.Packages.props" {
@@ -256,7 +256,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92: Bundler Gemfile.lock GEM + GIT + PATH sections (MF-05)
+# Bundler Gemfile.lock GEM + GIT + PATH sections 
 # ---------------------------------------------------------------------------
 
 @test "extract_versions: Gemfile.lock GEM section gem is extracted" {

@@ -1,8 +1,8 @@
 /**
  * Test suite for migration 016 — enrichment_log table.
  *
- * Phase 111 (TRUST-06, TRUST-14): creates an audit-log table for post-scan
- * reconciliation field changes. Plan 111-03 wires the writes; this test covers
+ * creates an audit-log table for post-scan
+ * reconciliation field changes.  wires the writes; this test covers
  * the schema-only contract: table exists, FK CASCADE, CHECK constraint on
  * target_kind, indexes present, default created_at.
  *

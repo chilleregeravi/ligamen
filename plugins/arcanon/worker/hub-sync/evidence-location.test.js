@@ -1,6 +1,6 @@
 /**
  * worker/hub-sync/evidence-location.test.js — Unit tests for the pure
- * extractEvidenceLocation helper (Phase 120-01 INT-01).
+ * extractEvidenceLocation helper .
  *
  * The helper is the single source of truth for evidence-snippet line
  * derivation. It is consumed by:

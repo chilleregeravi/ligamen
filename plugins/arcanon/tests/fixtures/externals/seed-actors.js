@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * tests/fixtures/externals/seed-actors.js — Phase 121 Plan 02 (INT-09).
+ * tests/fixtures/externals/seed-actors.js —   .
  *
- * Thin wrapper around the canonical Phase 114 list seeder
+ * Thin wrapper around the canonical  list seeder
  * (tests/fixtures/list/seed.js). Exists to satisfy plan 121-02's
  * artifacts.contains: "INSERT INTO actors" expectation and to give the
  * tests/externals-labels.bats E2E suite a single, semantically-named
