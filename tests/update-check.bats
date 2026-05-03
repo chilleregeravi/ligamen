@@ -50,11 +50,15 @@ EOF
 }
 
 # Helper: write the marketplace mirror file with a given version string.
+# update.sh now reads the canonical marketplace.json at the marketplace root
+# (not the inner plugins/<name>/.claude-plugin/ copy). The version is sourced
+# from .plugins[0].version, matching what Claude Code's marketplace machinery
+# itself reads.
 write_mirror() {
   local version="$1"
-  local mirror_dir="$TEST_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon/.claude-plugin"
+  local mirror_dir="$TEST_HOME/.claude/plugins/marketplaces/arcanon/.claude-plugin"
   mkdir -p "$mirror_dir"
-  printf '{"version":"%s","name":"arcanon"}\n' "$version" > "$mirror_dir/marketplace.json"
+  printf '{"name":"arcanon","plugins":[{"name":"arcanon","version":"%s","source":"./plugins/arcanon"}],"version":"%s"}\n' "$version" "$version" > "$mirror_dir/marketplace.json"
 }
 
 # Helper: read the installed version from the plugin under test.
@@ -87,8 +91,8 @@ installed_version() {
 # Stub claude exits fast so the test completes in well under 1s.
 @test "missing marketplace mirror dir returns status:offline" {
   stub_fast_claude
-  # Sanity check: confirm the mirror really is missing.
-  [ ! -e "$TEST_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon/.claude-plugin/marketplace.json" ]
+  # Sanity check: confirm the canonical mirror manifest really is missing.
+  [ ! -e "$TEST_HOME/.claude/plugins/marketplaces/arcanon/.claude-plugin/marketplace.json" ]
 
   run bash "$PLUGIN_ROOT/scripts/update.sh" --check
   [ "$status" -eq 0 ]

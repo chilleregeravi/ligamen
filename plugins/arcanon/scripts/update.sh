@@ -229,16 +229,21 @@ MARKETPLACE_DIR="${HOME}/.claude/plugins/marketplaces/arcanon"
 # Offline gate: mirror file existence is the single source of truth.
 # Refresh-process timeout is a staleness signal (we may have an old mirror)
 # but NOT an offline signal — if the mirror file is on disk, we still
-# compute newer/equal/ahead from it. (..03)
-if [[ ! -f "${MARKETPLACE_DIR}/plugins/arcanon/.claude-plugin/marketplace.json" ]]; then
-  # REQ : exit 0 with offline status; commands/update.md formats the user-facing message
+# compute newer/equal/ahead from it.
+#
+# The canonical marketplace manifest lives at <mirror-root>/.claude-plugin/marketplace.json
+# — same file Claude Code's marketplace machinery itself reads. We pull the
+# plugin version from .plugins[0].version (single source of truth, no
+# duplicate-file drift hazard).
+if [[ ! -f "${MARKETPLACE_DIR}/.claude-plugin/marketplace.json" ]]; then
+  # Exit 0 with offline status; commands/update.md formats the user-facing message
   printf '{"status":"offline","installed":"%s","remote":null,"update_available":false,"changelog_preview":""}\n' "$INSTALLED_VER"
   exit 0
 fi
 
-# 3. Read remote version
-REMOTE_VER=$(jq -r '.version // empty' \
-  "${MARKETPLACE_DIR}/plugins/arcanon/.claude-plugin/marketplace.json" 2>/dev/null || true)
+# 3. Read remote version from the canonical marketplace.json
+REMOTE_VER=$(jq -r '.plugins[0].version // empty' \
+  "${MARKETPLACE_DIR}/.claude-plugin/marketplace.json" 2>/dev/null || true)
 [[ -z "$REMOTE_VER" ]] && REMOTE_VER="unknown"
 
 # 4. Semver comparison (REQ  — Pitfall 1). Node + semver.
