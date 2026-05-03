@@ -6,12 +6,12 @@
  * source file at most once per call.
  *
  * Used by:
- *   - worker/hub-sync/payload.js (hash-only evidence_mode — Phase 120-01 INT-01)
- *   - worker/server/http.js computeVerdict (verify command — Phase 112-02 TRUST-01)
+ *   worker/hub-sync/payload.js (hash-only evidence_mode —  )
+ *   worker/server/http.js computeVerdict (verify command —  )
  *
  * Single source of truth for evidence line semantics. The agent does not
  * persist line numbers — they are derived at read time from the source
- * file + the literal evidence substring (Phase 109 §D-03 confirmed:
+ * file + the literal evidence substring ( § confirmed:
  * connections schema has no line_start/line_end columns).
  *
  * Contract:

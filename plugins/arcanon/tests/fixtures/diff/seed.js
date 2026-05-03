@@ -1,5 +1,5 @@
 /**
- * tests/fixtures/diff/seed.js — Phase 115-02 fixture seeder (NAV-04).
+ * tests/fixtures/diff/seed.js —  fixture seeder .
  *
  * Builds a SQLite DB shaped for /arcanon:diff bats tests. Five modes:
  *
@@ -99,7 +99,7 @@ function setRepoState(db, repoId, sha) {
  * and UNIQUE(connections source/target/protocol/method/path), so within a
  * single DB it's impossible to have the same service or connection tagged
  * with two different scan_version_ids. True "modified" diff detection
- * therefore requires the shadow-DB pattern (Phase 119). This fixture
+ * therefore requires the shadow-DB pattern . This fixture
  * exercises the added/removed paths only.
  */
 function seedDefault(db, projectRoot) {

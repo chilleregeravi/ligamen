@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # tests/install-deps.bats
-# Bats tests for scripts/install-deps.sh (Phase 107 architecture)
-# Covers: INST-04, INST-05, INST-07, INST-08, INST-09, INST-10, INST-11, INST-12
+# Bats tests for scripts/install-deps.sh ( architecture)
+# Covers:, ,, ,, ,, 
 
 PROJECT_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 INSTALL_SCRIPT="$PROJECT_ROOT/plugins/arcanon/scripts/install-deps.sh"
@@ -66,32 +66,32 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# INST-04: hooks.json registration (preserved from former DEPS-03/DEPS-04)
+# hooks.json registration (preserved from former DEPS-03/DEPS-04)
 # ---------------------------------------------------------------------------
 
-@test "INST-04: hooks.json install-deps entry has timeout >= 120" {
+@test "hooks.json install-deps entry has timeout >= 120" {
   run jq -r '.hooks.SessionStart[0].hooks[] | select(.command | endswith("install-deps.sh")) | .timeout' "$HOOKS_FILE"
   [ "$status" -eq 0 ]
   [ "$output" -ge 120 ]
 }
 
-@test "INST-04: install-deps.sh runs before session-start.sh in hooks.json" {
+@test "install-deps.sh runs before session-start.sh in hooks.json" {
   run jq -r '.hooks.SessionStart[0].hooks[0].command' "$HOOKS_FILE"
   [ "$status" -eq 0 ]
   [[ "$output" == *"install-deps.sh" ]]
 }
 
-@test "INST-04: session-start.sh is second in SessionStart hooks array" {
+@test "session-start.sh is second in SessionStart hooks array" {
   run jq -r '.hooks.SessionStart[0].hooks[1].command' "$HOOKS_FILE"
   [ "$status" -eq 0 ]
   [[ "$output" == *"session-start.sh" ]]
 }
 
 # ---------------------------------------------------------------------------
-# INST-05: Non-blocking guarantee + clean stdout (folded from old DEPS-01)
+# Non-blocking guarantee + clean stdout (folded from old DEPS-01)
 # ---------------------------------------------------------------------------
 
-@test "INST-05: exits 0 when CLAUDE_PLUGIN_DATA is unset (dev mode, non-blocking)" {
+@test "exits 0 when CLAUDE_PLUGIN_DATA is unset (dev mode, non-blocking)" {
   run env -u CLAUDE_PLUGIN_DATA \
     bash -c "CLAUDE_PLUGIN_ROOT='$MOCK_PLUGIN_ROOT' \
       bash '$MOCK_PLUGIN_ROOT/scripts/install-deps.sh'"
@@ -100,7 +100,7 @@ teardown() {
   [ ! -f "$MOCK_PLUGIN_ROOT/.arcanon-deps-sentinel" ]
 }
 
-@test "INST-05: produces no stdout output (hook stdout must stay clean)" {
+@test "produces no stdout output (hook stdout must stay clean)" {
   # Seed the happy path: matching sentinel + symlinked real node_modules
   echo "$EXPECTED_HASH" > "$MOCK_PLUGIN_DATA/.arcanon-deps-sentinel"
   ln -s "$REAL_PLUGIN_ROOT/node_modules" "$MOCK_PLUGIN_ROOT/node_modules"
@@ -112,10 +112,10 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# INST-07: happy-path skip — sentinel matches + binding loads + no npm + <100ms
+# happy-path skip — sentinel matches + binding loads + no npm + <100ms
 # ---------------------------------------------------------------------------
 
-@test "INST-07: happy path skips install — no npm process spawned, <threshold ms latency" {
+@test "happy path skips install — no npm process spawned, <threshold ms latency" {
   # Skip if real binding fixture is not available (project must be `npm install`-ed)
   if [[ ! -d "$REAL_PLUGIN_ROOT/node_modules/better-sqlite3/build/Release" ]]; then
     skip "Real better-sqlite3 binding not present (run 'npm install --prefix plugins/arcanon' first)"
@@ -130,7 +130,7 @@ teardown() {
   export NPM_INVOKED_MARKER
   _install_recording_npm_stub "$STUB_NPM_DIR"
 
-  # Latency thresholds (CONTEXT D-08): 100ms is the in-script logic budget;
+  # Latency thresholds (CONTEXT ): 100ms is the in-script logic budget;
   # the bats subprocess measurement includes bash + node startup overhead
   # (~80-150ms on Apple Silicon for `bash -c` + `node -e` together — see
   # 107-02-SUMMARY live verification: "Second run rc=0, elapsed=173ms ...
@@ -183,10 +183,10 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# INST-08: broken-binding detection + rebuild restoration
+# broken-binding detection + rebuild restoration
 # ---------------------------------------------------------------------------
 
-@test "INST-08: broken binding triggers rebuild and binding loads after" {
+@test "broken binding triggers rebuild and binding loads after" {
   if [[ ! -d "$REAL_PLUGIN_ROOT/node_modules/better-sqlite3/build/Release" ]]; then
     skip "Real better-sqlite3 binding not present (run 'npm install --prefix plugins/arcanon' first)"
   fi
@@ -225,11 +225,11 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# INST-09: prebuild silent-fail — install reports success, binding broken,
+# prebuild silent-fail — install reports success, binding broken,
 # rebuild fixes
 # ---------------------------------------------------------------------------
 
-@test "INST-09: prebuild silent-fail — rebuild path engages and fixes binding" {
+@test "prebuild silent-fail — rebuild path engages and fixes binding" {
   if [[ ! -d "$REAL_PLUGIN_ROOT/node_modules/better-sqlite3/build/Release" ]]; then
     skip "Real better-sqlite3 binding not present (run 'npm install --prefix plugins/arcanon' first)"
   fi
@@ -297,10 +297,10 @@ STUB
 }
 
 # ---------------------------------------------------------------------------
-# INST-10: fresh install — empty node_modules + no sentinel
+# fresh install — empty node_modules + no sentinel
 # ---------------------------------------------------------------------------
 
-@test "INST-10: fresh install runs npm install, validates, writes sentinel" {
+@test "fresh install runs npm install, validates, writes sentinel" {
   if [[ ! -d "$REAL_PLUGIN_ROOT/node_modules/better-sqlite3/build/Release" ]]; then
     skip "Real better-sqlite3 binding not present (run 'npm install --prefix plugins/arcanon' first)"
   fi
@@ -356,10 +356,10 @@ STUB
 }
 
 # ---------------------------------------------------------------------------
-# INST-11: sentinel mismatch — bogus hex triggers reinstall + sentinel update
+# sentinel mismatch — bogus hex triggers reinstall + sentinel update
 # ---------------------------------------------------------------------------
 
-@test "INST-11: sentinel mismatch — install runs, sentinel updated to canonical hash" {
+@test "sentinel mismatch — install runs, sentinel updated to canonical hash" {
   if [[ ! -d "$REAL_PLUGIN_ROOT/node_modules/better-sqlite3/build/Release" ]]; then
     skip "Real better-sqlite3 binding not present (run 'npm install --prefix plugins/arcanon' first)"
   fi
@@ -397,11 +397,11 @@ STUB
 }
 
 # ---------------------------------------------------------------------------
-# INST-12: integration smoke — auto-skips when claude CLI is unavailable.
-# Manual fresh-install smoke is handed off to Phase 113 VER-05.
+# integration smoke — auto-skips when claude CLI is unavailable.
+# Manual fresh-install smoke is handed off to  .
 # ---------------------------------------------------------------------------
 
-@test "INST-12: fresh-install integration smoke (auto-skip if claude unavailable)" {
+@test "fresh-install integration smoke (auto-skip if claude unavailable)" {
   if ! command -v claude >/dev/null 2>&1; then
     skip "Claude Code CLI not on PATH — manual smoke required (handed to Phase 113 VER-05)"
   fi

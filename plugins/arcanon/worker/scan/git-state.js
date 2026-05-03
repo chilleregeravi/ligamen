@@ -1,5 +1,5 @@
 /**
- * worker/scan/git-state.js — Phase 116-02 (FRESH-02/03).
+ * worker/scan/git-state.js —  (/03).
  *
  * Pure helper that shells out to git via execFileSync (mirroring the existing
  * pattern at worker/scan/manager.js:317 — getChangedFiles / getCurrentHead).

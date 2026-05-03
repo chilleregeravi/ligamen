@@ -1,17 +1,17 @@
 #!/usr/bin/env bats
-# tests/pii-masking.bats — Phase 123 (PII-07-bats half).
+# tests/pii-masking.bats —  ( half).
 #
 # Cross-seam integration grep: asserts every Wave-2 egress seam emits zero
 # `/Users/` (or `/home/`) strings after a clean scan, plus a structural
 # regression guard against session-start.sh future-rendering `repos[].path`
-# without masking (S2 mitigation).
+# without masking .
 #
 # Layout:
 #   1.   Unit-gate — node tests for path-mask + findings.pii06 must pass.
 #   2-4. Three HTTP-route greps — /projects, /graph, /api/scan-freshness.
 #   5-7. Three export-format greps — mermaid, dot, html.
 #   8.   Log-file grep — ~/.arcanon/logs/worker.log after a clean scan.
-#   9.   PII-06 unit gate — re-runs findings.pii06.test.js.
+#   9.    unit gate — re-runs findings.pii06.test.js.
 #  10.   S2 structural guard — session-start.sh must not render repos[].path.
 #
 # Tests requiring a running worker or scanned fixture `skip` with a clear
@@ -227,7 +227,7 @@ teardown() {
 # 8 — Log-file grep: worker.log contains no /Users/ after a clean scan.
 #      We exercise the *current* logger seam by pointing the worker at a
 #      fresh data-dir (so its log file is isolated from the dev's actual
-#      ~/.arcanon/logs/worker.log, which may contain pre-PII-04 historical
+#      ~/.arcanon/logs/worker.log, which may contain pre- historical
 #      entries that pre-date this phase). After the worker has served at
 #      least one HTTP request, we assert the live log contains zero leaks.
 # ---------------------------------------------------------------------------
@@ -253,24 +253,69 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# 9 — PII-06 unit-gate: findings.pii06.test.js exits 0.
+# 9 —  unit-gate: findings.pii06.test.js exits 0.
 # ---------------------------------------------------------------------------
-@test "PII-bats-09: parseAgentOutput rejects absolute source_file (PII-06 unit gate)" {
+@test "PII-bats-09: parseAgentOutput rejects absolute source_file" {
   cd "$PLUGIN_ROOT"
   run node --test worker/scan/findings.pii06.test.js
   assert_success
 }
 
 # ---------------------------------------------------------------------------
-# 10 — S2 structural guard: session-start.sh does NOT render repos[].path.
+# 10 — Structural guard: session-start.sh does NOT render repos[].path.
 #      Catches future contributors who'd surface the field without masking.
 # ---------------------------------------------------------------------------
-@test "PII-bats-10: session-start.sh does not render repos[].path (S2 guard)" {
+@test "PII-bats-10: session-start.sh does not render repos[].path (structural guard)" {
   assert [ -f "$SESSION_START_SH" ]
   count="$(grep -c -E 'repos\[\]\.path|repo\.path|r\.path' "$SESSION_START_SH" || true)"
   [ "$count" -eq 0 ] || {
     echo "session-start.sh references unmasked repo path field; lines:" >&2
     grep -nE 'repos\[\]\.path|repo\.path|r\.path' "$SESSION_START_SH" >&2
+    return 1
+  }
+}
+
+# ---------------------------------------------------------------------------
+# 11 — /arcanon:status --json zero-leak gate.
+#      data_dir + config_file fields must emit ~-prefixed paths, not the
+#      user's actual $HOME-rooted absolute path. Runs in a fake HOME with a
+#      HOME-rooted project so maskHome() actually engages.
+# ---------------------------------------------------------------------------
+@test "PII-bats-11: /arcanon:status --json contains no \$HOME absolute paths" {
+  HUB_JS="${PLUGIN_ROOT}/worker/cli/hub.js"
+  assert [ -f "$HUB_JS" ]
+
+  # Build a fake HOME with a project inside it, so cwd is under HOME and
+  # maskHome() can convert /<fake-home>/... → ~/...
+  # Realpath both so macOS /var ↔ /private/var symlink doesn't break the
+  # HOME-prefix match (os.homedir() vs process.cwd() can return different forms).
+  FAKE_HOME="$(cd "$BATS_TEST_TMPDIR" && pwd -P)/fakehome"
+  PROJECT_DIR="$FAKE_HOME/myproject"
+  mkdir -p "$PROJECT_DIR"
+  printf '{"project-name":"myproject","linked-repos":[]}\n' > "$PROJECT_DIR/arcanon.config.json"
+
+  cd "$PROJECT_DIR"
+  run env ARCANON_DATA_DIR="$FAKE_HOME/.arcanon" \
+        HOME="$FAKE_HOME" \
+        node "$HUB_JS" status --json
+  assert_success
+
+  # Output must not contain the fake-HOME absolute prefix
+  echo "$output" | grep -F "$FAKE_HOME" >/dev/null && {
+    echo "/arcanon:status --json leaked an absolute \$HOME path:" >&2
+    echo "$output" | grep -F "$FAKE_HOME" >&2
+    return 1
+  } || true
+
+  # Output must contain ~-prefixed paths for both data_dir and config_file
+  echo "$output" | grep -F '"data_dir": "~' >/dev/null || {
+    echo "/arcanon:status --json: data_dir not masked to ~" >&2
+    echo "$output" >&2
+    return 1
+  }
+  echo "$output" | grep -F '"config_file": "~' >/dev/null || {
+    echo "/arcanon:status --json: config_file not masked to ~" >&2
+    echo "$output" >&2
     return 1
   }
 }

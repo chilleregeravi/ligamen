@@ -1,9 +1,9 @@
 /**
- * Tests for drift tools (Phase 48) — MCP tool implementations
+ * Tests for drift tools  — MCP tool implementations
  * Run: node --test worker/mcp/server-drift.test.js
  *
- * Wave 0 scaffold: tests for drift_versions (Plan 01), drift_types (Plan 02),
- * drift_openapi (Plan 03).  Plans 02 and 03 will add their own tests here.
+ * Wave 0 scaffold: tests for drift_versions, drift_types ,
+ * drift_openapi .  Plans 02 and 03 will add their own tests here.
  *
  * These tests exercise the query logic functions directly with an in-memory
  * SQLite database and temporary filesystem repos, bypassing the MCP SDK layer.
@@ -81,7 +81,7 @@ function createTempRepo(name, manifestFiles = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// queryDriftVersions — Plan 01 tests
+// queryDriftVersions —  tests
 // ─────────────────────────────────────────────────────────────
 
 test("queryDriftVersions: null db returns empty findings and repos_scanned=0", async () => {
@@ -274,7 +274,7 @@ test("queryDriftVersions: repos with no manifest files produce no findings for t
 });
 
 // ─────────────────────────────────────────────────────────────
-// queryDriftTypes — Plan 02 tests
+// queryDriftTypes —  tests
 // ─────────────────────────────────────────────────────────────
 
 test("queryDriftTypes: null db returns empty findings and repos_scanned=0", async () => {
@@ -404,7 +404,7 @@ test("queryDriftTypes: severity=CRITICAL suppresses INFO findings", async (t) =>
 });
 
 // ─────────────────────────────────────────────────────────────
-// queryDriftOpenapi — Plan 03 tests
+// queryDriftOpenapi —  tests
 // ─────────────────────────────────────────────────────────────
 
 const MINIMAL_OPENAPI_SPEC = `openapi: "3.0.0"

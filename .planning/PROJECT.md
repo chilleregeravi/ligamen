@@ -207,57 +207,43 @@ Every edit is automatically formatted and linted, every quality check runs with 
 - ✓ Externals catalog + user extension + `actors.label` surfacing (INT-06..10) — 20 entries, migration 018, `external_labels` user override — v0.1.4
 - ✓ v0.1.4 release gate (VER-01..07) — bats 448/449, node 774/775, manifests at 0.1.4, lockfile regen, CHANGELOG `[0.1.4]` pinned — v0.1.4
 
+- ✓ PII path-masking primitive (`worker/lib/path-mask.js` — `maskHome` + `maskHomeDeep` with cycle-safe WeakSet, idempotent on already-relative paths) wired at 4 egress seams (MCP, HTTP, logger, export) + parse-time absolute-`source_file` reject in `findings.parseAgentOutput` (PII-01..07) — v0.1.5
+- ✓ Hub auth core / X-Org-Id contract — `uploadScan` sends `X-Org-Id`; missing-orgId throws `HubError(code='missing_org_id')` BEFORE network attempt; new `worker/hub-sync/whoami.js` returning `{user_id, key_id, scopes, grants}`; `resolveCredentials({orgIdRequired})` precedence chain (opts → env → home-config); `storeCredentials` spread-merge default_org_id mode 0600; per-repo `hub.org_id` threading via `manager.js _readHubConfig` (AUTH-01..05) — v0.1.5
+- ✓ Whoami-driven `/arcanon:login` flow with full 4×2 branch table (auth/hub-5xx/network × `--org-id`/no-flag); auto-select-on-N=1 grant; multi-grant `AskUserQuestion` re-entry via exit-7 + `__ARCANON_GRANT_PROMPT__` stdout sentinel; verified-vs-mismatch differentiation (AUTH-06) — v0.1.5
+- ✓ `/arcanon:status` Identity block (nested `identity:` object in `--json`, additive contract per D-125-03) + 7-code RFC 7807 error parser (frozen `HUB_ERROR_CODE_MESSAGES` map; `body.title` fallback for forward-compat) (AUTH-07, AUTH-08) — v0.1.5
+- ✓ 4-file docs sweep — `commands/login.md`, `commands/status.md`, `arcanon.config.json.example`, `docs/{hub-integration,getting-started,configuration}.md` cover the credential triple, env vars, login flow, resolution precedence (AUTH-09) — v0.1.5
+- ✓ Auth regression test suite — `client.test.js` 7-code table-driven test, new `whoami.test.js` (7 tests), `integration.test.js` round-trip via `withTempHome` async fixture; net 824 total / 823 pass / 1 baseline-flake fail (AUTH-10) — v0.1.5
+- ✓ v0.1.5 release gate (VER-01..03) — 4 manifests pinned at 0.1.5 + lockfile regen, CHANGELOG `[0.1.5]` with explicit BREAKING/THE-1030 callout, bats 458/459 + node 823/824 green at v0.1.4 floors — v0.1.5
+
 ### Active
 
-- [ ] **THE-1029** — `X-Org-Id` on scan upload + auto-default via `/auth/whoami` (paired with hub-side THE-1030; personal-credential model) — v0.1.5
-- [ ] **THE-1031** — PII path masking at egress seams (MCP, HTTP, logger, exports; belt-and-suspenders agent contract assertion) — v0.1.5
+(none — `/gsd-new-milestone` to start the next cycle)
 
-## Current Milestone: v0.1.5 Identity & Privacy
+## Current Milestone
 
-**Goal:** Adopt the hub's new personal-credential auth model and stop home-dir PII from leaking out of the worker — two cross-cutting trust gaps that block public-beta credibility.
-
-**Target work (2 high-priority Linear items):**
-
-1. **THE-1029 — Personal-credential hub auth (blocked by hub-side THE-1030)**
-   - `uploadScan()` sends `X-Org-Id`; missing → fail-fast `HubError`. Per-error-code parsing (`missing_x_org_id`, `invalid_x_org_id`, `insufficient_scope`, `key_not_authorized_for_org`, `not_a_member`, `forbidden_scan`, `invalid_key`) → actionable user messages.
-   - **NEW** `worker/hub-sync/whoami.js` → `getKeyInfo(apiKey, hubUrl)` calls `GET /api/v1/auth/whoami`, returns `{ user_id, key_id, scopes, grants }`.
-   - `resolveCredentials()` precedence: `opts.orgId` → `ARCANON_ORG_ID` env → `~/.arcanon/config.json` `default_org_id`. Returns `{ apiKey, hubUrl, orgId, source }`.
-   - `_readHubConfig` (manager.js) reads per-repo `cfg.hub.org_id` override; threads orgId through `uploadScan`.
-   - `/arcanon:login arc_xxx [--org-id <uuid>]`: with `--org-id`, validates against whoami (warn-but-allow on mismatch); without `--org-id`, calls whoami → 1 grant auto-selects, N grants prompt via AskUserQuestion, 0 grants fail clearly.
-   - `/arcanon:status` shows resolved org id + source, key preview, scopes, authorized-orgs list.
-   - `arcanon.config.json.example` shows `hub.org_id`. Docs (`hub-integration.md`, `getting-started.md`, `configuration.md`) cover the new field, env var, and login flow.
-
-2. **THE-1031 — PII path masking at egress seams**
-   - **NEW** `worker/lib/path-mask.js` with `maskHome(p)` and `maskHomeDeep(obj)` — idempotent, walks path-keyed properties.
-   - Apply at **🔴 MCP tool responses** (`worker/mcp/server.js`) — only egress to a third party (Anthropic).
-   - Apply at **🟠 HTTP responses** (`worker/server/http.js`: `/api/scan-freshness`, `/api/repos`, `/graph`).
-   - Apply at **🟠 worker logger** (`worker/lib/logger.js`: stack traces + `extra` fields).
-   - Apply at **🟡 export outputs** (`worker/cli/export*.js`: mermaid/dot/html).
-   - Belt-and-suspenders: `parseAgentOutput` in `worker/scan/findings.js` rejects `source_file` starting with `/` (WARN + drop).
-   - Tests: node `path-mask.test.js` (round-trips); bats grep-assertion that no `/Users/` strings appear in MCP responses, export outputs, worker logs, or `/api/scan-freshness` JSON.
-
-**Hard dependency:** THE-1029 cannot ship until arcanon-hub THE-1030 (server-side personal-credential rewrite + `whoami` + `X-Org-Id` enforcement) lands. Brief upload outage between merges accepted — neither has shipped publicly.
-
-**Storage model:** Single credential triple in `~/.arcanon/config.json` (apiKey + hubUrl + default_org_id). NO multi-cred map. One key serves all authorized orgs; plugin only tracks the *default*.
-
-**Scope discipline:** No new commands. No skills/agents work — that remains v0.2.0. No multi-org switching, no per-org credential profiles, no service-account credentials — all deferred to v2.3+ (per THE-1029 Out of Scope).
-
-**Phase numbering:** Continues from v0.1.4 (last phase 122) → v0.1.5 starts at Phase 123.
+(none — v0.1.5 archived 2026-04-30. Run `/gsd-new-milestone` to start the next cycle.)
 
 ## Current State
 
-**Shipped:** v0.1.4 Operator Surface (2026-04-27) — 9 phases, 21 plans, 41 REQs, 117 commits, +33,305/-371 LOC. Architectural correction at release prep eliminated the worker-HTTP-route shape for `/arcanon:rescan` and `/arcanon:shadow-scan` (re-architected as markdown-orchestrated, cloning `/arcanon:map`'s pattern). Zero deferred items at ship.
+**Shipped:** v0.1.5 Identity & Privacy (2026-04-30) — 5 phases (123-127), 5 plans, 20/21 REQs satisfied (VER-04 deferred), 45 commits squashed into PR #23 (merge `525a160`), +9,150/-871 LOC, 4-day cycle.
 
-**Operator surface today:** 17 `/arcanon:*` slash commands — `map`, `list`, `view`, `doctor`, `diff`, `verify`, `correct`, `rescan`, `shadow-scan`, `diff --shadow`, `promote-shadow`, `drift`, `status`, `sync`, `login`, `update`, `export` — all with universal `--help`. Three live SQLite databases (live `impact-map.db`, shadow `impact-map-shadow.db`, optional `pre-promote-<ts>` backups) under `${ARCANON_DATA_DIR}/projects/<hash>/`. Hub payload v1.0/v1.1/v1.2 envelope state machine; explicit-spec OpenAPI drift; curated externals catalog with user extension.
+**Operator surface today (post-v0.1.5):** 17 `/arcanon:*` slash commands. `/arcanon:login` whoami-driven 4×2 branch table with multi-grant AskUserQuestion re-entry via exit-7 + stdout sentinel. `/arcanon:status` Identity block (nested in `--json`). `/arcanon:sync` carries `X-Org-Id` header on every upload. `~/.arcanon/config.json` stores the credential triple (apiKey + hubUrl + default_org_id) at mode 0600 with spread-merge preservation. Egress masking at MCP / HTTP / logger / export — zero `$HOME` paths leak from any wire boundary; DB still stores absolute paths for git operations. 7-code RFC 7807 error parser surfaces actionable messages.
 
-**Deferred at v0.1.4 close:** Phase 114 `114-UAT.md` — 7 operator-facing manual scenarios (cold-start, list, view, doctor x4). Recorded in `STATE.md ## Deferred Items`. Not a release blocker — phase 114 automated verification is `passed` (31/31 bats green).
+**Hub-side blocker (live):** arcanon-hub THE-1030 not yet deployed. Hub-half of the product (login round-trip + sync upload) is non-functional until the hub enforces `X-Org-Id` and serves `whoami`. Local features (`/arcanon:map`, `/arcanon:impact`, `/arcanon:list`, `/arcanon:diff`, `/arcanon:export`, `/arcanon:doctor`, `/arcanon:view`) work standalone. Marketplace publication held back until hub is reachable.
+
+**Deferred at v0.1.5 close:** 3 operator-side e2e walkthroughs (125-01 T4, 125-02 T4, 127-01 T4) — all unblock together when THE-1030 deploys. Plus 1 carry-forward (Phase 114 UAT — 7 operator scenarios from v0.1.4) and 3 follow-up items: cmdStatus `data_dir`/`config_file` masking (out-of-charter), marketplace.json description softening, `auth.js:174` orphan JSDoc cleanup. All recorded in `STATE.md ## Deferred Items`.
 
 ## Next Milestone Goals
 
-After v0.1.5 ships:
+After arcanon-hub THE-1030 deploys:
+
+- **Operator validation closeout** — run the 3 bundled walkthroughs against the live hub, flip VER-04 to satisfied, push tag, publish to marketplace.
+
+Open candidates for the next planning cycle:
 
 - **v0.1.6 Hub Surface follow-on** — multi-level scope (product/project/repo grants) per arcanon-hub APIKEY-01; service-account credentials per APIKEY-02. Both deferred from THE-1029.
-- **v0.2.0 Skills & Agents** — Design the skills layer on top of shipped hooks, refactor inline `Explore` agent calls, add MCP-tool-composing investigator agent. Intentionally deferred since v0.1.1.
+- **v0.2.0 Skills & Agents** — design the skills layer on top of shipped hooks, refactor inline `Explore` agent calls, add MCP-tool-composing investigator agent. Intentionally deferred since v0.1.1.
+- **Status PII closeout** — small follow-up to mask `data_dir` + `config_file` in cmdStatus (`hub.js:384-385`) and add a bats grep gate. Pre-existing v0.1.4 leak, out of v0.1.5 PII charter.
 - Platform extensions, observability surface, agent runtime work, or new Linear backlog items not yet captured.
 
 ## (archived) Milestone: v0.1.3 Trust & Foundations
@@ -321,7 +307,7 @@ Architecture: commands/ for user-invoked features, skills/ for auto-invoked know
 Known tech debt: db/database.js has console.log in script-mode guard, getQueryEngineByHash inline migration workaround, renderLibraryConnections() unused `outgoing` parameter, node_metadata table unused (forward-looking for STRIDE/vuln views), impact-flow.bats imports stale module paths (pre-existing from v3.0 restructure), package.json bin entry references non-existent ligamen-init.js, graph-fit-to-screen.test.js has 2 stale assertions for inlined fitToScreen() (Phase 26 regression).
 
 ---
-*Last updated: 2026-04-27 — v0.1.5 milestone started (Identity & Privacy)*
+*Last updated: 2026-04-30 — after v0.1.5 milestone close (Identity & Privacy shipped)*
 
 ## Constraints
 
@@ -393,9 +379,14 @@ Known tech debt: db/database.js has console.log in script-mode guard, getQueryEn
 | Zero-tolerance on Ligamen refs — v0.1.2 | No back-compat, no two-read fallbacks, no deprecation warnings. Back-compat stubs permanently encode the legacy name; just remove. Breaking change for v5.x users accepted. | ✓ Good |
 | Rename ChromaDB `COLLECTION_NAME` — v0.1.2 | Existing collections orphaned on upgrade; users rebuild via `/arcanon:map`. Acceptable since ChromaDB is optional and rebuildable, and policy demands zero ligamen refs. | ✓ Good |
 | Combined plan+execute for phases 102–105 — v0.1.2 | Scope well-understood after Phase 101 discovery; separate planner spawns would have been ceremony. Saved ~4 agent round-trips. | ✓ Good |
-| Single credential triple in `~/.arcanon/config.json` — v0.1.5 | THE-1030 personal-credential model: one key serves all authorized orgs. Multi-cred map adds complexity for no value at single-machine/single-user scope. | Pending validation |
-| Auto-default-org via `whoami` at login — v0.1.5 | Forcing user to type a UUID at `/arcanon:login` is hostile. Hub already knows which orgs the key is authorized for; plugin asks. | Pending validation |
-| Mask `$HOME` at egress seams, not in DB — v0.1.5 | DB needs absolute paths for git operations; masking-at-egress preserves runtime correctness while closing the third-party leak (MCP → Anthropic). | Pending validation |
+| Single credential triple in `~/.arcanon/config.json` — v0.1.5 | THE-1030 personal-credential model: one key serves all authorized orgs. Multi-cred map adds complexity for no value at single-machine/single-user scope. | ✓ Good (shipped — pending hub deploy validation) |
+| Auto-default-org via `whoami` at login — v0.1.5 | Forcing user to type a UUID at `/arcanon:login` is hostile. Hub already knows which orgs the key is authorized for; plugin asks. | ✓ Good (shipped — pending hub deploy validation) |
+| Mask `$HOME` at egress seams, not in DB — v0.1.5 | DB needs absolute paths for git operations; masking-at-egress preserves runtime correctness while closing the third-party leak (MCP → Anthropic). | ✓ Good |
+| Single-seam logger masking (PII-04) — v0.1.5 | Single edit at `worker/lib/logger.js:66` between `Object.assign` and `JSON.stringify` covers all ~30 logger call sites. Stack frames inside `extra.stack` get masked because we mask all string values, not just keyed paths (M1 mitigation). | ✓ Good |
+| CLI exit-code-7 + `__ARCANON_GRANT_PROMPT__` stdout sentinel — v0.1.5 | Markdown-layer ↔ Node-CLI re-entry pattern for multi-grant `AskUserQuestion`. cmdLogin can't call `AskUserQuestion` directly (process boundary); exit code + sentinel is a clean handshake. Reusable for any future CLI flow needing human-in-the-loop choice. | ✓ Good (pattern reusable) |
+| Centralized 7-code RFC 7807 error map (AUTH-08) — v0.1.5 | `HUB_ERROR_CODE_MESSAGES` frozen in `client.js`; UI surfaces just print the message. New error codes added in one place. `body.title` fallback preserved for forward-compat with codes the plugin doesn't yet recognize. | ✓ Good |
+| Nested `identity:` object in `--json` mode (D-125-03) — v0.1.5 | Additive contract: existing top-level keys (plugin_version, data_dir, config_file, etc.) unchanged; new structured data nests under one new key. Insulates existing JSON consumers from field-set churn. | ✓ Good |
+| Hold marketplace publication until THE-1030 deploys — v0.1.5 | Codebase ships, but hub-half of product is non-functional until server enforces X-Org-Id + serves whoami. Shipping broken hub UX on first impression signals "don't trust this." Local-only features still work standalone — codebase tag is fine; public marketplace listing should wait. | Pending (deploy timing) |
 
 ---
-*Last updated: 2026-04-27 — v0.1.5 milestone started (Identity & Privacy)*
+*Last updated: 2026-04-30 — after v0.1.5 milestone close (Identity & Privacy shipped)*

@@ -1,5 +1,5 @@
 /**
- * Tests for evidence-substring guard in persistFindings (Phase 109, Plan 02 - TRUST-02 / TRUST-10).
+ * Tests for evidence-substring guard in persistFindings (-).
  *
  * Covers the write-time validation rule: if the agent emits a connection with
  * non-empty evidence AND a source_file that resolves to a readable file on disk,
@@ -8,7 +8,7 @@
  * evidence, null source_file, missing-on-disk source_file) persist anyway,
  * with a warning where applicable.
  *
- * See 109-CONTEXT.md D-03..D-05 for the rules.
+ * See 109-CONTEXT.md .. for the rules.
  *
  * Run: node --test plugins/arcanon/worker/db/query-engine-evidence.test.js
  */
@@ -201,10 +201,10 @@ const baseFindings = (connOverride) => ({
 });
 
 // ---------------------------------------------------------------------------
-// TRUST-10 tests
+// tests
 // ---------------------------------------------------------------------------
 
-describe("TRUST-02 evidence rejection in persistFindings (TRUST-10)", () => {
+describe("evidence rejection in persistFindings", () => {
   it("persists when evidence appears verbatim in source_file (happy path)", async () => {
     const { db, repoId, qe, tmpRoot } = await freshEngineWithTempRepo();
     fs.mkdirSync(path.join(tmpRoot, "src"));
@@ -222,7 +222,7 @@ describe("TRUST-02 evidence rejection in persistFindings (TRUST-10)", () => {
     assert.equal(n, 1);
   });
 
-  it("skips and warns when evidence is prose with no substring match (TRUST-10 primary)", async () => {
+  it("skips and warns when evidence is prose with no substring match", async () => {
     const { db, repoId, qe, tmpRoot } = await freshEngineWithTempRepo();
     fs.mkdirSync(path.join(tmpRoot, "src"));
     fs.writeFileSync(

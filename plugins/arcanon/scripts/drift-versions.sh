@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # drift-versions.sh — Cross-repo dependency version drift checker
-# Part of the Arcanon drift skill (Phase 10, DRFT-01, DRFT-05, DRFT-06)
+# Part of the Arcanon drift skill (DRFT-01, DRFT-05, DRFT-06)
 # Usage: drift-versions.sh [--all] [--test-only]
 #   --all        Show INFO-level findings (suppressed by default)
 #   --test-only  Source-safe: define functions but do not execute main loop
@@ -172,7 +172,7 @@ extract_versions() {
     rm -f "$mvn_vermap"
   fi
 
-  # ---- build.gradle (Gradle Groovy DSL — MF-02, MF-03) --------------------
+  # build.gradle (Gradle Groovy DSL —) --------------------
   if [[ -f "${repo_dir}/build.gradle" ]]; then
     local gradle_catalog
     gradle_catalog=$(mktemp -t arcanon-gradle.XXXX) || return 0
@@ -199,7 +199,7 @@ extract_versions() {
     rm -f "$gradle_catalog"
   fi
 
-  # ---- build.gradle.kts (Gradle Kotlin DSL — MF-02, MF-03) ----------------
+  # build.gradle.kts (Gradle Kotlin DSL —) ----------------
   if [[ -f "${repo_dir}/build.gradle.kts" ]]; then
     local gradle_catalog_kts
     gradle_catalog_kts=$(mktemp -t arcanon-gradle.XXXX) || return 0
@@ -226,7 +226,7 @@ extract_versions() {
     rm -f "$gradle_catalog_kts"
   fi
 
-  # ---- *.csproj / Directory.Packages.props (NuGet + CPM — MF-04) -----------
+  # *.csproj / Directory.Packages.props (NuGet + CPM — ) -----------
   if compgen -G "${repo_dir}/*.csproj" > /dev/null 2>&1; then
     local cpm_map
     cpm_map=$(mktemp -t arcanon-cpm.XXXX) || return 0
@@ -255,7 +255,7 @@ extract_versions() {
     rm -f "$cpm_map"
   fi
 
-  # ---- Gemfile.lock (Bundler — GEM + GIT + PATH sections — MF-05) ---------
+  # Gemfile.lock (Bundler — GEM + GIT + PATH sections — ) ---------
   if [[ -f "${repo_dir}/Gemfile.lock" ]]; then
     awk '
       /^GEM$/    { section="GEM"; next }

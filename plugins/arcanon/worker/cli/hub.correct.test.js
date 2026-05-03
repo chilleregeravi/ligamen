@@ -1,5 +1,5 @@
 /**
- * worker/cli/hub.correct.test.js — Phase 118-01 (CORRECT-02).
+ * worker/cli/hub.correct.test.js —  .
  *
  * Pure node tests for the resolveServiceTarget helper. No worker spawn,
  * no migration chain — uses an in-memory better-sqlite3 with the minimal

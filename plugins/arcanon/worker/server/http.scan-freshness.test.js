@@ -1,5 +1,5 @@
 /**
- * worker/server/http.scan-freshness.test.js — Phase 116 Plan 02 (FRESH-03)
+ * worker/server/http.scan-freshness.test.js —   
  *
  * Verifies the new GET /api/scan-freshness endpoint:
  *   - 200 + documented shape on a populated DB
@@ -116,7 +116,7 @@ async function makeServer(resolveFn) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1 — 200 with shape (FRESH-03)
+// Test 1 — 200 with shape 
 // ---------------------------------------------------------------------------
 
 test('GET /api/scan-freshness — 200 with shape (FRESH-03)', async () => {

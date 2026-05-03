@@ -54,7 +54,7 @@ If credentials are missing, print verbatim:
 
 > Arcanon Hub uses an API key (starts with `arc_`) for uploads. To get one:
 > 1. Sign in at https://app.arcanon.dev (or sign up).
-> 2. Open Settings → API keys and create a key. *Note: deep-linking to `/settings/api-keys` while signed out lands on `/home` after login — known issue THE-1016, navigate manually.*
+> 2. Open Settings → API keys and create a key.
 > 3. Run `/arcanon:login arc_…` to store the key locally.
 >
 > Then re-run `/arcanon:sync`.

@@ -98,7 +98,7 @@ export async function loadProject(hash, canvas) {
     return;
   }
   hideOverlay();
-  // Store latest scan version for "what changed" overlay (Phase 56)
+  // Store latest scan version for "what changed" overlay 
   state.latestScanVersionId = raw.latest_scan_version_id ?? null;
 
   // Map API response to UI shape
@@ -153,7 +153,7 @@ export async function loadProject(hash, canvas) {
   // Store raw actors for detail panel
   state.graphData.actors = raw.actors || [];
 
-  // SREL-02: Filter actors whose name matches a known service — defense in depth
+  // Filter actors whose name matches a known service — defense in depth
   // for stale actor data. The serviceNameToId map is already populated above.
   state.graphData.actors = state.graphData.actors.filter(
     (actor) => !(actor.name in serviceNameToId)
@@ -167,7 +167,7 @@ export async function loadProject(hash, canvas) {
     const syntheticId = -actor.id;  // negative to avoid collision with service IDs
     state.graphData.nodes.push({
       id: syntheticId,
-      // INT-08: render the friendly label on the canvas when present; the raw
+      // render the friendly label on the canvas when present; the raw
       // actor name (URL/hostname) is preserved on raw_name and on _actorData
       // for the detail panel + future "show raw URL" toggle. Search filter
       // (renderer.js) walks node.name, so users searching for "Stripe" find

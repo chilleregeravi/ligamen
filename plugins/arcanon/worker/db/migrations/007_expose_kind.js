@@ -9,7 +9,7 @@
  *   Broken library/infra scans inserted function signatures (e.g. 'ClientConfig):')
  *   and Unicode arrows (e.g. '→') as path values. These rows occupy UNIQUE slots
  *   (service_id, method, path) and cause INSERT OR IGNORE to silently block correct
- *   rows on re-scan. Must be purged before the fixed parser lands in Plan 30-02.
+ *   rows on re-scan. Must be purged before the fixed parser lands in .
  */
 
 export const version = 7;

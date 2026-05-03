@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/freshness/seed.sh — Phase 116-02 (FRESH-05).
+# plugins/arcanon/tests/fixtures/freshness/seed.sh —  .
 #
 # Thin wrapper around seed.js. Invoked from tests/freshness.bats setup() to:
 #   1. Build a fresh git repo at <project-root>/repo-a/ with 4 commits.

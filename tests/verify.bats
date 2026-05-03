@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/verify.bats — Phase 112 (TRUST-01, TRUST-07, TRUST-08, TRUST-09).
+# tests/verify.bats —  (,).
 #
 # End-to-end coverage of /arcanon:verify driving the real shell wrapper, real
 # worker HTTP endpoint, and real on-disk fixtures. Pairs with the in-process
@@ -22,7 +22,7 @@ SEED_SH="${REPO_ROOT}/plugins/arcanon/tests/fixtures/verify/seed.sh"
 WORKER_PORT=37999
 
 # ---------------------------------------------------------------------------
-# Helpers (kept local to avoid editing tests/test_helper.bash; per Plan 02
+# Helpers (kept local to avoid editing tests/test_helper.bash; per 
 # `done` checklist: ZERO additions to test_helper.bash).
 # ---------------------------------------------------------------------------
 
@@ -97,9 +97,9 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# TRUST-07: happy path — all three seeded connections verify ok.
+# happy path — all three seeded connections verify ok.
 # ---------------------------------------------------------------------------
-@test "TRUST-07: all 3 connections verify ok when source files + evidence match" {
+@test "all 3 connections verify ok when source files + evidence match" {
   cd "$PROJECT_ROOT"
   run bash "$HUB_SH" verify --json
   [ "$status" -eq 0 ]
@@ -111,10 +111,10 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# TRUST-08: a deleted source file flips that connection to "moved" and exit 1.
+# a deleted source file flips that connection to "moved" and exit 1.
 # Other two connections keep their "ok" verdicts.
 # ---------------------------------------------------------------------------
-@test "TRUST-08: deleting a source file produces verdict moved" {
+@test "deleting a source file produces verdict moved" {
   cd "$PROJECT_ROOT"
   rm "$PROJECT_ROOT/tests/fixtures/verify/source/users.js"
   run bash "$HUB_SH" verify --json
@@ -125,9 +125,9 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# TRUST-09: file kept but cited snippet removed → verdict "missing", exit 1.
+# file kept but cited snippet removed → verdict "missing", exit 1.
 # ---------------------------------------------------------------------------
-@test "TRUST-09: overwriting cited line range produces verdict missing" {
+@test "overwriting cited line range produces verdict missing" {
   cd "$PROJECT_ROOT"
   cat > "$PROJECT_ROOT/tests/fixtures/verify/source/users.js" <<'EOF'
 // file rewritten — evidence no longer present

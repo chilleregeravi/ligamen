@@ -1,9 +1,9 @@
 /**
  * Test suite for migration 017 - scan_overrides table.
  *
- * Phase 117 (CORRECT-01): creates the staged-corrections table that the
- * apply-hook (Plan 117-02) drains BETWEEN persistFindings and endScan, and
- * that the /arcanon:correct command (Phase 118) writes into.
+ * creates the staged-corrections table that the
+ * apply-hook  drains BETWEEN persistFindings and endScan, and
+ * that the /arcanon:correct command  writes into.
  *
  * Verifies:
  *   - version export === 17

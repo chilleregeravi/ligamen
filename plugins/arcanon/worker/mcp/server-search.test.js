@@ -156,25 +156,52 @@ test("querySearch: respects limit parameter", async () => {
 // queryScan tests
 // ─────────────────────────────────────────────────────────────
 
+// queryScan reads `<dataDir>/worker.port` to find the worker. On a developer
+// machine the real ~/.arcanon/worker.port may exist and point at a running
+// worker — that would short-circuit the "unavailable" path the test below
+// exists to pin. Isolate via ARCANON_DATA_DIR pointing at an empty tmpdir.
+import os from "node:os";
+import fs from "node:fs";
+import path from "node:path";
+
+function withIsolatedDataDir(fn) {
+  const original = process.env.ARCANON_DATA_DIR;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "arcanon-queryscan-"));
+  process.env.ARCANON_DATA_DIR = tmp;
+  try {
+    return fn(tmp);
+  } finally {
+    if (original === undefined) delete process.env.ARCANON_DATA_DIR;
+    else process.env.ARCANON_DATA_DIR = original;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 test("queryScan: returns unavailable when port file does not exist", async () => {
-  const result = await queryScan({ repo: "/nonexistent/path/abc123" });
-  assert.equal(result.status, "unavailable");
-  assert.ok(typeof result.message === "string");
+  await withIsolatedDataDir(async () => {
+    const result = await queryScan({ repo: "/nonexistent/path/abc123" });
+    assert.equal(result.status, "unavailable");
+    assert.ok(typeof result.message === "string");
+  });
 });
 
 test("queryScan: never throws — always returns structured object", async () => {
-  let result;
-  try {
-    result = await queryScan({ repo: "/nonexistent/path/abc123" });
-  } catch {
-    assert.fail("queryScan should not throw");
-  }
-  assert.ok("status" in result, "result should have status");
-  assert.ok("message" in result, "result should have message");
+  await withIsolatedDataDir(async () => {
+    let result;
+    try {
+      result = await queryScan({ repo: "/nonexistent/path/abc123" });
+    } catch {
+      assert.fail("queryScan should not throw");
+    }
+    assert.ok("status" in result, "result should have status");
+    assert.ok("message" in result, "result should have message");
+  });
 });
 
 test("queryScan: returns object with status and message fields", async () => {
-  const result = await queryScan({});
-  assert.ok(typeof result.status === "string", "status should be string");
-  assert.ok(typeof result.message === "string", "message should be string");
+  await withIsolatedDataDir(async () => {
+    const result = await queryScan({});
+    assert.ok(typeof result.status === "string", "status should be string");
+    assert.ok(typeof result.message === "string", "message should be string");
+  });
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// plugins/arcanon/tests/fixtures/doctor/mock-hub.js — Phase 114-03 (NAV-03).
+// plugins/arcanon/tests/fixtures/doctor/mock-hub.js —  .
 //
 // Minimal HTTP stub for /arcanon:doctor check 8 (hub credential round-trip)
 // — Test 9. Listens on 127.0.0.1:37996 (sibling to the bats-doctor worker

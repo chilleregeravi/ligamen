@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# tests/known-externals-yaml.bats — INT-05
+# tests/known-externals-yaml.bats — 
 # Schema-and-shape validation for plugins/arcanon/data/known-externals.yaml.
-# Phase 120 ships ONLY the data file; Phase 121 owns the consumer/loader.
+# ships ONLY the data file;  owns the consumer/loader.
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
@@ -14,23 +14,23 @@ setup() {
   command -v yq >/dev/null 2>&1 || skip "yq not installed — required for catalog tests"
 }
 
-@test "INT-05: known-externals.yaml file exists at the documented path" {
+@test "known-externals.yaml file exists at the documented path" {
   [ -f "$CATALOG" ]
 }
 
-@test "INT-05: known-externals.yaml is valid YAML and has an externals top-level key" {
+@test "known-externals.yaml is valid YAML and has an externals top-level key" {
   run yq '.externals' "$CATALOG"
   [ "$status" -eq 0 ]
   [[ "$output" != "null" ]]
 }
 
-@test "INT-05: known-externals.yaml has at least 20 entries" {
+@test "known-externals.yaml has at least 20 entries" {
   run yq '.externals | length' "$CATALOG"
   [ "$status" -eq 0 ]
   [ "$output" -ge 20 ]
 }
 
-@test "INT-05: every entry has name + label + category" {
+@test "every entry has name + label + category" {
   count=$(yq '.externals | length' "$CATALOG")
   for i in $(seq 0 $((count - 1))); do
     name=$(yq ".externals[$i].name" "$CATALOG")
@@ -42,7 +42,7 @@ setup() {
   done
 }
 
-@test "INT-05: every entry's category is in the documented enum" {
+@test "every entry's category is in the documented enum" {
   count=$(yq '.externals | length' "$CATALOG")
   for i in $(seq 0 $((count - 1))); do
     category=$(yq ".externals[$i].category" "$CATALOG")
@@ -53,7 +53,7 @@ setup() {
   done
 }
 
-@test "INT-05: every entry has at least one match signal (hosts or ports)" {
+@test "every entry has at least one match signal (hosts or ports)" {
   count=$(yq '.externals | length' "$CATALOG")
   for i in $(seq 0 $((count - 1))); do
     hosts_len=$(yq ".externals[$i].hosts | length // 0" "$CATALOG")
@@ -66,7 +66,7 @@ setup() {
   done
 }
 
-@test "INT-05: all names are kebab-case" {
+@test "all names are kebab-case" {
   count=$(yq '.externals | length' "$CATALOG")
   for i in $(seq 0 $((count - 1))); do
     name=$(yq ".externals[$i].name" "$CATALOG")
@@ -77,12 +77,12 @@ setup() {
   done
 }
 
-@test "INT-05: all names are unique" {
+@test "all names are unique" {
   dupes=$(yq '.externals[].name' "$CATALOG" | sort | uniq -d)
   [ -z "$dupes" ] || { echo "duplicate names: $dupes"; return 1; }
 }
 
-@test "INT-05: file has the documented header comment block" {
+@test "file has the documented header comment block" {
   run grep -F '# known-externals.yaml — catalog' "$CATALOG"
   [ "$status" -eq 0 ]
   run grep -F '# Schema (Phase 120 — INT-05;' "$CATALOG"

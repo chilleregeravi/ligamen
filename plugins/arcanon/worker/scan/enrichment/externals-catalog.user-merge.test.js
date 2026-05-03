@@ -1,7 +1,7 @@
 /**
- * worker/scan/enrichment/externals-catalog.user-merge.test.js — Phase 121 / INT-07.
+ * worker/scan/enrichment/externals-catalog.user-merge.test.js —  / .
  *
- * Tests the user-extension merge surface added on top of Plan 121-01:
+ * Tests the user-extension merge surface added on top of :
  *   loadUserExtensions(projectRoot, logger?)
  *   loadMergedCatalog(projectRoot, logger?)
  *
@@ -36,7 +36,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Reuse the same fixture shipped catalog from Plan 121-01.
+// Reuse the same fixture shipped catalog from .
 const FIXTURE_DIR = path.resolve(__dirname, '..', '..', '..', 'tests', 'fixtures', 'externals');
 const FIXTURE_VALID = path.join(FIXTURE_DIR, 'known-externals.yaml');
 
@@ -190,7 +190,7 @@ describe('externals-catalog: loadMergedCatalog', () => {
     writeConfig(projectDir, {
       external_labels: {
         // Use a slug that almost certainly collides with the shipped catalog.
-        // Both Phase 120 catalog and our test fixture include "stripe".
+        // Both  catalog and our test fixture include "stripe".
         stripe: {
           label: 'Stripe (Production)',
           hosts: ['api.stripe.com'],

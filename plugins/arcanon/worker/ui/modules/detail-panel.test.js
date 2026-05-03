@@ -111,7 +111,7 @@ check(
   "node.exposes"
 );
 
-// ── NAV-04: Clickable connection targets ──────────────────────────────────
+// ── : Clickable connection targets ──────────────────────────────────
 
 // data-node-id attribute emitted on .conn-target spans
 check(
@@ -148,7 +148,7 @@ check(
   "state.positions[nodeId]"
 );
 
-// ── Phase 72: renderServiceMeta ────────────────────────────────────────────
+// ── : renderServiceMeta ────────────────────────────────────────────
 
 // renderServiceMeta function is defined
 check(
@@ -213,7 +213,7 @@ check(
   "escapeHtml(node.db_backend)"
 );
 
-// ── Phase 72: confidence badges ────────────────────────────────────────────
+// ── : confidence badges ────────────────────────────────────────────
 
 // confidenceColor variable defined
 check(
@@ -303,7 +303,7 @@ check(
 
 // ── UNK-01: Unknown state always visible ──────────────────────────────────
 
-// renderServiceMeta function is defined (from Plan 01)
+// renderServiceMeta function is defined (from )
 check(
   src.includes('renderServiceMeta'),
   'UNK-01: renderServiceMeta function defined',
@@ -347,7 +347,7 @@ check(
   'confidenceBadge or confidenceColor+48bb78'
 );
 
-// ── AGENT-03: source_file and target_file display ─────────────────────────
+// ── : source_file and target_file display ─────────────────────────
 
 // Outgoing "Calls" section shows source_file when present
 check(

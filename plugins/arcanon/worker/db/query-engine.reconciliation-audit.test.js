@@ -1,9 +1,9 @@
 /**
- * worker/db/query-engine.reconciliation-audit.test.js — Phase 111 Plan 03 (TRUST-06, TRUST-14)
+ * worker/db/query-engine.reconciliation-audit.test.js —   
  *
  * Integration test for the reconciliation → audit-log path wired in
  * commands/map.md Step 3 (capture _reconciliation field) and Step 5
- * (resolve connection_id and call qe.logEnrichment) under Plan 111-03.
+ * (resolve connection_id and call qe.logEnrichment) under .
  *
  * The slash-command flow itself (a Claude-driven JS snippet) is not directly
  * unit-testable, so this test reproduces the relevant slice of map.md inline:
@@ -121,7 +121,7 @@ function runStep5AuditWrite(db, qe, findings, repoId, scanVersionId) {
   }
 }
 
-describe('reconciliation → enrichment_log integration (Plan 111-03 / TRUST-06, TRUST-14)', () => {
+describe('reconciliation → enrichment_log integration', () => {
   it('one external→cross-service reclassification produces one audit row with the locked schema', () => {
     const db = freshDb();
     const qe = new QueryEngine(db);

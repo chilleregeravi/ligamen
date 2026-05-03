@@ -142,7 +142,7 @@ describe('Java auth/db end-to-end — Spring Boot 3 (SecurityFilterChain + postg
 });
 
 // ---------------------------------------------------------------------------
-// Test C: Spring Security 5 (@EnableWebSecurity) — ENR-02
+// Test C: Spring Security 5 (@EnableWebSecurity) — 
 // ---------------------------------------------------------------------------
 
 describe('Java auth/db end-to-end — Spring Security 5 (@EnableWebSecurity)', () => {

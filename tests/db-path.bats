@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/db-path.bats — HOK-12 parity tests for lib/db-path.sh vs worker/db/pool.js
+# tests/db-path.bats —  parity tests for lib/db-path.sh vs worker/db/pool.js
 #
 # Verifies that the bash hash algorithm in db-path.sh produces identical output
 # to the JS algorithm in worker/db/pool.js projectHashDir():

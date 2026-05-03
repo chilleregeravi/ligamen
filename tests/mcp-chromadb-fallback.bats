@@ -66,7 +66,7 @@ teardown() {
   assert_output --partial '"drift_versions"'
   assert_output --partial '"drift_types"'
   assert_output --partial '"drift_openapi"'
-  # impact_audit_log added in Phase 111 Plan 03 (TRUST-06 / TRUST-14).
+  # impact_audit_log added in   .
   assert_output --partial '"impact_audit_log"'
 }
 

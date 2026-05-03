@@ -1,7 +1,7 @@
 /**
  * Test suite for migration 018 — actors.label TEXT NULL column.
  *
- * Phase 121 (INT-06): adds the `label` column to the `actors` table so the
+ * adds the `label` column to the `actors` table so the
  * scan enrichment pass can stamp friendly display names matched from
  * `data/known-externals.yaml`.
  *

@@ -1,5 +1,5 @@
 /**
- * Tests for the scan-version selector resolver (Phase 115, Plan 115-01, Task 1).
+ * Tests for the scan-version selector resolver (, Task 1).
  *
  * Covers all four input forms (integer, HEAD/HEAD~N, ISO date, branch) plus the
  * defensive grep regression (test 14) that asserts the source uses ONLY

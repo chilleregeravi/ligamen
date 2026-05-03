@@ -24,7 +24,7 @@ mkdir -p "$DATA_DIR"
 PID_FILE="${DATA_DIR}/worker.pid"
 PORT_FILE="${DATA_DIR}/worker.port"
 
-# DSP-07: stale-PID + version-mismatch detection extracted to lib/worker-restart.sh.
+# stale-PID + version-mismatch detection extracted to lib/worker-restart.sh.
 # MUTEX BOUNDARY: all new logic below this point runs only when no worker is active
 # (either no PID file, or PID is stale, or we just killed it on version mismatch).
 # Pitfall 8: do NOT move any new initialization logic above this block.

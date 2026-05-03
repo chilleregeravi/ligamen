@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/scan-overrides-apply.bats - Phase 117-02 (CORRECT-03).
+# tests/scan-overrides-apply.bats -  .
 #
 # End-to-end coverage of the scan-overrides apply-hook. Drives the same
 # applyPendingOverrides function the scan pipeline calls between
@@ -31,9 +31,9 @@ setup() {
 }
 
 # ---------------------------------------------------------------------------
-# CORRECT-03: apply-hook applies all 3 pending overrides and stamps each.
+# apply-hook applies all 3 pending overrides and stamps each.
 # ---------------------------------------------------------------------------
-@test "CORRECT-03: apply-hook deletes connection, renames service, stamps all 3 overrides" {
+@test "apply-hook deletes connection, renames service, stamps all 3 overrides" {
   # Drive applyPendingOverrides against the seeded DB. The scan_version_id
   # used for stamping (42) is arbitrary - in production it is r.scanVersionId
   # from the manager's Phase B loop; here we pass any positive integer to
@@ -92,10 +92,10 @@ db.close();
 }
 
 # ---------------------------------------------------------------------------
-# CORRECT-03 idempotency: a second invocation processes 0 overrides (all
+# idempotency: a second invocation processes 0 overrides (all
 # stamped from the first pass).
 # ---------------------------------------------------------------------------
-@test "CORRECT-03: re-invoking apply-hook is a no-op (already-applied filtered)" {
+@test "re-invoking apply-hook is a no-op (already-applied filtered)" {
   run node --input-type=module --eval "
 import Database from '${PLUGIN_ROOT}/node_modules/better-sqlite3/lib/index.js';
 import { QueryEngine } from '${PLUGIN_ROOT}/worker/db/query-engine.js';

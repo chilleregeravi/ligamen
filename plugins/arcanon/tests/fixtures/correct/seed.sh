@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/correct/seed.sh — Phase 118-01 (CORRECT-02).
+# plugins/arcanon/tests/fixtures/correct/seed.sh —  .
 #
 # Thin wrapper around seed.js. Invoked from tests/correct.bats setup() to
 # populate a fresh SQLite DB at the path /arcanon:correct will compute for

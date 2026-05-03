@@ -1,5 +1,5 @@
 /**
- * worker/scan/enrichment/actor-labeler.js — Phase 121 / INT-06.
+ * worker/scan/enrichment/actor-labeler.js —  / .
  *
  * Per-repo actor labeling pass. Invoked from manager.js once per repo, after
  * the per-service enrichment loop and BEFORE the slog('INFO', 'enrichment

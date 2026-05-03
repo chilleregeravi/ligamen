@@ -2,22 +2,22 @@
  * worker/scan/overrides.js — Apply pending operator overrides to the current
  * scan_version, between persistFindings and endScan.
  *
- * CORRECT-03: scan pipeline reads scan_overrides BEFORE endScan and applies
+ * scan pipeline reads scan_overrides BEFORE endScan and applies
  * pending overrides to the persisted findings. Each override is marked
  * applied_in_scan_version_id on apply. Already-applied overrides are skipped
  * on subsequent scans (filtered by getPendingOverrides WHERE clause).
  *
- * Conflict resolution (RESEARCH section 6 D-02): override wins. The apply pass
+ * Conflict resolution (RESEARCH section 6 ): override wins. The apply pass
  * runs AFTER persistFindings has written the agent rows for this scan_version,
  * so any UPDATE/DELETE here overrides what the agent just wrote.
  *
- * Apply granularity (RESEARCH section 6 D-03): per-override. Each override is
+ * Apply granularity (RESEARCH section 6 ): per-override. Each override is
  * stamped with applied_in_scan_version_id immediately after its mutation
  * succeeds (markOverrideApplied is called inside the per-override loop, NOT
  * batched at the end). Crash mid-loop preserves partial progress — unstamped
  * rows retry on the next scan.
  *
- * Dangling target handling (RESEARCH section 6 D-04): UPDATE/DELETE that
+ * Dangling target handling (RESEARCH section 6 ): UPDATE/DELETE that
  * affects 0 rows is logged at WARN and the override IS STILL stamped — the
  * user intent is satisfied (the row is already gone) and leaving it pending
  * would repeat the WARN on every future scan.
@@ -99,7 +99,7 @@ export async function applyPendingOverrides(scanVersionId, queryEngine, slog) {
     try {
       const rowsAffected = _applyOne(row, payload, queryEngine);
       if (rowsAffected === 0) {
-        // D-04: dangling target — log+skip+stamp
+        // dangling target — log+skip+stamp
         slog('WARN', 'override target missing — skipping', {
           override_id: row.override_id,
           kind: row.kind,
@@ -114,7 +114,7 @@ export async function applyPendingOverrides(scanVersionId, queryEngine, slog) {
           action: row.action,
         });
       }
-      // Stamp regardless of dangling — D-04 (avoids WARN-loop on future scans).
+      // Stamp regardless of dangling —  (avoids WARN-loop on future scans).
       queryEngine.markOverrideApplied(row.override_id, scanVersionId);
       counters.applied++;
     } catch (err) {

@@ -1,5 +1,5 @@
 /**
- * worker/db/query-engine-actors-label.test.js — Phase 121 / INT-06.
+ * worker/db/query-engine-actors-label.test.js —  / .
  *
  * Verifies that getGraph() returns the new actors[].label field after
  * migration 018, and falls back gracefully (label: null per row) on a

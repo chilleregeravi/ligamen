@@ -20,11 +20,11 @@ The script reports:
 - Resolved config file (`arcanon.config.json`)
 - Project slug (from config)
 - Credential presence (missing → suggest `/arcanon:login`)
-- Identity (AUTH-07): resolved org id + source, key preview (`arc_xxxx…1234`), scopes, list of authorized orgs. Shows `(missing)` when no org id resolves; `(unavailable)` when the hub is unreachable.
+- Identity: resolved org id + source, key preview (`arc_xxxx…1234`), scopes, list of authorized orgs. Shows `(missing)` when no org id resolves; `(unavailable)` when the hub is unreachable.
 - Whether `hub.auto-sync` is enabled
 - Queue stats: pending / dead counts + oldest pending timestamp
 - Data directory path (`~/.arcanon/`)
-- Latest scan date + quality percentage (FRESH-01) and per-repo commits since last scan (FRESH-02) — sourced from `GET /api/scan-freshness`
+- Latest scan date + quality percentage and per-repo commits since last scan — sourced from `GET /api/scan-freshness`
 
 Relay the output verbatim. If anything is obviously broken (missing
 credentials with auto-sync on, dead rows in queue), call it out with

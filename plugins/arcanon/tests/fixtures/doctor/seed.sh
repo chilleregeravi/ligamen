@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/doctor/seed.sh — Phase 114-03 (NAV-03).
+# plugins/arcanon/tests/fixtures/doctor/seed.sh —  .
 #
 # Thin wrapper that delegates to the existing list-fixture seeder. The doctor
 # tests need exactly the same DB shape (3 repos, 8 services, 47 connections,

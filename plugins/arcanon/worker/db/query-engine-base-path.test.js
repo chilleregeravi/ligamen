@@ -1,5 +1,5 @@
 /**
- * worker/db/query-engine-base-path.test.js — Phase 110 (TRUST-04, TRUST-12)
+ * worker/db/query-engine-base-path.test.js —  
  *
  * Verifies the write + resolution paths for services.base_path:
  *   - Test 1: upsertService persists base_path on a migration-014 db
@@ -8,16 +8,16 @@
  *             migration-011 shape (no throw, base_path silently dropped)
  *   - Test 4: detectMismatches positive single-segment — /api/users matches
  *             exposed /users when target.base_path = '/api'
- *   - Test 5: detectMismatches positive multi-segment (D-03) — /api/v1/users
+ *   Test 5: detectMismatches positive multi-segment  — /api/v1/users
  *             matches exposed /users when target.base_path = '/api/v1'
- *   - Test 6: detectMismatches negative D-02 guard — /api/users does NOT
+ *   Test 6: detectMismatches negative  guard — /api/users does NOT
  *             match exposed /users when target.base_path = NULL
- *   - Test 7: detectMismatches segment-boundary D-03 guard — /api/users does
+ *   Test 7: detectMismatches segment-boundary  guard — /api/users does
  *             NOT match exposed /i/users when target.base_path = '/ap'
  *   - Test 8: detectMismatches literal-match preserved — /api/users matches
  *             literal /api/users even when target.base_path = '/api'
  *
- * Also unit-tests the exported stripBasePath helper (D-02 + D-03 algorithm).
+ * Also unit-tests the exported stripBasePath helper ( +  algorithm).
  */
 
 import { describe, it } from 'node:test';
@@ -111,7 +111,7 @@ function insertConnection(db, srcId, tgtId, protocol, method, pathStr) {
 }
 
 // ===========================================================================
-// stripBasePath helper unit tests (D-02 + D-03 algorithm)
+// stripBasePath helper unit tests ( +  algorithm)
 // ===========================================================================
 
 describe('stripBasePath helper (D-02 + D-03)', () => {

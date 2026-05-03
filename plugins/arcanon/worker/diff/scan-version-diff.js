@@ -1,5 +1,5 @@
 /**
- * Scan-version diff engine — Phase 115, Plan 115-01, Task 2 (NAV-04).
+ * Scan-version diff engine —, , Task 2 .
  *
  * Computes a set-diff of services and connections between two scan-version IDs
  * across two open `better-sqlite3` Database handles. Returns an
@@ -7,12 +7,12 @@
  * (`(repo_id, name)` for services, `(source_name, target_name, protocol,
  * method, path)` for connections).
  *
- * Engine-shape contract (load-bearing for Phase 119 shadow-DB reuse — see
- * 115-RESEARCH.md §8 for the full Phase 119 dependency promise):
+ * Engine-shape contract (load-bearing for  shadow-DB reuse — see
+ * 115-RESEARCH.md §8 for the full  dependency promise):
  *
  *   - Takes two raw `better-sqlite3` Database handles (NOT projectRoot
- *     strings, NOT pool keys). Phase 115 callers pass the same handle for
- *     both (`dbA === dbB`); Phase 119 will pass a shadow DB handle on one
+ *     strings, NOT pool keys).  callers pass the same handle for
+ *     both (`dbA === dbB`);  will pass a shadow DB handle on one
  *     side and the live DB handle on the other. The engine signature does
  *     not change between the two phases.
  *
@@ -20,7 +20,7 @@
  *     `worker/db/database.js`. The defensive grep regression in
  *     `scan-version-diff.test.js` (test 18) enforces this — it greps for
  *     the forbidden pool-helper names and fails the build if any appear.
- *     Adding any pool import would silently break Phase 119's shadow
+ *     Adding any pool import would silently break 's shadow
  *     contract; the grep test catches it loudly.
  *
  *   - Read-only. Only SELECT statements; no INSERT / UPDATE / DELETE
@@ -47,7 +47,7 @@
  *      keys (no collisions even if names contain `|` or other delimiters).
  *      In-memory set-diff is preferred over SQL `EXCEPT` because (a) data
  *      volumes are tiny, (b) it requires no `ATTACH DATABASE` cross-handle
- *      acrobatics for Phase 119, and (c) the field-diff for `modified` is
+ *      acrobatics for, and (c) the field-diff for `modified` is
  *      cleaner in JS than as nested SELECTs. See RESEARCH §4.1.
  *
  *   4. Walk keys: in B only → added; in A only → removed; in both → run
@@ -66,7 +66,7 @@
  *                       evidence, path_template
  *
  * The engine does NOT truncate `evidence` (or any other field). Truncation
- * for human display is the formatter's job (Plan 115-02). Test 17 verifies
+ * for human display is the formatter's job . Test 17 verifies
  * 500-char evidence passes through verbatim.
  */
 

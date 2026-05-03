@@ -1,7 +1,7 @@
 /**
  * manager.dep-collector.test.js — Integration tests for dep-collector wiring in Phase B loop
  *
- * Tests: DEP-09 (collector invoked per service), DEP-10 (cascade cleanup), DEP-11 (ecosystems logged)
+ * Tests:  (collector invoked per service),  (cascade cleanup),  (ecosystems logged)
  *
  * Uses node:test + node:assert/strict. No external test framework.
  */
@@ -115,7 +115,7 @@ describe('manager.js dep-collector integration (DEP-09/10/11)', () => {
     setScanLogger(null);
   });
 
-  it('scanRepos populates service_dependencies end-to-end (DEP-09)', async () => {
+  it('scanRepos populates service_dependencies end-to-end', async () => {
     const qe = buildQe();
     setAgentRunner(makeAgentRunner(repoDir));
     await scanRepos([repoDir], { full: true }, qe);
@@ -128,7 +128,7 @@ describe('manager.js dep-collector integration (DEP-09/10/11)', () => {
     assert.ok(!names.includes('vitest'), 'devDependency vitest leaked into service_dependencies');
   });
 
-  it('cascade cleanup when service removed on re-scan (DEP-10)', async () => {
+  it('cascade cleanup when service removed on re-scan', async () => {
     const qe = buildQe();
 
     // First scan: service present — deps populated
@@ -162,7 +162,7 @@ describe('manager.js dep-collector integration (DEP-09/10/11)', () => {
     );
   });
 
-  it('dep-scan done INFO log includes ecosystemsSeen with npm (DEP-11)', async () => {
+  it('dep-scan done INFO log includes ecosystemsSeen with npm', async () => {
     const qe = buildQe();
     const calls = [];
     setScanLogger({ log: (level, msg, extra) => calls.push({ level, msg, ...extra }) });

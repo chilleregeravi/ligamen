@@ -158,7 +158,7 @@ test("serializePayload returns body + byte count under the limit", () => {
   assert.equal(JSON.parse(body).version, "1.0");
 });
 
-// ── HUB-01/02/03: libraryDepsEnabled gate + schemaVersion derivation ──────────
+// ── /02/03: libraryDepsEnabled gate + schemaVersion derivation ──────────
 
 test("buildFindingsBlock(findings) with no opts returns schemaVersion 1.0 (backward compat)", () => {
   const block = buildFindingsBlock({ services: [{ name: "svc" }] });
@@ -233,10 +233,10 @@ test("buildScanPayload with libraryDepsEnabled=true but empty deps emits version
 });
 
 // ---------------------------------------------------------------------------
-// HUB-04 / HUB-05 — Phase 96-02: additional matrix coverage + regression guard
+// additional matrix coverage + regression guard
 // ---------------------------------------------------------------------------
 
-// Shared fixture — matches Phase 93-02 getDependenciesForService return shape.
+// Shared fixture — matches  getDependenciesForService return shape.
 const SAMPLE_DEP_ROW = {
   id: 1,
   service_id: 42,
@@ -318,7 +318,7 @@ test("HUB-04 end-to-end default: buildScanPayload without libraryDepsEnabled emi
   );
 });
 
-// ── INT-01: hub.evidence_mode + v1.2 envelope ──────────────────────────────
+// ── : hub.evidence_mode + v1.2 envelope ──────────────────────────────
 
 function sha256(s) {
   return crypto.createHash("sha256").update(s).digest("hex");
@@ -356,7 +356,7 @@ function makeEvidenceFindings({ withDeps = false } = {}) {
   };
 }
 
-test("INT-01 M1 — default omitted evidenceMode emits v1.0 with string evidence (back-compat)", () => {
+test("default omitted evidenceMode emits v1.0 with string evidence (back-compat)", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const { payload } = buildScanPayload({
@@ -368,7 +368,7 @@ test("INT-01 M1 — default omitted evidenceMode emits v1.0 with string evidence
   assert.equal(payload.findings.connections[0].evidence, EVIDENCE_LITERAL);
 });
 
-test("INT-01 M2 — explicit evidenceMode='full' is identical to omitted default", () => {
+test("explicit evidenceMode='full' is identical to omitted default", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const a = buildScanPayload({
@@ -387,7 +387,7 @@ test("INT-01 M2 — explicit evidenceMode='full' is identical to omitted default
   assert.deepEqual(a.payload.findings.connections, b.payload.findings.connections);
 });
 
-test("INT-01 M3 — evidenceMode='full' + libraryDepsEnabled emits v1.1 with string evidence + dependencies", () => {
+test("evidenceMode='full' + libraryDepsEnabled emits v1.1 with string evidence + dependencies", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const { payload } = buildScanPayload({
@@ -402,7 +402,7 @@ test("INT-01 M3 — evidenceMode='full' + libraryDepsEnabled emits v1.1 with str
   assert.equal(payload.findings.connections[0].evidence, EVIDENCE_LITERAL);
 });
 
-test("INT-01 M4 — evidenceMode='hash-only' emits v1.2 with {hash, start_line, end_line} object", () => {
+test("evidenceMode='hash-only' emits v1.2 with {hash, start_line, end_line} object", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const { payload } = buildScanPayload({
@@ -419,7 +419,7 @@ test("INT-01 M4 — evidenceMode='hash-only' emits v1.2 with {hash, start_line, 
   assert.equal(ev.end_line, 1);
 });
 
-test("INT-01 M5 — evidenceMode='hash-only' with missing source_file yields hash + null lines", () => {
+test("evidenceMode='hash-only' with missing source_file yields hash + null lines", () => {
   const repoPath = makeTempGitRepo();
   // No file on disk for the source_file path.
   const { payload } = buildScanPayload({
@@ -435,7 +435,7 @@ test("INT-01 M5 — evidenceMode='hash-only' with missing source_file yields has
   assert.equal(ev.end_line, null);
 });
 
-test("INT-01 M6 — evidenceMode='hash-only' with falsy connection.evidence omits the field entirely", () => {
+test("evidenceMode='hash-only' with falsy connection.evidence omits the field entirely", () => {
   const repoPath = makeTempGitRepo();
   const { payload } = buildScanPayload({
     findings: {
@@ -450,7 +450,7 @@ test("INT-01 M6 — evidenceMode='hash-only' with falsy connection.evidence omit
   assert.equal("evidence" in payload.findings.connections[0], false);
 });
 
-test("INT-01 M7 — evidenceMode='none' emits v1.2 and omits evidence on every connection", () => {
+test("evidenceMode='none' emits v1.2 and omits evidence on every connection", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const { payload } = buildScanPayload({
@@ -463,7 +463,7 @@ test("INT-01 M7 — evidenceMode='none' emits v1.2 and omits evidence on every c
   assert.equal("evidence" in payload.findings.connections[0], false);
 });
 
-test("INT-01 M8 — unknown evidenceMode falls back to 'full' with a console.warn (no throw)", () => {
+test("unknown evidenceMode falls back to 'full' with a console.warn (no throw)", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const originalWarn = console.warn;
@@ -489,7 +489,7 @@ test("INT-01 M8 — unknown evidenceMode falls back to 'full' with a console.war
   assert.match(captured[0], /weird-not-real/);
 });
 
-test("INT-01 M9 — state machine matrix across (evidenceMode, libraryDepsEnabled) combos", () => {
+test("state machine matrix across (evidenceMode, libraryDepsEnabled) combos", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const cases = [
@@ -530,7 +530,7 @@ test("INT-01 M9 — state machine matrix across (evidenceMode, libraryDepsEnable
 
 // ── LOAD-BEARING byte-identical regression ─────────────────────────────────
 
-test("INT-01 M10 — BYTE-IDENTICAL FULL @ v1.0: evidenceMode='full' === omitted-evidenceMode for the same input", () => {
+test("BYTE-IDENTICAL FULL @ v1.0: evidenceMode='full' === omitted-evidenceMode for the same input", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const findings = {
@@ -562,7 +562,7 @@ test("INT-01 M10 — BYTE-IDENTICAL FULL @ v1.0: evidenceMode='full' === omitted
   );
 });
 
-test("INT-01 M11 — BYTE-IDENTICAL FULL @ v1.1 (LOAD-BEARING pre-flight): evidenceMode='full' + libraryDepsEnabled === omitted-evidenceMode", () => {
+test("BYTE-IDENTICAL FULL @ v1.1 (LOAD-BEARING pre-flight): evidenceMode='full' + libraryDepsEnabled === omitted-evidenceMode", () => {
   const repoPath = makeTempGitRepo();
   const { projectRoot } = makeTempFileWithContent(EVIDENCE_LITERAL + "\n");
   const findings = {
@@ -600,7 +600,7 @@ test("INT-01 M11 — BYTE-IDENTICAL FULL @ v1.1 (LOAD-BEARING pre-flight): evide
   );
 });
 
-test("INT-01 — ALLOWED_EVIDENCE_MODES enum is exported and frozen", () => {
+test("ALLOWED_EVIDENCE_MODES enum is exported and frozen", () => {
   assert.deepEqual([...ALLOWED_EVIDENCE_MODES].sort(), ["full", "hash-only", "none"].sort());
   assert.throws(() => {
     ALLOWED_EVIDENCE_MODES.push("xyz");

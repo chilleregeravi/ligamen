@@ -50,7 +50,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Required input: package.json (single source of truth post-Phase 107)
+# Required input: package.json (single source of truth post-)
 # ---------------------------------------------------------------------------
 PACKAGE_JSON="${PLUGIN_ROOT}/package.json"
 if [[ ! -f "${PACKAGE_JSON}" ]]; then
@@ -103,7 +103,7 @@ if [[ -f "${SENTINEL}" ]]; then
   SENTINEL_HASH="$(cat "${SENTINEL}" 2>/dev/null | tr -d '[:space:]')"
 fi
 
-# --- Happy path (INST-04): hash match + binding loads ---------------------
+# Happy path : hash match + binding loads ---------------------
 if [[ "${CURRENT_HASH}" == "${SENTINEL_HASH}" ]] && validate_binding; then
   exit 0
 fi
@@ -121,7 +121,7 @@ if [[ "${SKIP_INSTALL}" -eq 0 ]]; then
        --omit=dev --no-fund --no-audit --package-lock=false \
        2>&1 | head -50 >&2; then
     echo "[arcanon] npm install failed — runtime will surface details on first feature use" >&2
-    # Per D-05: do NOT rm -rf node_modules; do NOT delete the sentinel
+    # Per : do NOT rm -rf node_modules; do NOT delete the sentinel
     exit 0
   fi
 
@@ -134,7 +134,7 @@ if [[ "${SKIP_INSTALL}" -eq 0 ]]; then
   # Install ok but binding fails: drop into the rebuild path below
 fi
 
-# --- Rebuild fallback (INST-03): one chance to fix a broken binding -----
+# Rebuild fallback : one chance to fix a broken binding -----
 echo "[arcanon] better-sqlite3 binding failed to load — running npm rebuild" >&2
 if ! npm rebuild better-sqlite3 --prefix "${PLUGIN_ROOT}" \
      2>&1 | head -50 >&2; then

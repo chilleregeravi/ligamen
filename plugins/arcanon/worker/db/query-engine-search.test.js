@@ -7,10 +7,10 @@
  *   - search() with skipChroma=true falls through to FTS5 or SQL
  *   - search() result shape: [{id, name, type, score}]
  *   - Each tier returns results when appropriate data exists
- *   - prepared statement cache (REL-04): reuse and LRU eviction
+ *   prepared statement cache : reuse and LRU eviction
  *
  * Uses node:test + node:assert/strict — zero external dependencies.
- * Uses better-sqlite3 directly for isolation (per Phase 14-02 decision).
+ * Uses better-sqlite3 directly for isolation (per  decision).
  */
 
 import { test, describe, before, after } from "node:test";
@@ -38,7 +38,7 @@ before(async () => {
   const hash = createHash("sha256").update(tmpRoot).digest("hex").slice(0, 12);
   const dbDir = join(homedir(), ".arcanon", "projects", hash);
 
-  // Use better-sqlite3 directly (Phase 14-02 decision: avoid singleton isolation issues)
+  // Use better-sqlite3 directly ( decision: avoid singleton isolation issues)
   db = new Database(":memory:");
   db.pragma("foreign_keys = ON");
 
@@ -239,10 +239,10 @@ describe("search() — Tier 1 (ChromaDB fallback when unavailable)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// prepared statement cache (REL-04)
+// prepared statement cache 
 // ---------------------------------------------------------------------------
 
-describe("search() -- prepared statement cache (REL-04)", () => {
+describe("search() -- prepared statement cache", () => {
   test("reuses prepared statements for identical queries", async () => {
     // Clear the cache so we start from a known state
     _stmtCache.clear();

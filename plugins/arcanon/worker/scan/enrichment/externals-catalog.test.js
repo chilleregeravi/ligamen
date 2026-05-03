@@ -1,5 +1,5 @@
 /**
- * worker/scan/enrichment/externals-catalog.test.js — Phase 121 / INT-06.
+ * worker/scan/enrichment/externals-catalog.test.js —  / .
  *
  * Tests the YAML loader and pure matchActor() function exposed by
  * worker/scan/enrichment/externals-catalog.js.

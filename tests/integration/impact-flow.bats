@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # tests/integration/impact-flow.bats
-# Integration tests for Phase 21: session hook, ChromaDB fallback, snapshots, E2E scan flow
+# Integration tests for : session hook, ChromaDB fallback, snapshots, E2E scan flow
 # Requires: Node.js 20+, git, bats-core
 # Does NOT require: ChromaDB running, real Claude agents
 

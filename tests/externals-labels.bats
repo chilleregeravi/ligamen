@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/externals-labels.bats — Phase 121 Plan 02 (INT-07, INT-08, INT-09).
+# tests/externals-labels.bats —   ().
 #
 # E2E coverage of the external-labels merge + UI/list label rendering. Each
 # test seeds a bare-actor DB, writes an arcanon.config.json with an
@@ -101,7 +101,7 @@ _run_label_pass() {
 # ---------------------------------------------------------------------------
 # Test 1 — User-only entry labels its actor end-to-end.
 # ---------------------------------------------------------------------------
-@test "INT-07: user external_labels entry labels its actor end-to-end" {
+@test "user external_labels entry labels its actor end-to-end" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -144,7 +144,7 @@ EOF
 # ---------------------------------------------------------------------------
 # Test 2 — User wins on collision (Stripe override).
 # ---------------------------------------------------------------------------
-@test "INT-07: user wins on key collision with shipped catalog" {
+@test "user wins on key collision with shipped catalog" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"
@@ -185,7 +185,7 @@ EOF
 # ---------------------------------------------------------------------------
 # Test 3 — Shipped YAML byte-integrity (file MUST NOT mutate during merge).
 # ---------------------------------------------------------------------------
-@test "INT-07: shipped known-externals.yaml is byte-identical after merge" {
+@test "shipped known-externals.yaml is byte-identical after merge" {
   local hash
   hash="$(_arcanon_project_hash "$PROJECT_ROOT")"
   local db_path="$ARC_DATA_DIR/projects/$hash/impact-map.db"

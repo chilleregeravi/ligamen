@@ -25,7 +25,7 @@ import { chromaSearch, isChromaAvailable } from "../server/chroma.js";
 import { resolveConfigPath } from "../lib/config-path.js";
 
 // ---------------------------------------------------------------------------
-// LRU prepared statement cache (REL-04)
+// LRU prepared statement cache 
 // ---------------------------------------------------------------------------
 
 /**
@@ -214,7 +214,7 @@ export async function search(query, options = {}) {
 const SEVERITY_ORDER = { CRITICAL: 0, WARN: 1, INFO: 2 };
 
 // ---------------------------------------------------------------------------
-// Path canonicalization (TRUST-03)
+// Path canonicalization 
 // ---------------------------------------------------------------------------
 
 /**
@@ -225,7 +225,7 @@ const SEVERITY_ORDER = { CRITICAL: 0, WARN: 1, INFO: 2 };
  * for paths the agent didn't claim.
  *
  * Out of scope this phase: Express `:id` style, OpenAPI named groups, JAX-RS
- * constraint suffixes. See 109-CONTEXT.md D-06 in
+ * constraint suffixes. See 109-CONTEXT.md  in
  * .planning/phases/109-path-canonicalization-and-evidence/.
  *
  * @param {string|null|undefined} pathStr
@@ -256,14 +256,14 @@ function sanitizeBindings(obj) {
 }
 
 // ---------------------------------------------------------------------------
-// base_path strip helper (TRUST-04 / Phase 110)
+// base_path strip helper 
 // ---------------------------------------------------------------------------
 
 /**
  * Strips a target service's `base_path` from an outbound connection path,
  * if and only if the prefix is at a path-segment boundary.
  *
- * Algorithm (D-02 + D-03):
+ * Algorithm ( + ):
  *   1. If basePath is null/empty/undefined → return null (no strip applies).
  *   2. Normalize trailing slash on basePath.
  *   3. If connPath === basePath → return "/" (full match collapses to root).
@@ -409,7 +409,7 @@ export class QueryEngine {
         scanned_at = COALESCE(excluded.scanned_at, scanned_at)
     `);
 
-    // Try with base_path column (migration 014, TRUST-04). Fall back through
+    // Try with base_path column (migration 014). Fall back through
     // migration-011 (boundary_entry only), then pre-011 plain shape for older
     // databases. Mirrors the connections.path_template multi-tier fallback.
     this._hasBasePath = false;
@@ -453,7 +453,7 @@ export class QueryEngine {
       }
     }
 
-    // Try with path_template column (migration 013, TRUST-03). Falls back
+    // Try with path_template column (migration 013). Falls back
     // through migration-009 (confidence+evidence), migration-008 (crossing),
     // then pre-008 plain columns for legacy DBs.
     this._hasPathTemplate = false;
@@ -612,13 +612,13 @@ export class QueryEngine {
       this._stmtUpsertDependency = null;
     }
 
-    // --- quality_score statements (migration 015 / TRUST-05, TRUST-13) ---
+    // quality_score statements (migration 015) ---
     // The breakdown SQL counts confidence='high' and confidence='low' rows in
     // a single scan. Wrapped in try/catch so a pre-migration-015 db (no
     // quality_score column) cleanly disables persistence — endScan stays
     // best-effort.
     //
-    // Lock-phrase (Phase 111 CONTEXT D-02, verbatim — kept on a single line so
+    // Lock-phrase ( CONTEXT, verbatim — kept on a single line so
     // the source-grep test in query-engine.quality-score.test.js can verify it):
     // NULL confidence is counted in `total` but contributes 0 to the numerator — agent omissions do not count as 'low'.
     this._stmtUpdateQualityScore = null;
@@ -657,13 +657,13 @@ export class QueryEngine {
       this._stmtSelectQualityBreakdown = null;
     }
 
-    // --- enrichment_log statements (migration 016 / TRUST-06, TRUST-14) ---
+    // enrichment_log statements (migration 016) ---
     // Wrapped in try/catch so a pre-migration-016 db (no enrichment_log table)
     // cleanly disables the writers/readers — logEnrichment returns null and
     // getEnrichmentLog returns []. Mirrors the actor / node_metadata /
     // service_dependencies fallback pattern above.
     //
-    // Decision (Phase 111 CONTEXT D-04): logEnrichment does NOT pre-validate
+    // Decision ( CONTEXT ): logEnrichment does NOT pre-validate
     // target_kind in JS. The migration-016 SQL CHECK constraint is the source
     // of truth — duplicating the check would silently mask SQL-level errors
     // and drift if the CHECK loosens in a later migration.
@@ -697,15 +697,15 @@ export class QueryEngine {
       this._stmtSelectEnrichmentLogByEnricher = null;
     }
 
-    // --- scan_overrides statements (migration 017 / CORRECT-01) ---
+    // scan_overrides statements (migration 017) ---
     // Wrapped in try/catch so a pre-migration-017 db (no scan_overrides table)
     // cleanly disables the writers/readers — upsertOverride returns null,
     // getPendingOverrides returns [], markOverrideApplied returns null.
     // Mirrors the enrichment_log fallback pattern above.
     //
-    // Decision (Plan 117-01): the SQL CHECK constraints on `kind` and `action`
+    // Decision : the SQL CHECK constraints on `kind` and `action`
     // are the source of truth. Helpers do NOT pre-validate in JS - the apply-
-    // hook (Plan 117-02) is the single point that validates payload SHAPE at
+    // hook  is the single point that validates payload SHAPE at
     // apply time. Same rationale as logEnrichment (query-engine.js:1106-1108).
     this._stmtInsertOverride = null;
     this._stmtSelectPendingOverrides = null;
@@ -883,7 +883,7 @@ export class QueryEngine {
    * Inserts or replaces a service row. Always returns the stable row id —
    * looks up by (repo_id, name) UNIQUE key when the prepared statement reports
    * lastInsertRowid=0 (UPDATE path) or returns a stale rowid from a prior
-   * INSERT on a different table. (#TRUST-03 idempotency: caller wires
+   * INSERT on a different table. (# idempotency: caller wires
    * serviceIdMap from this return value, so a stale rowid from a sibling
    * INSERT in the same connection produced cross-wired connection FK
    * references on re-scan.)
@@ -944,7 +944,7 @@ export class QueryEngine {
   }
 
   // --------------------------------------------------------------------------
-  // Evidence-substring guard helpers (TRUST-02)
+  // Evidence-substring guard helpers 
   // --------------------------------------------------------------------------
 
   /**
@@ -973,10 +973,10 @@ export class QueryEngine {
    * resolves to a readable file AND the literal substring is not found.
    *
    * Per .planning/phases/109-path-canonicalization-and-evidence/109-CONTEXT.md:
-   *   D-03: whole-file substring check (no line_start window — schema doesn't
+   *   whole-file substring check (no line_start window — schema doesn't
    *         carry one).
-   *   D-04: literal substring, no whitespace/regex normalization.
-   *   D-05: lenient on null/missing/unreadable — return ok:true (warn when
+   *   literal substring, no whitespace/regex normalization.
+   *   lenient on null/missing/unreadable — return ok:true (warn when
    *         appropriate; persist anyway).
    *
    * @param {{ evidence?: string|null, source_file?: string|null }} conn
@@ -986,10 +986,10 @@ export class QueryEngine {
    */
   _validateEvidence(conn, repoRootPath) {
     const evidence = (conn.evidence ?? "").trim();
-    if (!evidence) return { ok: true }; // D-05 case 1: agent didn't claim evidence
+    if (!evidence) return { ok: true }; // case 1: agent didn't claim evidence
 
     const srcRel = conn.source_file;
-    if (srcRel == null || srcRel === "") return { ok: true }; // D-05 case 2
+    if (srcRel == null || srcRel === "") return { ok: true }; // case 2
 
     // Resolve relative paths against repo root. Absolute paths used as-is.
     let abs = srcRel;
@@ -1001,7 +1001,7 @@ export class QueryEngine {
     try {
       content = fs.readFileSync(abs, "utf8");
     } catch (e) {
-      // D-05 case 3: file missing or unreadable — warn but don't reject
+      // case 3: file missing or unreadable — warn but don't reject
       const detail = e.code || e.message || "unknown error";
       return {
         ok: true,
@@ -1027,7 +1027,7 @@ export class QueryEngine {
   }
 
   // --------------------------------------------------------------------------
-  // path_template merge helpers (TRUST-03)
+  // path_template merge helpers 
   // --------------------------------------------------------------------------
 
   /**
@@ -1136,13 +1136,13 @@ export class QueryEngine {
   }
 
   /**
-   * Write a row to enrichment_log. (TRUST-06 / TRUST-14 — migration 016.)
+   * Write a row to enrichment_log. (— migration 016.)
    *
    * No-op (returns null) when migration 016 is not applied — the table is
    * absent and the prepared statement could not arm in the constructor.
    *
    * Throws (SqliteError) when the SQL CHECK on `target_kind` fails — JS does
-   * NOT pre-validate per Phase 111 CONTEXT D-04 (the SQL CHECK is the source
+   * NOT pre-validate per  CONTEXT  (the SQL CHECK is the source
    * of truth; duplicating the check would silently mask SQL-level errors).
    *
    * @param {number} scanVersionId
@@ -1208,16 +1208,16 @@ export class QueryEngine {
   }
 
   /**
-   * Insert a pending override row. (CORRECT-01 / CORRECT-02 — migration 017.)
+   * Insert a pending override row. (— migration 017.)
    *
    * No-op (returns null) when migration 017 is not applied — the table is
    * absent and the prepared statement could not arm in the constructor.
    *
    * MUST NOT call beginScan/endScan — overrides are persisted by the
-   * /arcanon:correct command (Phase 118), which runs OUTSIDE any scan bracket.
+   * arcanon:correct command, which runs OUTSIDE any scan bracket.
    *
    * `payload` is JSON-stringified here. Caller passes a plain object; the
-   * apply-hook (Plan 117-02) calls JSON.parse on read.
+   * apply-hook  calls JSON.parse on read.
    *
    * Throws SqliteError when the SQL CHECK on `kind` or `action` fails — JS
    * does NOT pre-validate (matches the `logEnrichment` decision documented
@@ -1259,8 +1259,8 @@ export class QueryEngine {
 
   /**
    * Stamp applied_in_scan_version_id on a single override row. Per-override
-   * granularity (RESEARCH section 6 D-03) — called once per applied override
-   * by the apply-hook in Plan 117-02.
+   * granularity (RESEARCH section 6 ) — called once per applied override
+   * by the apply-hook in .
    *
    * No-op (returns null) on pre-017 db. Returns 0 changes (not an error) if
    * the override_id does not exist.
@@ -1422,10 +1422,10 @@ export class QueryEngine {
     }
     this._stmtEndScan.run(new Date().toISOString(), scanVersionId);
 
-    // TRUST-05: compute quality_score = (high + 0.5 * low) / total and persist
+    // compute quality_score = (high + 0.5 * low) / total and persist
     // it on the scan_versions row. NULL when total = 0 (no connections in this
     // scan). NULL confidence rows count toward `total` but contribute 0 to the
-    // numerator (Phase 111 D-02). Best-effort — a write failure here MUST NOT
+    // numerator . Best-effort — a write failure here MUST NOT
     // prevent the bracket close, so the call is wrapped in try/catch.
     if (this._stmtSelectQualityBreakdown && this._stmtUpdateQualityScore) {
       try {
@@ -1504,7 +1504,7 @@ export class QueryEngine {
    * scan_version row is missing, or endScan has not yet run for this scan).
    *
    * The score formula and NULL semantics are documented at the SQL site in the
-   * constructor and in `endScan` — see Phase 111 CONTEXT D-02. (TRUST-05.)
+   * constructor and in `endScan` — see  CONTEXT . (.)
    *
    * @param {number} scanVersionId
    * @returns {number | null}
@@ -1530,16 +1530,16 @@ export class QueryEngine {
    *     high: number,
    *     low: number,
    *     null_count: number,
-   *     prose_evidence_warnings: number,   // D-01: 0 placeholder for v0.1.3
+   *     prose_evidence_warnings: number,   // : 0 placeholder for v0.1.3
    *     service_count: number,
    *     quality_score: number | null,
    *     completed_at: string | null,
    *   }
    *
-   * `prose_evidence_warnings` returns 0 today — the TRUST-02 prose-evidence
+   * `prose_evidence_warnings` returns 0 today — the  prose-evidence
    * rejection logic logs to stderr but does not persist a counter. A future
    * ticket will add a `scan_versions.prose_evidence_warnings INTEGER` column
-   * populated by `persistFindings` (out of v0.1.3 scope per CONTEXT D-01).
+   * populated by `persistFindings` (out of v0.1.3 scope per CONTEXT ).
    *
    * Returns null when the quality_score column is absent (pre-015 db) or when
    * the scan_version row does not exist.
@@ -1568,7 +1568,7 @@ export class QueryEngine {
         low: breakdown?.low ?? 0,
         null_count: breakdown?.null_count ?? 0,
         // TODO(post-v0.1.3): persist prose_evidence_warnings counter on
-        // scan_versions and surface it here. See CONTEXT.md D-01.
+        // scan_versions and surface it here. See CONTEXT.md .
         prose_evidence_warnings: 0,
         service_count: serviceCount,
         quality_score: sv.quality_score ?? null,
@@ -1666,7 +1666,7 @@ export class QueryEngine {
     const mismatches = this.detectMismatches();
 
     // Fetch actors and their connected services (graceful if migration 008 not applied).
-    // INT-06 (Phase 121): label column added by migration 018. On pre-018 DBs the SELECT
+    // label column added by migration 018. On pre-018 DBs the SELECT
     // throws "no such column: label" — fall back to the pre-018 SELECT and synthesize
     // label: null per row.
     let actors = [];
@@ -1801,7 +1801,7 @@ export class QueryEngine {
       .get();
     if (!tableExists) return [];
 
-    // Phase 110 (TRUST-04): pull candidate connections + their target's
+    // pull candidate connections + their target's
     // base_path, and apply base_path stripping in JS before comparing against
     // the target's exposed endpoints. Falls back to a SQL shape that omits
     // s_tgt.base_path for pre-migration-014 databases.
@@ -1859,10 +1859,10 @@ export class QueryEngine {
         exposedStmt.all(c.target_id).map((r) => r.path),
       );
       // Try literal match first — preserves correctness when base_path is
-      // absent (D-02) and when the agent emitted the literal prefixed path
+      // absent  and when the agent emitted the literal prefixed path
       // in `exposes` (Test 8).
       if (exposedPaths.has(c.path)) continue;
-      // Try stripped match if target has base_path (D-02: gated on target).
+      // Try stripped match if target has base_path (: gated on target).
       const stripped = stripBasePath(c.path, c.target_base_path);
       if (stripped !== null && exposedPaths.has(stripped)) continue;
       // Neither match — real mismatch.
@@ -1942,10 +1942,10 @@ export class QueryEngine {
       // Unknown internal target — still skip; we have no row to point at.
       if (!targetId) continue;
 
-      // TRUST-02: evidence guard — runs BEFORE canonicalize+upsert.
+      // evidence guard — runs BEFORE canonicalize+upsert.
       // Skip the connection (and warn) when prose evidence does not appear
       // verbatim in the cited source_file. Lenient on null/missing files
-      // (D-05): persist with a warning when the file is unreadable, persist
+      // persist with a warning when the file is unreadable, persist
       // silently when source_file or evidence are null/empty.
       const repoRoot = this._getRepoRootPath(repoId);
       const evVerdict = this._validateEvidence(conn, repoRoot);
@@ -1970,10 +1970,10 @@ export class QueryEngine {
       if (evVerdict.warn) {
         if (this._logger?.warn) this._logger.warn(evVerdict.warn);
         else process.stderr.write(evVerdict.warn + "\n");
-        // fall through — persist anyway (D-05)
+        // fall through — persist anyway 
       }
 
-      // TRUST-03: canonicalize path ({xxx} -> {_}) and merge path_template.
+      // canonicalize path ({xxx} -> {_}) and merge path_template.
       // Reading the existing path_template BEFORE the INSERT OR REPLACE prevents
       // clobbering on re-scan (the REPLACE deletes-then-inserts).
       const protocol = conn.protocol || "unknown";

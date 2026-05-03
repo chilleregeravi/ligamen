@@ -1,5 +1,5 @@
 /**
- * Tests for confidence and evidence pipeline (Phase 70, Plan 01).
+ * Tests for confidence and evidence pipeline .
  *
  * Covers:
  *   - upsertConnection writes confidence + evidence to DB

@@ -1,5 +1,5 @@
 /**
- * worker/scan/enrichment/externals-catalog.js — Phase 121 / INT-06.
+ * worker/scan/enrichment/externals-catalog.js —  / .
  *
  * Loads the shipped externals catalog (data/known-externals.yaml) and exposes
  * a pure matchActor(actorName, catalog) function used by the per-repo actor
@@ -18,7 +18,7 @@
  *       matching catalog entry, or null when nothing matches / input invalid.
  *
  * Catalog shape adaptation:
- *   The shipped Phase 120 file uses top-level `externals:` (a list with each
+ *   The shipped  file uses top-level `externals:` (a list with each
  *   entry carrying a `name` field). The plan-assumed shape was top-level
  *   `entries:` (a map keyed by slug, OR a list with `id` field). The
  *   normalizer accepts BOTH top-level keys and BOTH shapes — the loader is
@@ -121,7 +121,7 @@ function normalizeCatalog(raw, logger) {
   const entries = new Map();
   if (!raw || typeof raw !== 'object') return { entries };
 
-  // Phase 120 ships `externals:`; the plan assumed `entries:`. Accept both.
+  // ships `externals:`; the plan assumed `entries:`. Accept both.
   const rawEntries = raw.entries ?? raw.externals;
   if (!rawEntries) return { entries };
 
@@ -262,7 +262,7 @@ function matchHost(hostname, pattern) {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 121 / INT-07 — User extension via arcanon.config.json#external_labels
+// User extension via arcanon.config.json#external_labels
 // ---------------------------------------------------------------------------
 
 /**

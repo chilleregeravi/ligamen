@@ -9,8 +9,8 @@
 #   0 = also used for silent paths (self-exclusion, no classification, worker down, internal error)
 #
 # Environment:
-#   ARCANON_DISABLE_HOOK=1   — escape hatch; exit 0 silently (HOK-11)
-#   ARCANON_IMPACT_DEBUG=1   — append JSONL trace to $DATA_DIR/logs/impact-hook.jsonl (HOK-10)
+#   ARCANON_DISABLE_HOOK=1   — escape hatch; exit 0 silently 
+#   ARCANON_IMPACT_DEBUG=1   — append JSONL trace to $DATA_DIR/logs/impact-hook.jsonl 
 #
 # Flags:
 #   --self-test              — runs skeleton smoke test without reading stdin, exits 0
@@ -44,7 +44,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# ARCANON_DISABLE_HOOK (HOK-11) — escape hatch, short-circuit
+# ARCANON_DISABLE_HOOK  — escape hatch, short-circuit
 # ---------------------------------------------------------------------------
 if [[ "${ARCANON_DISABLE_HOOK:-0}" == "1" ]]; then
   exit 0
@@ -59,7 +59,7 @@ if [[ "${1:-}" == "--self-test" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Source library helpers — silently swallow errors (HOK-09)
+# Source library helpers — silently swallow errors 
 # ---------------------------------------------------------------------------
 # Pure-bash hook dir resolution: avoids two subshells (cd + dirname) on every run.
 # ${BASH_SOURCE[0]%/*} strips the filename component; works for both absolute and
@@ -78,7 +78,7 @@ source "${_LIB_DIR}/db-path.sh" 2>/dev/null || exit 0
 DATA_DIR=$(resolve_arcanon_data_dir) || exit 0
 
 # ---------------------------------------------------------------------------
-# Debug trace helper (HOK-10)
+# Debug trace helper 
 # ---------------------------------------------------------------------------
 _debug_trace() {
   [[ "${ARCANON_IMPACT_DEBUG:-0}" == "1" ]] || return 0
@@ -141,7 +141,7 @@ fi
 BASENAME="${FILE##*/}"
 
 # ---------------------------------------------------------------------------
-# HOK-07 — Self-exclusion: skip if file is inside $CLAUDE_PLUGIN_ROOT
+# Self-exclusion: skip if file is inside $CLAUDE_PLUGIN_ROOT
 # ---------------------------------------------------------------------------
 if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]]; then
   # Normalize plugin root for stable prefix match
@@ -153,7 +153,7 @@ if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# HOK-02 Tier 1 — Pure bash pattern match (~0ms)
+# Tier 1 — Pure bash pattern match (~0ms)
 # Fires warning for: *.proto, openapi.{yaml,yml,json}, swagger.{yaml,yml,json}
 # ---------------------------------------------------------------------------
 _tier1_match="false"
@@ -171,8 +171,8 @@ if [[ "$_tier1_match" == "true" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# HOK-02 Tier 2 — SQLite root_path prefix match + HOK-03 trailing-slash norm
-# HOK-09 — All errors exit 0 silently
+# Tier 2 — SQLite root_path prefix match +  trailing-slash norm
+# All errors exit 0 silently
 # ---------------------------------------------------------------------------
 
 # Resolve project root by walking up from the edited file.
@@ -226,7 +226,7 @@ _SERVICE_ROWS=$(sqlite3 -readonly -cmd ".timeout 500" -separator $'\t' "$DB_PATH
 
 SERVICE=""
 # Read tab-separated rows; find first prefix match with trailing-slash normalization
-# (HOK-03: "auth-legacy" must not match "auth" — trailing-slash norm prevents it)
+# (: "auth-legacy" must not match "auth" — trailing-slash norm prevents it)
 while IFS=$'\t' read -r _svc_name _svc_abs; do
   [[ -z "$_svc_name" || -z "$_svc_abs" ]] && continue
   _svc_abs_norm="${_svc_abs%/}"
@@ -248,7 +248,7 @@ if [[ -z "$SERVICE" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# HOK-08 — Staleness prefix: prepend [stale map — scanned Xd ago] when DB mtime > 48h
+# Staleness prefix: prepend [stale map — scanned Xd ago] when DB mtime > 48h
 # ---------------------------------------------------------------------------
 _STALE_PREFIX=""
 if [[ -f "$DB_PATH" ]]; then
@@ -266,7 +266,7 @@ if [[ -f "$DB_PATH" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# HOK-04 — Consumer query: worker HTTP primary, direct SQLite fallback
+# Consumer query: worker HTTP primary, direct SQLite fallback
 # ---------------------------------------------------------------------------
 
 # Source worker-client (safe to re-source; functions just redefine)
@@ -325,7 +325,7 @@ if [[ -n "$_consumer_list" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# HOK-05 — Emit warning (warn-only, never block)
+# Emit warning (warn-only, never block)
 # ---------------------------------------------------------------------------
 _MSG=""
 if [[ "$CONSUMER_COUNT" -gt 0 ]]; then

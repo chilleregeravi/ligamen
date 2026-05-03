@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # tests/drift-dispatcher.bats — scripts/drift.sh unified dispatcher
-# Covers: DSP-01 (subcommand set), DSP-02 (subprocess not source),
-#         DSP-03 (direct invoke regression), DSP-04 (Bash 4+ guard),
-#         DSP-08 (no linked repos message), DSP-14 (bats coverage)
+# Covers:  (subcommand set),  (subprocess not source),
+#         (direct invoke regression),  (Bash 4+ guard),
+#         (no linked repos message),  (bats coverage)
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
@@ -16,7 +16,7 @@ setup() {
   # Minimal marker so extract_* functions don't choke — an empty dir is enough to exercise routing.
   export DRIFT_TEST_LINKED_REPOS="$FAKE_REPO"
   # Ensure Homebrew bash (4+) is on PATH so `bash drift.sh` satisfies the Bash 4+ version guard.
-  # macOS ships Bash 3.2 at /bin/bash; the dispatcher requires 4+ for declare -A safety (DSP-04).
+  # macOS ships Bash 3.2 at /bin/bash; the dispatcher requires 4+ for declare -A safety .
   export PATH="/opt/homebrew/bin:$PATH"
 }
 
@@ -26,7 +26,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DSP-02: subcommand routing — each subcommand is invoked as a subprocess
+# subcommand routing — each subcommand is invoked as a subprocess
 # ─────────────────────────────────────────────────────────────────────────────
 
 @test "drift.sh versions routes to drift-versions.sh (exit 0 for single-repo case)" {
@@ -55,7 +55,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DSP-01: reserved slots licenses|security print TBD, exit 2
+# reserved slots licenses|security print TBD, exit 2
 # ─────────────────────────────────────────────────────────────────────────────
 
 @test "drift.sh licenses prints 'not yet implemented' and exits 2" {
@@ -77,7 +77,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DSP-03: regression — direct invocation of drift-versions.sh still works
+# regression — direct invocation of drift-versions.sh still works
 # ─────────────────────────────────────────────────────────────────────────────
 
 @test "direct invocation: bash drift-versions.sh --all still works (DSP-03 regression guard)" {
@@ -86,8 +86,8 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DSP-02 (static): dispatcher uses `bash` not `source`
-# DSP-04 (static): Bash 4+ guard present at top of dispatcher
+# (static): dispatcher uses `bash` not `source`
+# (static): Bash 4+ guard present at top of dispatcher
 # ─────────────────────────────────────────────────────────────────────────────
 
 @test "drift.sh uses 'bash' subprocess for subcommands, never 'source'" {
@@ -106,7 +106,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DSP-08: drift-common.sh emits canonical "no linked repos configured" message
+# drift-common.sh emits canonical "no linked repos configured" message
 # ─────────────────────────────────────────────────────────────────────────────
 
 @test "drift.sh versions with no linked repos emits canonical DSP-08 stderr line" {

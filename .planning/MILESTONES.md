@@ -1,5 +1,37 @@
 # Milestones
 
+## v0.1.5 Identity & Privacy (Shipped: 2026-04-30)
+
+**Phases completed:** 5 phases (123-127), 5 plans
+**Requirements:** 20/21 complete (PII-01..07, AUTH-01..10, VER-01..03); VER-04 deferred — operator e2e walkthrough blocked on arcanon-hub THE-1030 deploy
+**Timeline:** 2026-04-27 → 2026-04-30 (4 days)
+**Stats:** 57 files changed, +9,150 / -871 lines, 45 commits squashed into PR #23 (merge commit `525a160`)
+
+**Key accomplishments:**
+
+- **PII path masking primitive (PII-01..07):** New `worker/lib/path-mask.js` with `maskHome` + `maskHomeDeep` (cycle-safe WeakSet, idempotent on already-relative paths, no-mutate). Wired at 4 egress seams — MCP server (`mcp/server.js:32`), HTTP routes (`/projects` + `/graph` + `/api/scan-freshness`), single-seam logger (`lib/logger.js:66`), and CLI export (mermaid/dot/html). Belt-and-suspenders parse-time reject of absolute `source_file` in `findings.parseAgentOutput` (X2 mitigation). Hardened agent contract in `agent-prompt-service.md`. Bats grep gate (`tests/pii-masking.bats`, 10 tests) + 12 unit tests + 4 PII-06 specific tests.
+- **Hub auth core / X-Org-Id contract (AUTH-01..05):** Every `uploadScan` now sends `X-Org-Id` header; missing-orgId throws `HubError(code='missing_org_id')` BEFORE network attempt. New `worker/hub-sync/whoami.js` client calling `GET /api/v1/auth/whoami` returning `{user_id, key_id, scopes, grants}`. `resolveCredentials({orgIdRequired})` precedence chain: opts → `ARCANON_ORG_ID` env → `~/.arcanon/config.json#default_org_id`. `storeCredentials` spread-merge preserves unknown keys at mode 0600. Per-repo `hub.org_id` override threaded through `manager.js _readHubConfig`.
+- **Whoami-driven `/arcanon:login` flow (AUTH-06):** Full 4×2 branch table (auth-error / hub-5xx / network × `--org-id` / no-flag) — AuthError NEVER stores; hub-5xx + `--org-id` stores with WARN; success on N=1 grant auto-selects; success on N>1 grants emits `__ARCANON_GRANT_PROMPT__` stdout sentinel + exit code 7 for the slash-command markdown layer to handle via `AskUserQuestion` + re-invocation with `--org-id <chosen>`. Verified-vs-mismatch differentiation when explicit `--org-id` is supplied.
+- **`/arcanon:status` Identity block (AUTH-07) + 7-code RFC 7807 error parser (AUTH-08):** Nested `identity: {…}` object in `--json` mode (D-125-03 — additive contract, existing top-level keys unchanged). Frozen `HUB_ERROR_CODE_MESSAGES` map in `client.js` covers all 7 server codes (`missing_x_org_id`, `invalid_x_org_id`, `insufficient_scope`, `key_not_authorized_for_org`, `not_a_member`, `forbidden_scan`, `invalid_key`); `body.title` fallback preserved for forward-compat. `_buildIdentityBlock` 4 s timeout cap so `/arcanon:status` never hangs.
+- **Auth regression test suite (AUTH-10):** `client.test.js` 7-code table-driven test exercising every entry in `HUB_ERROR_CODE_MESSAGES`; `whoami.test.js` (7 tests) pinning `getKeyInfo` contract; `integration.test.js` round-trip via new `withTempHome` async fixture (login → store → resolve → upload). Net +3 tests over Phase 124 baseline (824 total / 823 pass / 1 baseline-flake fail).
+- **Release gate (VER-01..03):** All 4 manifests pinned at 0.1.5 (`package.json`, `plugins/arcanon/package.json`, `plugins/arcanon/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`); lockfile regenerated; CHANGELOG `[0.1.5]` section with explicit `### BREAKING` block citing THE-1030 hub-side dep, the `/arcanon:login --org-id` upgrade path, and the X-Org-Id requirement; bats 458/459 + node 823/824 green at v0.1.4 floors with no new pre-existing-mock carryforwards.
+
+**Patterns established:**
+
+- **Egress-seam masking (mask at the wire, not in the DB):** DB stores absolute paths (git operations need them); the boundary is the wire, not the store. Single primitive (`maskHomeDeep`) wrapped at every egress seam, single seam per file.
+- **CLI exit-code-as-action:** exit 0 = success, exit 2 = failure, exit 7 = needs-human-decision. Markdown layer parses stdout sentinel (`__ARCANON_GRANT_PROMPT__`), prompts via `AskUserQuestion`, re-invokes CLI with the chosen flag.
+- **Centralized error-code → message map:** Single `Object.freeze` constant; UI surfaces just print the message. New error codes added in one place.
+- **Nested-object additive JSON contract:** When extending a status command's `--json` output, nest new structured data under a new top-level key (`identity:`) rather than spreading flat fields — protects existing consumers.
+- **`withTempHome(fn)` async fixture pattern:** HOME-swap for tests touching `~/.arcanon/config.json` so the developer's real home is never mutated; reusable across phases.
+
+**Known deferred items at close: 3 (see STATE.md `## Deferred Items`)**
+
+The 3 deferred operator walkthroughs (125-01 T4, 125-02 T4, 127-01 T4) all unblock together when arcanon-hub THE-1030 deploys. They're operator-side validation against a real hub — not codebase gaps. Bundle into a single operator session post-deploy.
+
+**External hub dependency:** v0.1.5 plugin codebase is shipped, but hub-half of the product (login round-trip, /arcanon:sync upload) is non-functional until arcanon-hub THE-1030 deploys server-side `X-Org-Id` enforcement and the `whoami` endpoint. Marketplace publication should wait for the hub deploy. Local features (`/arcanon:map`, `/arcanon:impact`, `/arcanon:list`, `/arcanon:diff`, `/arcanon:export`, `/arcanon:doctor`, `/arcanon:view`) work standalone.
+
+---
+
 ## v0.1.3 Trust & Foundations (Shipped: 2026-04-25)
 
 **Phases completed:** 7 phases (107-113), 14 plans
@@ -21,6 +53,7 @@
 - **9th MCP tool added:** `impact_audit_log` (was 8). bats fixtures updated.
 
 **Issues caught and fixed beyond REQs:**
+
 - Migration 013 numbering collision (Phase 109 + Phase 110 both claimed 013) — caught at planning review, renumbered before execution
 - `UNIQUE INDEX uq_connections_dedup` missing on connections table — added during 109-02 to make `INSERT OR REPLACE` actually collapse rows
 - `upsertService` `lastInsertRowid` poisoning — fixed via explicit `SELECT id` post-upsert
@@ -28,12 +61,14 @@
 - v0.1.2's documented `worker/mcp/server-search.test.js queryScan` pre-existing failure now resolved by Phase 107-112 work
 
 **Stats:**
+
 - bats: 315/315 green (HOK-06 macOS latency caveat unchanged from v0.1.1; not triggered at threshold=200)
 - node: 630/631 green (1 pre-existing v0.1.2 mock failure carried forward; net 1 fewer failure than v0.1.2 baseline)
 - 4 manifests + package-lock.json all at 0.1.3
 - ~30 new tests across worker modules
 
 **Breaking changes for v0.1.2 → v0.1.3 upgraders:**
+
 - `runtime-deps.json` deleted — install-deps.sh sentinel mismatch on first session post-upgrade triggers a one-time reinstall
 - `/arcanon:upload` removed — CI scripts hardcoded to it must update to `/arcanon:sync`
 
@@ -57,12 +92,14 @@
 - **CHANGELOG `### BREAKING` section** added with comprehensive migration instructions
 
 **Breaking changes for v5.x upgraders:**
+
 - Rename `ligamen.config.json` → `arcanon.config.json`
 - Rename `$HOME/.ligamen/` → `$HOME/.arcanon/`
 - Rename shell `LIGAMEN_*` env vars → `ARCANON_*`
 - Rebuild ChromaDB collection via `/arcanon:map` (if using semantic search)
 
 **Known non-regressions (documented):**
+
 - bats 309/310 (1 macOS-only HOK-06 p99 latency caveat, pre-existing since v0.1.1, CI passes with `IMPACT_HOOK_LATENCY_THRESHOLD=100`)
 - node 524/526 (2 pre-existing test failures unrelated to the rename, confirmed via git diff against pre-Phase-101 base)
 
@@ -85,9 +122,11 @@
 - Deprecated `/arcanon:upload` stub preserved for one release (forwards to `/arcanon:sync` with stderr warning) so hardcoded CI pipelines don't break
 
 **Deferred to Linear:**
+
 - THE-1022 (High — scan quality), THE-1023 (read-only command polish), THE-1024 (scan ops), THE-1025 (UX polish), THE-1026 (integration improvements) — 18 of 20 external review points filed; 2 folded into this milestone
 
 **Known tech debt:**
+
 - `session-start.sh` duplicates `lib/db-path.sh` hash logic inline (consolidation opportunity, not a bug)
 - `commands/update.md` has a stale "Phase 1 status" planning-era paragraph (cosmetic)
 

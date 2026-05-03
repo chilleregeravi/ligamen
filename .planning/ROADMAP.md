@@ -24,7 +24,7 @@
 - ✅ **v0.1.2 Ligamen Residue Purge** — Phases 101-105 (shipped 2026-04-23)
 - ✅ **v0.1.3 Trust & Foundations** — Phases 107-113 (shipped 2026-04-25)
 - ✅ **v0.1.4 Operator Surface** — Phases 114-122 (shipped 2026-04-27)
-- 🚧 **v0.1.5 Identity & Privacy** — Phases 123-127 (in progress)
+- ✅ **v0.1.5 Identity & Privacy** — Phases 123-127 (shipped 2026-04-30)
 
 ## Phases
 
@@ -226,14 +226,12 @@ Full details: `.planning/milestones/v0.1.4-ROADMAP.md`
 
 </details>
 
-<details open>
-<summary>🚧 v0.1.5 Identity & Privacy (Phases 123-127) — IN PROGRESS</summary>
+<details>
+<summary>✅ v0.1.5 Identity & Privacy (Phases 123-127) — SHIPPED 2026-04-30</summary>
 
-- [x] **Phase 123: PII Path Masking** — `worker/lib/path-mask.js` + apply at MCP / HTTP / logger / export egress seams + agent contract assertion + tests (PII-01..07). ✓ shipped 2026-04-28.
-- [x] **Phase 124: Hub Auth Core** — `uploadScan` `X-Org-Id` header + `whoami` client + `resolveCredentials` precedence chain + `~/.arcanon/config.json` `default_org_id` field + per-repo `hub.org_id` override (AUTH-01..05). ✓ shipped 2026-04-28.
-- [x] **Phase 125: Login & Status UX** — `/arcanon:login [--org-id]` whoami flow + `/arcanon:status` Identity block + structured server error-code parsing + docs (AUTH-06..09). ✓ shipped 2026-04-28 (commits d554225..1301fdc); 2 manual checkpoints deferred to Phase 127 pending arcanon-hub THE-1030 deploy.
-- [ ] **Phase 126: Auth Test Suite** — `client.test.js`, `whoami.test.js`, `integration.test.js` covering header landing, missing-orgId fail-fast, error-code-to-message mapping, login flow, resolution-order precedence (AUTH-10).
-- [ ] **Phase 127: Verification & Release Gate** — manifest bumps to 0.1.5, CHANGELOG `[0.1.5]`, full bats + node green, end-to-end verification against a hub instance honoring THE-1030 (VER-01..04).
+- [x] Phase 123-127: 5 phases, 5 plans — `worker/lib/path-mask.js` + 4 egress seams (MCP / HTTP / logger / export) + parse-time PII-06 reject (PII-01..07); `uploadScan` `X-Org-Id` header + new `whoami.js` client + `resolveCredentials` precedence chain (opts → env → home-config) + `default_org_id` config field + per-repo `hub.org_id` override (AUTH-01..05); `/arcanon:login` whoami-driven 4×2 branch table with multi-grant `AskUserQuestion` re-entry (exit-7 + stdout sentinel) + `/arcanon:status` Identity block (nested in `--json`) + 7-code RFC 7807 error parser + 4-file docs sweep (AUTH-06..09); regression test suite (+3 net tests on top of 824 baseline; AUTH-10); manifests pinned at 0.1.5, CHANGELOG `[0.1.5]` with BREAKING/THE-1030 callout, bats 458/459 + node 823/824 green at v0.1.4 floors (VER-01..03). Operator e2e walkthrough (VER-04) deferred — 3 bundled checkpoints pending arcanon-hub THE-1030 deploy.
+
+Full details: `.planning/milestones/v0.1.5-ROADMAP.md`
 
 </details>
 
@@ -711,7 +709,10 @@ Plans:
 
 ---
 
-## v0.1.5 Identity & Privacy (Phases 123-127) — IN PROGRESS
+<!-- v0.1.5 phase details archived to .planning/milestones/v0.1.5-ROADMAP.md -->
+
+<details>
+<summary>archived: full Phase 123-127 details (see .planning/milestones/v0.1.5-ROADMAP.md)</summary>
 
 ### Phase 123: PII Path Masking
 **Goal**: `$HOME` paths no longer leak from the worker process — every egress seam (MCP responses, HTTP responses, log lines, export outputs) emits `~`-prefixed paths, and the agent contract is hardened against future regressions
@@ -801,6 +802,8 @@ Plans:
   4. End-to-end manual verification confirms: `/arcanon:login` round-trips against a real hub honoring THE-1030; `/arcanon:status` shows the expected Identity block; an MCP tool call's response is inspected and asserted to contain zero `/Users/` strings; a real `/arcanon:sync` upload succeeds with the `X-Org-Id` header landing server-side
 **Plans**: TBD (estimate 1 plan — manifest bumps + CHANGELOG + e2e verification)
 
+</details>
+
 ---
 
 ## Progress
@@ -829,8 +832,4 @@ Plans:
 | 101-105 | v0.1.2 | 9/9 | Complete | 2026-04-23 |
 | 107-113 | v0.1.3 | 14/14 | Complete | 2026-04-25 |
 | 114-122 | v0.1.4 | 21/21 | Complete | 2026-04-27 |
-| 123 | v0.1.5 | 7/7 | Complete | 2026-04-28 |
-| 124 | v0.1.5 | 6/6 | Complete | 2026-04-28 |
-| 125 | v0.1.5 | 2/2 | Complete | 2026-04-28 |
-| 126 | v0.1.5 | 0/1 | Pending | — |
-| 127 | v0.1.5 | 0/1 | Pending | — |
+| 123-127 | v0.1.5 | 5/5 | Complete | 2026-04-30 |

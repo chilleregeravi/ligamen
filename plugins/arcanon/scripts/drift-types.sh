@@ -115,7 +115,7 @@ extract_java_types() {
 # Prints C# public type names (interface|class|record|struct|enum), one per line.
 # NOTE: `partial class Foo` is captured as `Foo` — fragments across multiple files
 # are treated as separate types in v5.8.0 (PITFALLS.md P13: documented limitation,
-# not fixed here; out of Phase 92 scope).
+# not fixed here; out of  scope).
 extract_cs_types() {
   local repo_dir="$1"
   find "$repo_dir" -maxdepth 10 -name "*.cs" 2>/dev/null | while IFS= read -r f; do

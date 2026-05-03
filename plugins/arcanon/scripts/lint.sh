@@ -35,7 +35,7 @@ esac
 
 LANG=""
 
-# Prefer shared detect.sh when Phase 2 has been executed
+# Prefer shared detect.sh when  has been executed
 if [[ -f "${CLAUDE_PLUGIN_ROOT:-}/lib/detect.sh" ]]; then
   # shellcheck source=/dev/null
   source "${CLAUDE_PLUGIN_ROOT}/lib/detect.sh"

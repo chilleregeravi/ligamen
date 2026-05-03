@@ -308,7 +308,7 @@ describe("buildConfirmationPrompt", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 1 (THE-934) Tests: applyEdits — synonym normalization and NEEDS_REPROMPT
+// Task 1  Tests: applyEdits — synonym normalization and NEEDS_REPROMPT
 // ---------------------------------------------------------------------------
 
 describe("applyEdits — synonym normalization", () => {

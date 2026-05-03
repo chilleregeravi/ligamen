@@ -1,5 +1,5 @@
 /**
- * Tests for path canonicalization (Phase 109, Plan 02 - TRUST-03 / TRUST-11).
+ * Tests for path canonicalization (-).
  *
  * Covers:
  *   - canonicalizePath helper (5 unit tests, direct function calls)
@@ -220,7 +220,7 @@ const baseFindings = (path) => ({
 // Tests 1-5: canonicalizePath helper (pure-JS unit tests)
 // ---------------------------------------------------------------------------
 
-describe("canonicalizePath helper (TRUST-03)", () => {
+describe("canonicalizePath helper", () => {
   it("replaces single {var}", () => {
     assert.equal(
       canonicalizePath("/runtime/streams/{stream_id}"),
@@ -251,10 +251,10 @@ describe("canonicalizePath helper (TRUST-03)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests 6-9: persistFindings end-to-end (TRUST-11)
+// Tests 6-9: persistFindings end-to-end 
 // ---------------------------------------------------------------------------
 
-describe("TRUST-03 path canonicalization in persistFindings (TRUST-11)", () => {
+describe("path canonicalization in persistFindings", () => {
   it("collapses two template-variants to one row with both originals in path_template", async () => {
     const { db, repoId, qe } = await freshEngine();
     const findings = {

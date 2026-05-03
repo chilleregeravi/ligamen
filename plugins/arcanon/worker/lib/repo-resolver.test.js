@@ -1,5 +1,5 @@
 /**
- * worker/lib/repo-resolver.test.js — Phase 118-02 (CORRECT-05).
+ * worker/lib/repo-resolver.test.js —  .
  *
  * Pure unit tests for resolveRepoIdentifier. Uses an in-memory better-sqlite3
  * DB with the minimum schema needed (just the `repos` table). No worker spawn,

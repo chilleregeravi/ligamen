@@ -6,7 +6,7 @@
  * them with even horizontal spacing within each layer.
  *
  * The right-most 18% of the canvas is reserved for external actors
- * (Phase 35).  Use the exported ACTOR_COLUMN_RESERVE_RATIO constant
+ * .  Use the exported ACTOR_COLUMN_RESERVE_RATIO constant
  * to place actors in the matching region.
  */
 

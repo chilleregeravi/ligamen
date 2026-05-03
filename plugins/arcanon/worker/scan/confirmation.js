@@ -2,7 +2,7 @@
  * worker/confirmation-flow.js — User confirmation flow module for Arcanon v2.0
  *
  * Pure module: no I/O, no SQLite calls, no console.log.
- * All functions are stateless — caller (Phase 20 command layer) drives the
+ * All functions are stateless — caller ( command layer) drives the
  * interactive loop and calls db.writeScan() ONLY after this module returns
  * confirmed findings.
  *
@@ -12,7 +12,7 @@
  * - LOW confidence findings are capped at MAX_LOW_CONFIDENCE to keep the review
  *   session manageable; overflow is stored for a subsequent round
  * - Edit instructions are parsed in a single pass — complex edits are handled by
- *   the Phase 20 interactive loop; this module handles one-shot instruction parsing
+ *   the  interactive loop; this module handles one-shot instruction parsing
  *
  * Exports:
  *   MAX_LOW_CONFIDENCE       — integer cap (10)
@@ -22,7 +22,7 @@
  *   formatHighConfidenceSummary — formatted string for batch high-confidence review
  *   formatLowConfidenceQuestions — array of per-finding clarifying question strings
  *   applyEdits               — apply user edit instructions to findings array
- *   buildConfirmationPrompt  — assemble full prompt text for Phase 20 to present
+ *   buildConfirmationPrompt  — assemble full prompt text for  to present
  */
 
 /** Maximum number of low-confidence findings shown per confirmation session. */
@@ -45,7 +45,7 @@ export const AFFIRMATIVE_SYNONYMS = Object.freeze(
 /**
  * Split a findings array by confidence level and cap the low bucket.
  *
- * @param {Array} findings - Array of finding objects from Phase 18 scan-manager.
+ * @param {Array} findings - Array of finding objects from  scan-manager.
  * @returns {{ high: Array, low: Array, lowOverflow: Array }}
  */
 export function groupByConfidence(findings) {

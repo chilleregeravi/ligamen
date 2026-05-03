@@ -41,44 +41,17 @@ import {
 } from "../hub-sync/index.js";
 import { resolveConfigPath } from "../lib/config-path.js";
 import { resolveDataDir } from "../lib/data-dir.js";
+import { maskHome } from "../lib/path-mask.js";
+import { readHubAutoSync as _readHubAutoSync } from "../lib/hub-config.js";
 import { projectHashDir, evictLiveQueryEngine } from "../db/pool.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// CLN-08: Module-level guard ensures the deprecation warning fires at most
-// once per worker process, even if _readHubAutoSync is called multiple times.
-let _autoUploadDeprecationWarned = false;
-
-/**
- * Read hub.auto-sync with a legacy fallback to hub.auto-upload.
- * Writes a one-time stderr deprecation warning when the legacy key is the
- * sole activator. Remove this helper in v0.2.0 when the fallback is dropped.
- *
- * @param {Record<string, unknown>|undefined} hubBlock The `cfg.hub` object.
- * @returns {boolean} Effective flag value.
- */
-function _readHubAutoSync(hubBlock) {
-  const newKey = hubBlock?.["auto-sync"];
-  const legacyKey = hubBlock?.["auto-upload"];
-  // Explicit undefined check so that auto-sync:false beats auto-upload:true.
-  if (typeof newKey !== "undefined") return Boolean(newKey);
-  if (typeof legacyKey !== "undefined") {
-    if (!_autoUploadDeprecationWarned) {
-      process.stderr.write(
-        "arcanon: config key 'hub.auto-upload' is deprecated — rename to 'hub.auto-sync' (legacy key will be dropped in v0.2.0)\n"
-      );
-      _autoUploadDeprecationWarned = true;
-    }
-    return Boolean(legacyKey);
-  }
-  return false;
-}
 
 /**
  * Bounded fetch with timeout. Returns a normalized result object regardless
  * of success/failure so callers don't need try/catch boilerplate.
  *
- * Used by cmdDoctor checks 1, 2, and 8 (NAV-03 / Plan 114-03). The contract
+ * Used by cmdDoctor checks 1, 2, and 8. The contract
  * documented here is the surface the doctor checks rely on — do NOT change
  * field names without updating cmdDoctor.
  *
@@ -158,7 +131,7 @@ async function cmdVersion(flags) {
 }
 
 /**
- * AUTH-06 / D-125-02: Whoami-driven login flow.
+ * Whoami-driven login flow.
  *
  * Calls GET /api/v1/auth/whoami to discover org grants for the supplied key,
  * then applies the 4×2 branch table (whoami outcome × --org-id provided/not).
@@ -230,7 +203,7 @@ async function cmdLogin(flags, positional) {
     }
   }
 
-  // ---- Branch table (D-125-02) ----
+  // ---- Branch table ----
 
   // Case: AuthError (401/403) — key invalid or revoked. NEVER store.
   if (whoamiErrKind === "auth") {
@@ -366,7 +339,7 @@ async function cmdStatus(flags) {
     }
   })();
 
-  // FRESH-01/02 (Phase 116-02): best-effort latest-scan freshness via the new
+  // Best-effort latest-scan freshness via the
   // /api/scan-freshness endpoint. Surfaces both the quality line ("Latest scan:
   // YYYY-MM-DD (NN% high-confidence)") and the per-repo drift line ("N repo(s)
   // have new commits since last scan: <name> (M new), ..."). The drift line is
@@ -376,13 +349,13 @@ async function cmdStatus(flags) {
   // is no longer consumed by /arcanon:status.
   const freshness = await _fetchScanFreshness(process.cwd());
 
-  // AUTH-07 / D-125-03: Identity block.
+  // Identity block.
   const identity = await _buildIdentityBlock(cfg);
 
   const report = {
     plugin_version: readPackageVersion(),
-    data_dir: resolveDataDir(),
-    config_file: resolveConfigPath(process.cwd()),
+    data_dir: maskHome(resolveDataDir()),
+    config_file: maskHome(resolveConfigPath(process.cwd())),
     project_slug: projectSlug,
     hub_auto_sync: hubAutoSync,
     credentials: hasCreds ? "present" : "missing",
@@ -404,7 +377,7 @@ async function cmdStatus(flags) {
     `  data dir:     ${report.data_dir}`,
   ];
 
-  // AUTH-07 / D-125-03: Identity block (4 indented lines under "Identity:" header).
+  // Identity block (4 indented lines under "Identity:" header).
   // Rendered after data dir, before Latest scan freshness lines.
   lines.push(`  Identity:`);
   const idOrgId = identity.org_id || "(missing)";
@@ -430,7 +403,7 @@ async function cmdStatus(flags) {
 }
 
 /**
- * AUTH-07 / D-125-03: Build the Identity block surfaced in /arcanon:status.
+ * Build the Identity block surfaced in /arcanon:status.
  *
  * Resolution:
  *   1. Try resolveCredentials({orgIdRequired:false}) — gives apiKey + hubUrl + best-effort orgId.
@@ -525,14 +498,14 @@ async function _buildIdentityBlock(cfg) {
 }
 
 /**
- * Fetches scan freshness data from the worker (FRESH-03/04). Returns formatted
+ * Fetches scan freshness data from the worker. Returns formatted
  * status output lines plus the raw report for --json mode. Best-effort:
  * returns null on any failure (worker offline, no scan data, network error,
  * old worker without the endpoint). Callers MUST tolerate a null return —
  * status output gracefully omits both freshness lines.
  *
  * Output:
- *   qualityLine     — "Latest scan: 2026-04-23 (87% high-confidence)" (FRESH-01)
+ *   qualityLine     — "Latest scan: 2026-04-23 (87% high-confidence)" 
  *   freshnessLines  — ["1 repo has new commits since last scan: api (3 new)"]
  *                     Empty array when no repo has positive new_commits drift.
  *   report          — raw JSON for --json mode
@@ -582,14 +555,14 @@ async function _fetchScanFreshness(projectRoot) {
   }
   if (!body || body.error) return null;
 
-  // FRESH-01 line: "Latest scan: 2026-04-23 (87% high-confidence)"
+  // line: "Latest scan: 2026-04-23 (87% high-confidence)"
   const datePart = (body.last_scan_iso || "").slice(0, 10) || "unknown";
   const pctPart = body.scan_quality_pct === null || body.scan_quality_pct === undefined
     ? "n/a"
     : `${body.scan_quality_pct}% high-confidence`;
   const qualityLine = `Latest scan: ${datePart} (${pctPart})`;
 
-  // FRESH-02 line(s): "N repo(s) have new commits since last scan: <name> (M new), ..."
+  // line(s): "N repo(s) have new commits since last scan: <name> (M new), ..."
   // Suppressed entirely when no repo has positive new_commits.
   const repos = Array.isArray(body.repos) ? body.repos : [];
   const drifted = repos.filter((r) => Number.isInteger(r.new_commits) && r.new_commits > 0);
@@ -620,8 +593,8 @@ async function loadLatestFindings(repoPath) {
     )
     .all(repoRow.id);
 
-  // HUB-01: attach per-service deps. getDependenciesForService returns []
-  // gracefully on pre-migration-010 DBs (Phase 93-02 contract), so this is
+  // attach per-service deps. getDependenciesForService returns []
+  // gracefully on pre-migration-010 DBs ( contract), so this is
   // safe to call unconditionally — the feature flag determines whether the
   // payload actually emits them.
   const services = servicesRaw.map((s) => ({
@@ -629,7 +602,7 @@ async function loadLatestFindings(repoPath) {
     dependencies: qe.getDependenciesForService(s.id),
   }));
 
-  // INT-01 (Phase 120-01): also project c.evidence, c.confidence, c.source_file
+  // also project c.evidence, c.confidence, c.source_file
   // so the new hub.evidence_mode flag has data to operate on. Pre-migration-009
   // databases lack the evidence/confidence columns; pre-migration-001 still has
   // source_file (it's in the base schema). On column-missing fall back to the
@@ -692,7 +665,7 @@ async function cmdUpload(flags) {
   const projectSlug =
     flags.project || cfg?.hub?.["project-slug"] || cfg?.["project-name"];
   const libraryDepsEnabled = Boolean(cfg?.hub?.beta_features?.library_deps);
-  // INT-01 (Phase 120-01): hub.evidence_mode controls per-connection evidence
+  // hub.evidence_mode controls per-connection evidence
   // shape and payload version. Default "full" preserves byte-identical legacy
   // output for every existing user. Unknown values are tolerated downstream
   // (buildScanPayload warn-and-falls-back) so a typo here can never break uploads.
@@ -712,9 +685,9 @@ async function cmdUpload(flags) {
     projectSlug,
     apiKey: flags["api-key"],
     hubUrl: flags["hub-url"],
-    libraryDepsEnabled,  // HUB-03 feature flag — gates v1.1 emission
-    evidenceMode,        // INT-01 — forwarded to buildScanPayload
-    projectRoot: repoPath, // INT-01 — for line-number derivation in hash-only mode
+    libraryDepsEnabled,  // feature flag — gates v1.1 emission
+    evidenceMode,        // — forwarded to buildScanPayload
+    projectRoot: repoPath, // — for line-number derivation in hash-only mode
     log: flags.verbose ? (lvl, msg, data) => console.error(`[${lvl}] ${msg}`, data || "") : undefined,
   });
 
@@ -764,10 +737,10 @@ async function cmdSync(flags) {
 }
 
 /**
- * cmdVerify — Re-read cited source files and report per-connection verdicts
- * (TRUST-01). Read-only; never writes to the scan database.
+ * cmdVerify — Re-read cited source files and report per-connection verdicts.
+ * Read-only; never writes to the scan database.
  *
- * Verdicts (D-01, exhaustive): ok | moved | missing | method_mismatch
+ * Verdicts (exhaustive): ok | moved | missing | method_mismatch
  *
  * Flags:
  *   --connection <id>  Verify exactly one connection by integer ID
@@ -776,7 +749,7 @@ async function cmdSync(flags) {
  *   --json             Emit machine-readable JSON
  *   --repo <path>      Override project root (defaults to process.cwd())
  *
- * Exit codes (D-04):
+ * Exit codes :
  *   0 — all verdicts ok
  *   1 — at least one non-ok verdict OR truncated cap hit OR worker down
  *   2 — invocation error (bad --connection ID, etc.)
@@ -797,7 +770,7 @@ async function cmdVerify(flags) {
   } else if (flags.source !== undefined && flags.source !== true) {
     params.set("source_file", String(flags.source));
   }
-  // else: implicit --all (D-06) — no further params
+  // else: implicit --all  — no further params
 
   // Resolve worker port: <dataDir>/worker.port → $ARCANON_WORKER_PORT → 37888
   let workerPort = 37888;
@@ -849,7 +822,7 @@ async function cmdVerify(flags) {
     process.exit(code);
   }
 
-  // Truncated cap — D-03.
+  // Truncated cap — .
   if (body.truncated === true) {
     const msg =
       body.message ||
@@ -922,7 +895,7 @@ async function cmdVerify(flags) {
 }
 
 /**
- * cmdList — Concise read-only project overview (NAV-01, plan 114-01).
+ * cmdList — Concise read-only project overview (plan 114-01).
  *
  * Composes from existing endpoints — does not write to the DB, does not
  * register new HTTP routes, does not introduce a new auth surface.
@@ -947,7 +920,7 @@ async function cmdVerify(flags) {
 async function cmdList(flags) {
   const repoPath = path.resolve(flags.repo || process.cwd());
 
-  // Project detection — silent no-op in non-Arcanon directories (NAV-01 contract).
+  // Project detection — silent no-op in non-Arcanon directories ( contract).
   // Each `bash hub.sh list` spawns a fresh node process so projectHashDir's
   // module-cached dataDir picks up the current ARCANON_DATA_DIR env var.
   const dbPath = path.join(projectHashDir(repoPath), "impact-map.db");
@@ -1021,7 +994,7 @@ async function cmdList(flags) {
     by_type: { service: null, library: null, infra: null },
   };
   let actorsCount = null;
-  // INT-08: capture {name,label} per actor so the human formatter can render
+  // capture {name,label} per actor so the human formatter can render
   // the inline label list and the JSON formatter can emit a structured array.
   // null label is preserved (surfaced as JSON null; human mode falls back to
   // the bare name).
@@ -1114,7 +1087,7 @@ async function cmdList(flags) {
       services: serviceCounts,
       connections: connectionsCounts,
       actors_count: actorsCount,
-      // INT-08: structured per-actor array — {name, label} per row. label is
+      // structured per-actor array — {name, label} per row. label is
       // null when the catalog has no match. Stable shape for CI/scripts.
       actors: actorsArr,
       hub: hubReport,
@@ -1149,7 +1122,7 @@ async function cmdList(flags) {
   }
 
   // Actors line — graceful degradation when /graph failed.
-  // INT-08: when actors are present, append a parenthetical inline label list.
+  // when actors are present, append a parenthetical inline label list.
   // Use label when populated; fall back to the raw name. Cap inline labels at
   // 5 with a "+N more" tail for the remainder.
   if (actorsCount === null) {
@@ -1258,7 +1231,7 @@ function formatDoctorTable(checks, summary) {
 }
 
 /**
- * cmdDoctor — 8-check diagnostic suite (NAV-03 / Plan 114-03).
+ * cmdDoctor — 8-check diagnostic suite .
  *
  * Critical checks (exit 1 on FAIL): 1 (worker reachable), 5 (data dir
  * writable), 6 (DB integrity). Non-critical checks (FAIL → WARN; exit 0):
@@ -1336,7 +1309,7 @@ async function cmdDoctor(flags) {
   //
   // Migration head is computed at runtime from the filesystem glob
   // worker/db/migrations/[0-9]+_*.js — NOT a hardcoded constant. This is
-  // forward-compatible with Phase 117 (017_scan_overrides.js) etc.; the
+  // forward-compatible with  (017_scan_overrides.js) etc.; the
   // doctor stays correct without a source change on every migration.
   //
   // DB head comes from a fresh isolated read-only connection (BLOCK 2 — do
@@ -1579,9 +1552,9 @@ async function cmdDoctor(flags) {
       let creds;
       try {
         // Check 8 only needs apiKey + hubUrl for the GET /api/version probe;
-        // org_id is not part of that round-trip. Opt out of the AUTH-03 org-id
+        // org_id is not part of that round-trip. Opt out of the  org-id
         // requirement so a "creds present but no org_id" config doesn't get
-        // mis-classified as SKIP. (See doctor.bats NAV-03 tests 9-10.)
+        // mis-classified as SKIP. (See doctor.bats  tests 9-10.)
         creds = resolveCredentials({ orgIdRequired: false });
       } catch {
         return { status: "SKIP", detail: "no credentials configured" };
@@ -1626,7 +1599,7 @@ async function cmdDoctor(flags) {
 }
 
 /**
- * cmdDiff — Compare two scan versions (NAV-04, plan 115-02).
+ * cmdDiff — Compare two scan versions (plan 115-02).
  *
  * Read-only: opens the project DB via better-sqlite3 directly (no worker
  * round-trip — diff is a direct SQL read).
@@ -1649,9 +1622,9 @@ async function cmdDoctor(flags) {
  * output, mirroring /arcanon:list and /arcanon:doctor.
  */
 async function cmdDiff(flags, positional) {
-  // SHADOW-02 (Plan 119-02) — handle --shadow before the positional/HEAD/ISO
+  // handle --shadow before the positional/HEAD/ISO
   // resolver. --shadow compares live vs shadow LATEST scans (no positional
-  // args needed) and reuses Phase 115's diffScanVersions(dbA, dbB, idA, idB)
+  // args needed) and reuses 's diffScanVersions(dbA, dbB, idA, idB)
   // engine — passing the live DB handle and the shadow DB handle as the two
   // sources. Engine is pool-agnostic and read-only (see scan-version-diff.js
   // module docs), so opening fresh better-sqlite3 readonly handles is safe.
@@ -1789,10 +1762,10 @@ async function cmdDiff(flags, positional) {
 }
 
 /**
- * cmdDiffShadow — SHADOW-02 (Phase 119-02).
+ * cmdDiffShadow —  .
  *
  * Compares the LATEST completed scan in the live impact-map.db against the
- * LATEST completed scan in the impact-map-shadow.db, reusing Phase 115's
+ * LATEST completed scan in the impact-map-shadow.db, reusing 's
  * `diffScanVersions(dbA, dbB, scanIdA, scanIdB)` engine.
  *
  * Engine reuse rationale: 115's engine takes two raw `better-sqlite3`
@@ -1807,7 +1780,7 @@ async function cmdDiff(flags, positional) {
  *
  * Latest-scan resolution: `SELECT MAX(id) FROM scan_versions WHERE
  * completed_at IS NOT NULL`. Mirrors the in-progress-scan exclusion that
- * Phase 115's resolveScanSelector uses for HEAD.
+ * 's resolveScanSelector uses for HEAD.
  *
  * Exit codes:
  *   0 — diff completed (with or without changes)
@@ -1819,7 +1792,7 @@ async function cmdDiffShadow(flags) {
   const livePath = path.join(dir, "impact-map.db");
   const shadowPath = path.join(dir, "impact-map-shadow.db");
 
-  // Silent in non-Arcanon dir (mirrors NAV-01 / SHADOW-01 / SHADOW-03).
+  // Silent in non-Arcanon dir (mirrors  /).
   if (!fs.existsSync(livePath) && !fs.existsSync(shadowPath)) {
     process.exit(0);
   }
@@ -1832,7 +1805,7 @@ async function cmdDiffShadow(flags) {
     process.exit(2);
   }
 
-  // Open both DBs READ-ONLY. Phase 115's engine is pool-agnostic — see
+  // Open both DBs READ-ONLY. 's engine is pool-agnostic — see
   // scan-version-diff.js:18-25 for the load-bearing contract.
   const liveDb = new Database(livePath, { readonly: true, fileMustExist: true });
   const shadowDb = new Database(shadowPath, { readonly: true, fileMustExist: true });
@@ -1958,10 +1931,10 @@ async function cmdDiffShadow(flags) {
 }
 
 /**
- * cmdCorrect — Stage a scan-overrides row (CORRECT-02, plan 118-01).
+ * cmdCorrect — Stage a scan-overrides row (plan 118-01).
  *
  * Inserts ONE row into the scan_overrides table per invocation. Does NOT
- * apply the override — Phase 117-02's `applyPendingOverrides` consumes the
+ * apply the override — 's `applyPendingOverrides` consumes the
  * pending row on the next scan run.
  *
  * Subcommand grammar: `correct <kind> --action <action> [target-flags] [payload-flags]`
@@ -1981,7 +1954,7 @@ async function cmdDiffShadow(flags) {
  *   rename           --new-name <name>                        payload {new_name}
  *   set-base-path    --base-path <path>                       payload {base_path}
  *
- * Output (NAV-04 emit() pattern):
+ * Output ( emit pattern):
  *   human  "correct: queued (override_id=<id>) — kind=<k>, target_id=<t>, action=<a>"
  *          + hint "Apply on next /arcanon:map or /arcanon:rescan run."
  *   json   { ok: true, override_id, kind, target_id, action, payload }
@@ -2103,7 +2076,7 @@ async function cmdCorrect(flags, positional) {
     process.exit(2);
   }
 
-  // ----- 5. Insert via QueryEngine (Phase 117-01's helper) -----
+  // 5. Insert via QueryEngine ('s helper) -----
   const { getQueryEngine } = await import("../db/pool.js");
   const qe = getQueryEngine(cwd);
   if (!qe) {
@@ -2117,13 +2090,13 @@ async function cmdCorrect(flags, positional) {
     kind,
     target_id: targetId,
     action,
-    // Plan 117-01's helper JSON-stringifies internally. Pass the object
+    // 's helper JSON-stringifies internally. Pass the object
     // when we have one; pass null/{} when the action carries no payload.
     payload: payload ?? {},
     created_by: "cli",
   });
   if (overrideId === null) {
-    // Pre-mig-017 db. Phase 117-01's downgrade contract returns null when
+    // Pre-mig-017 db. 's downgrade contract returns null when
     // the prepared statement could not arm. Surface clearly.
     process.stderr.write(
       "error: scan_overrides table missing — run migrations (start the worker once via /arcanon:map) and retry\n",
@@ -2205,7 +2178,7 @@ function _findActiveScanLockForProject(projectRoot) {
 }
 
 /**
- * cmdPromoteShadow — SHADOW-03 (Phase 119-02).
+ * cmdPromoteShadow —  .
  *
  * Atomically swaps `impact-map-shadow.db` over `impact-map.db` with a
  * timestamped backup of the prior live DB. WAL sidecars (-wal, -shm) are
@@ -2213,7 +2186,7 @@ function _findActiveScanLockForProject(projectRoot) {
  * step so SQLite never sees a stale log on next open (RESEARCH §3).
  *
  * Sequence (exact order — DO NOT reorder):
- *   1. Silent no-op when neither live nor shadow exists (NAV-01 contract).
+ *   1. Silent no-op when neither live nor shadow exists ( contract).
  *   2. Exit 2 if shadow DB is missing (nothing to promote).
  *   3. Exit 2 if a live scan is in progress for any repo under cwd
  *      (T-119-02-04 — promote during scan would write to renamed-out fd).
@@ -2243,7 +2216,7 @@ async function cmdPromoteShadow(flags) {
   const livePath = path.join(dir, "impact-map.db");
   const shadowPath = path.join(dir, "impact-map-shadow.db");
 
-  // Step 1 — silent no-op in non-Arcanon dir (mirrors NAV-01 / SHADOW-01).
+  // Step 1 — silent no-op in non-Arcanon dir (mirrors).
   if (!fs.existsSync(livePath) && !fs.existsSync(shadowPath)) {
     process.exit(0);
   }
@@ -2335,12 +2308,12 @@ const HANDLERS = {
   upload: cmdUpload,
   sync: cmdSync,
   queue: cmdQueue,
-  verify: cmdVerify, // TRUST-01
-  list: cmdList,     // NAV-01
-  doctor: cmdDoctor, // NAV-03
-  diff: cmdDiff,     // NAV-04
-  correct: cmdCorrect, // CORRECT-02 stage path (Phase 118-01)
-  "promote-shadow": cmdPromoteShadow, // SHADOW-03 (Phase 119-02) — hyphenated key matches the slash-command name
+  verify: cmdVerify,
+  list: cmdList,
+  doctor: cmdDoctor,
+  diff: cmdDiff,
+  correct: cmdCorrect, // stage path
+  "promote-shadow": cmdPromoteShadow, // — hyphenated key matches the slash-command name
 };
 
 async function main() {
@@ -2367,7 +2340,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 }
 
 // Exported for test access only (_-prefixed = internal helper, not public surface).
-// loadLatestFindings is exported so the INT-01 test can drive the SELECT
+// loadLatestFindings is exported so the  test can drive the SELECT
 // extension (evidence/confidence/source_file) end-to-end without spawning
 // the CLI subprocess.
 export { _readHubAutoSync, cmdVerify, loadLatestFindings };

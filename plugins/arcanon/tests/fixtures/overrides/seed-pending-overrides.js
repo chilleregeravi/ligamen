@@ -1,5 +1,5 @@
 /**
- * tests/fixtures/overrides/seed-pending-overrides.js — Phase 117-02 (CORRECT-03).
+ * tests/fixtures/overrides/seed-pending-overrides.js —  .
  *
  * Seeds an impact-map.db with the schema state the apply-hook E2E test
  * (tests/scan-overrides-apply.bats) expects:
@@ -11,7 +11,7 @@
  *   - 3 pending scan_overrides:
  *       1. delete the connection (kind=connection, action=delete)
  *       2. rename web -> frontend (kind=service, action=rename)
- *       3. delete a non-existent service id 999 (dangling - exercises D-04)
+ *       3. delete a non-existent service id 999 (dangling - exercises )
  *
  * Lives inside plugins/arcanon/tests/fixtures/ so seed.js's
  * better-sqlite3 import resolves naturally via plugins/arcanon/node_modules/.

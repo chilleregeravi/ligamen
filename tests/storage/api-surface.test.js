@@ -1,7 +1,7 @@
 /**
  * tests/storage/api-surface.test.js
  *
- * Unit tests for getGraph() exposes attachment (Phase 31, Plan 01).
+ * Unit tests for getGraph exposes attachment .
  * Verifies that getGraph() attaches exposes arrays from exposed_endpoints
  * to every service node, including graceful degradation when migration 007
  * has not yet run.
@@ -27,7 +27,7 @@ import * as migration007 from "../../worker/db/migrations/007_expose_kind.js";
 
 /**
  * Creates an isolated in-memory-backed on-disk DB running migrations 001–007.
- * This is the full migration chain for Phase 31 tests.
+ * This is the full migration chain for  tests.
  */
 function makeQE() {
   const dir = path.join(os.tmpdir(), "arcanon-test-" + crypto.randomUUID());

@@ -3,7 +3,7 @@
  *
  * Source-analysis tests verifying that loadProject() in worker/ui/graph.js
  * filters actors whose name matches a known service before creating
- * synthetic actor nodes — defense in depth for stale actor data (SREL-02).
+ * synthetic actor nodes — defense in depth for stale actor data .
  */
 
 import { test } from "node:test";

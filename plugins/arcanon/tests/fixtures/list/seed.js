@@ -1,5 +1,5 @@
 /**
- * tests/fixtures/list/seed.js — Phase 114-01 fixture seeder (NAV-01).
+ * tests/fixtures/list/seed.js —  fixture seeder .
  *
  * Builds a SQLite DB shaped exactly like a post-/arcanon:map state, with the
  * specific shape the /arcanon:list happy-path test (Test 5) asserts against:
@@ -83,7 +83,7 @@ function applyAllMigrations(db) {
 }
 
 /**
- * Seed the Phase 114-01 list fixture into a fresh DB.
+ * Seed the  list fixture into a fresh DB.
  *
  * @param {{
  *   db: import('better-sqlite3').Database,
@@ -105,7 +105,7 @@ export function seedListFixture({
   withLabels = false,
   withManyLabels = false,
   noActors = false,
-  // Phase 121-02 INT-09 / Test 5.x: seed N bare actors (label NULL) by name,
+  // Test 5.x: seed N bare actors (label NULL) by name,
   // so the labeling pass can populate label end-to-end via the merged catalog.
   // Pass an array of strings, e.g. ['custom.example.com', 'api.stripe.com'].
   actorsNamed = null,
@@ -200,7 +200,7 @@ export function seedListFixture({
   }
 
   // 5. actors — pluggable based on mode flags. Default = 4 unlabeled actors
-  // (the original Phase 114-01 fixture). The Phase 121 Plan 02 INT-08 modes:
+  // (the original  fixture). The    modes:
   //   --with-labels        4 actors: 2 labeled (Stripe API, GitHub API),
   //                                   2 raw (raw1.example.com, raw2.example.com)
   //   --with-many-labels   8 actors all labeled (proves +N more truncation)
@@ -235,7 +235,7 @@ export function seedListFixture({
   if (noActors) {
     // Skip — empty actors table.
   } else if (Array.isArray(actorsNamed) && actorsNamed.length > 0) {
-    // INT-09 Test 5.x: bare actors (label NULL). The actor-labeling pass +
+    // Test 5.x: bare actors (label NULL). The actor-labeling pass +
     // merged catalog populates label end-to-end.
     seedActorRows(actorsNamed.map((name) => ({ name, label: null })));
   } else if (withManyLabels) {
@@ -307,7 +307,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const Database = (await import('better-sqlite3')).default;
   const db = new Database(args.db);
   db.pragma('foreign_keys = ON');
-  // INT-09: --actors-named-csv accepts a comma-separated list of bare actor
+  // actors-named-csv accepts a comma-separated list of bare actor
   // names (label NULL). Used by tests/externals-labels.bats to seed actors
   // whose label is filled by the labeling pass against the merged catalog.
   const actorsNamed =

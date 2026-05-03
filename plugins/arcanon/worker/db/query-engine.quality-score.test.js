@@ -1,14 +1,14 @@
 /**
- * worker/db/query-engine.quality-score.test.js — Phase 111 Plan 02 (TRUST-05, TRUST-13)
+ * worker/db/query-engine.quality-score.test.js —   
  *
- * Verifies the QueryEngine quality-score wiring landed by Plan 111-02:
+ * Verifies the QueryEngine quality-score wiring landed by :
  *   - endScan() computes quality_score = (high + 0.5 * low) / total and
- *     persists it on the scan_versions row (TRUST-05).
+ *     persists it on the scan_versions row .
  *   - getQualityScore(scanVersionId) returns the persisted scalar.
  *   - getScanQualityBreakdown(scanVersionId) returns the breakdown object.
- *   - NULL semantics: total == 0 → quality_score IS NULL (D-02).
+ *   NULL semantics: total == 0 → quality_score IS NULL .
  *   - confidence IS NULL rows count toward total but contribute 0 to numerator
- *     (D-02 — "agent omissions do not count as 'low'").
+ *     ( — "agent omissions do not count as 'low'").
  *   - endScan() does NOT throw on a pre-015 db (best-effort).
  *   - Per-scan_version_id scoping — endScan(A) ignores connections from scan B.
  *
@@ -113,7 +113,7 @@ function seedScan(qe, repoId, { high = 0, low = 0, nullCount = 0 } = {}) {
   return { serviceA, serviceB, scanVersionId };
 }
 
-describe('QueryEngine quality-score wiring (Plan 111-02 / TRUST-05, TRUST-13)', () => {
+describe('QueryEngine quality-score wiring', () => {
   it('Test 1 — mixed (8 high + 2 low) → quality_score === 0.9', () => {
     const { db, repoId } = freshDb();
     const qe = new QueryEngine(db);
@@ -165,7 +165,7 @@ describe('QueryEngine quality-score wiring (Plan 111-02 / TRUST-05, TRUST-13)', 
     const path = await import('node:path');
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const src = fs.readFileSync(path.join(here, 'query-engine.js'), 'utf8');
-    // The comment must include the lock phrase from CONTEXT D-02.
+    // The comment must include the lock phrase from CONTEXT .
     const expected =
       "NULL confidence is counted in `total` but contributes 0 to the numerator";
     assert.ok(

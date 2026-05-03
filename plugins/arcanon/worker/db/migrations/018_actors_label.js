@@ -1,10 +1,10 @@
 /**
- * Migration 018 — Add actors.label TEXT NULL column (Phase 121 / INT-06).
+ * Migration 018 — Add actors.label TEXT NULL column .
  *
  * The label column stores the friendly display name assigned by the actor
  * labeling pass (worker/scan/enrichment/actor-labeler.js) when an actor.name
  * matches an entry in data/known-externals.yaml or — eventually — the user's
- * arcanon.config.json external_labels (Plan 121-02).
+ * arcanon.config.json external_labels .
  *
  * Idempotency: SQLite has no `ALTER TABLE ADD COLUMN IF NOT EXISTS`, so we
  * inspect PRAGMA table_info(actors) before issuing the ALTER. This mirrors

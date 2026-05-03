@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plugins/arcanon/tests/fixtures/list/seed.sh — Phase 114-01 (NAV-01).
+# plugins/arcanon/tests/fixtures/list/seed.sh —  .
 #
 # Thin wrapper around seed.js. Invoked from tests/list.bats setup() to
 # populate a fresh SQLite DB at the path the Arcanon worker computes for the
@@ -31,5 +31,5 @@ mkdir -p "$(dirname "$DB_PATH")"
 
 # Forward all remaining flags untouched. seed.js's parser accepts
 # --no-scan, --with-labels, --with-many-labels, --no-actors as boolean flags
-# (no value follows). Phase 121-02 INT-08.
+# (no value follows).  .
 exec node "$SCRIPT_DIR/seed.js" --project "$PROJECT_ROOT" --db "$DB_PATH" "$@"

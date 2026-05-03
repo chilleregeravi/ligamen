@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# tests/impact-hook.bats — HOK-13 fixtures + HOK-06 p99 latency benchmark
+# tests/impact-hook.bats —  fixtures +  p99 latency benchmark
 #
 # Tests:
 #   1  Tier 1 match       — *.proto edit emits systemMessage (no DB needed)
@@ -44,7 +44,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HOK-13 fixture 1: Tier 1 match — *.proto edit triggers warning
+# fixture 1: Tier 1 match — *.proto edit triggers warning
 # Pure bash path — no DB required.
 # ─────────────────────────────────────────────────────────────────────────────
 @test "impact-hook - Tier 1: .proto edit emits systemMessage" {
@@ -56,7 +56,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HOK-13 fixture 2: Tier 2 match — file inside tracked service root_path
+# fixture 2: Tier 2 match — file inside tracked service root_path
 # Expects: stdout contains "auth" and "web" (consumer), exits 0.
 # ─────────────────────────────────────────────────────────────────────────────
 @test "impact-hook - Tier 2: file inside service root_path emits consumer warning" {
@@ -78,7 +78,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HOK-13 fixture 3: False-positive guard — auth-legacy must NOT match auth
+# fixture 3: False-positive guard — auth-legacy must NOT match auth
 # DB only has "auth" and "web" services; auth-legacy is NOT tracked.
 # ─────────────────────────────────────────────────────────────────────────────
 @test "impact-hook - HOK-03: auth-legacy does NOT match auth service" {
@@ -102,7 +102,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HOK-13 fixture 4: Self-exclusion — file inside $CLAUDE_PLUGIN_ROOT is ignored
+# fixture 4: Self-exclusion — file inside $CLAUDE_PLUGIN_ROOT is ignored
 # ─────────────────────────────────────────────────────────────────────────────
 @test "impact-hook - HOK-07: self-exclusion for \$CLAUDE_PLUGIN_ROOT" {
   local file json
@@ -121,7 +121,7 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HOK-13 fixture 5: Worker-down fallback — hook warns via SQLite even with no worker
+# fixture 5: Worker-down fallback — hook warns via SQLite even with no worker
 # worker.port file is absent → worker_running returns non-zero → SQLite fallback fires.
 # ─────────────────────────────────────────────────────────────────────────────
 @test "impact-hook - HOK-04: worker-down fallback uses SQLite" {
@@ -146,10 +146,10 @@ teardown() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HOK-06 fixture 6: p99 latency benchmark over 100 iterations
+# fixture 6: p99 latency benchmark over 100 iterations
 # Delegates to impact-hook-latency.sh (shared benchmark body).
 #
-# Default threshold: 50ms (HOK-06 requirement).
+# Default threshold: 50ms ( requirement).
 # Override on slow CI/dev machines via IMPACT_HOOK_LATENCY_THRESHOLD env var:
 #   IMPACT_HOOK_LATENCY_THRESHOLD=200 tests/bats/bin/bats tests/impact-hook.bats
 # When overriding, the actual p99 is printed so it can be tracked over time.

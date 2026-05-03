@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # drift-types.bats — Tests for scripts/drift-types.sh
-# Requirements: TYPE-01 (detect_repo_language java/cs/rb), TYPE-02 (Java extractor),
-#               TYPE-03 (C# extractor), TYPE-04 (Ruby extractor)
+# Requirements:  (detect_repo_language java/cs/rb),  (Java extractor),
+#               (C# extractor),  (Ruby extractor)
 
 TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
 PLUGIN_ROOT="$(cd "$TEST_DIR/../plugins/arcanon" && pwd)"
@@ -12,7 +12,7 @@ load "$TEST_DIR/test_helper/bats-support/load"
 load "$TEST_DIR/test_helper/bats-assert/load"
 
 # ---------------------------------------------------------------------------
-# Phase 92 TYPE-01: detect_repo_language returns java/cs/rb
+# detect_repo_language returns java/cs/rb
 # ---------------------------------------------------------------------------
 
 @test "detect_repo_language: pom.xml returns java" {
@@ -31,7 +31,7 @@ load "$TEST_DIR/test_helper/bats-assert/load"
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92 TYPE-02: Java extractor captures public class/interface/record/enum
+# Java extractor captures public class/interface/record/enum
 # ---------------------------------------------------------------------------
 
 @test "extract_java_types: captures public class with generic bound" {
@@ -45,7 +45,7 @@ load "$TEST_DIR/test_helper/bats-assert/load"
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92 TYPE-03: C# extractor captures public class + record
+# C# extractor captures public class + record
 # ---------------------------------------------------------------------------
 
 @test "extract_cs_types: captures public class User" {
@@ -65,7 +65,7 @@ load "$TEST_DIR/test_helper/bats-assert/load"
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92 TYPE-04: Ruby extractor captures class, skips class_eval + stdlib
+# Ruby extractor captures class, skips class_eval + stdlib
 # ---------------------------------------------------------------------------
 
 @test "extract_ruby_types: captures top-level User class" {
@@ -85,7 +85,7 @@ load "$TEST_DIR/test_helper/bats-assert/load"
 }
 
 # ---------------------------------------------------------------------------
-# Phase 92 TYPE-01: dispatcher wiring (extract_type_names routes to each extractor)
+# dispatcher wiring (extract_type_names routes to each extractor)
 # ---------------------------------------------------------------------------
 
 @test "extract_type_names: java dispatch produces non-empty output" {
