@@ -13,7 +13,10 @@ setup() {
   # Isolate marketplaces dir so we can control remote version under test.
   TEST_FAKE_HOME="$(mktemp -d)"
   export HOME="$TEST_FAKE_HOME"
-  mkdir -p "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon/.claude-plugin"
+  # update.sh now reads the canonical marketplace.json at the marketplace root
+  # (not the inner plugins/<name>/.claude-plugin/ copy that no longer exists).
+  mkdir -p "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon/.claude-plugin"
+  mkdir -p "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon"
 }
 
 teardown() {
@@ -23,8 +26,8 @@ teardown() {
 write_remote_manifest() {
   local version="$1"
   local changelog="${2:-}"
-  cat > "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon/.claude-plugin/marketplace.json" <<EOF
-{"version":"${version}"}
+  cat > "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon/.claude-plugin/marketplace.json" <<EOF
+{"name":"arcanon","plugins":[{"name":"arcanon","version":"${version}","source":"./plugins/arcanon"}],"version":"${version}"}
 EOF
   if [[ -n "$changelog" ]]; then
     printf '%s\n' "$changelog" > "$TEST_FAKE_HOME/.claude/plugins/marketplaces/arcanon/plugins/arcanon/CHANGELOG.md"

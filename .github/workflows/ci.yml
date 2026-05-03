@@ -17,7 +17,6 @@ jobs:
       - name: Validate plugin.json / marketplace.json / hooks.json
         run: |
           jq empty plugins/arcanon/.claude-plugin/plugin.json
-          jq empty plugins/arcanon/.claude-plugin/marketplace.json
           jq empty plugins/arcanon/hooks/hooks.json
           jq empty .claude-plugin/marketplace.json
           jq empty plugins/arcanon/package.json
@@ -25,9 +24,19 @@ jobs:
       - name: Assert plugin and marketplace names are "arcanon"
         run: |
           test "$(jq -r .name plugins/arcanon/.claude-plugin/plugin.json)" = "arcanon"
-          test "$(jq -r .name plugins/arcanon/.claude-plugin/marketplace.json)" = "arcanon"
-          test "$(jq -r .plugins[0].name plugins/arcanon/.claude-plugin/marketplace.json)" = "arcanon"
+          test "$(jq -r .name .claude-plugin/marketplace.json)" = "arcanon"
+          test "$(jq -r .plugins[0].name .claude-plugin/marketplace.json)" = "arcanon"
+          test "$(jq -r .plugins[0].source .claude-plugin/marketplace.json)" = "./plugins/arcanon"
           echo "manifest names match"
+      - name: Assert no duplicate inner marketplace.json (regression guard)
+        run: |
+          if [ -f plugins/arcanon/.claude-plugin/marketplace.json ]; then
+            echo "error: plugins/arcanon/.claude-plugin/marketplace.json should not exist." >&2
+            echo "       The canonical marketplace manifest is at .claude-plugin/marketplace.json (repo root)." >&2
+            echo "       An inner copy is non-standard and silently drifts out of sync." >&2
+            exit 1
+          fi
+          echo "no duplicate marketplace.json"
 
   shell-lint:
     name: Shellcheck
